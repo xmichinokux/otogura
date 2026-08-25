@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>音蔵 — Otogura</title>
+<style>
+  :root {
+    --bg: #ffffff; --sub: #f8f9fa; --line: #e5e7eb;
+    --text: #1a1a1a; --dim: #6b7280; --accent: #7c3aed; --accent-bg: #ede9fe;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column; background: var(--bg); color: var(--text);
+    font-family: "Yu Gothic UI", "Meiryo", system-ui, sans-serif; font-size: 13px;
+    user-select: none;
+  }
+
+  /* 上部: 再生中の情報（指示書: ウィンドウの上部に表示） */
+  #now {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--sub);
+    flex: 0 0 auto;
+  }
+  /* 大きさは指示書に無かったので相談して 80x80 に決めた（2026-08-24） */
+  #art {
+    width: 80px; height: 80px; flex: 0 0 auto; border-radius: 4px;
+    background: #e5e7eb center/cover no-repeat;
+  }
+
+  /* 再生リスト内のドラッグ＆ドロップ並べ替え（ライブラリ側は並べ替えない） */
+  tr.dragging td { opacity: .35; }
+  tr.dropzone td { box-shadow: inset 0 2px 0 0 var(--accent); }
+  td.grip { width: 26px; text-align: center; color: #d1d5db; cursor: grab; }
+  tr:hover td.grip { color: var(--accent); }
+
+  #meta { flex: 1; min-width: 0; }
+  #title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #sub   { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  #seek { flex: 1; }
+  /* 「ほかに N 件あります」の行。数字だけ出して黙らないため */
+  .more { color: #6b7280; font-size: 12px; padding: 8px 10px; font-style: normal; }
+  li.more { cursor: default; background: #fafafa; }
+  /* 音量のつまみ。長さを決めておかないと、席取り合戦で seek が潰れる */
+  #volwrap { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+  #vol { width: 90px; }
+  #volicon { font-size: 13px; width: 18px; text-align: center; }
+  .btn.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  td.plays { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 52px; font-size: 11px; }
+  #time { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; font-size: 12px; color: var(--text);
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:disabled { color: #d1d5db; cursor: default; border-color: var(--line); }
+
+  /* 3カラム（絞り込み） */
+  /* ★min-height:0 が無いと、中身の多い列が 240px に収まらず下まで伸び、
+     その下の曲一覧が画面外へ押し出される（68アーティストで発覚。4曲では出なかった）*/
+  #cols { display: flex; flex: 0 0 240px; min-height: 0; }
+  /* 3カラムの高さを掴んで変える取っ手。細いと掴めないので、少し余裕をとる */
+  #colsizer { flex: 0 0 6px; cursor: row-resize; background: var(--line); }
+  #colsizer:hover { background: var(--accent); }
+  .col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+  .col:last-child { border-right: none; }
+  .col h2 {
+    margin: 0; padding: 6px 10px; font-size: 10px; letter-spacing: .12em;
+    color: var(--dim); background: var(--sub); border-bottom: 1px solid var(--line);
+    font-weight: 600; text-transform: uppercase;
+  }
+  .col ul { margin: 0; padding: 0; list-style: none; overflow-y: auto; flex: 1; min-height: 0; }
+  .col li { padding: 5px 10px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .col li:hover { background: var(--sub); }
+  .col li.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+  /* 列の中を打ち込んで探す欄。件数が多い列にだけ出す */
+  /* 探す欄。スクロールしても上に残す（下へ流れると使えない） */
+  li.findrow { position: sticky; top: 0; background: #fff; padding: 0; cursor: default; z-index: 1; border-bottom: 1px solid var(--line); }
+  li.findrow:hover { background: #fff; }
+  .colfind { width: calc(100% - 12px); margin: 5px 6px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; font-size: 11px; outline: none; }
+  .colfind:focus { border-color: var(--accent); }
+
+  /* 下: 曲一覧（再生する場所） */
+  #list { flex: 1; min-height: 0; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    position: sticky; top: 0; background: var(--sub); text-align: left;
+    font-size: 10px; letter-spacing: .1em; color: var(--dim); text-transform: uppercase;
+    padding: 6px 10px; border-bottom: 1px solid var(--line); font-weight: 600;
+  }
+  th { position: relative; }
+  .resizer { position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; }
+  .resizer:hover { background: var(--accent); opacity: .5; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--accent); }
+  th.sorted { color: var(--accent); }
+  td { padding: 5px 10px; border-bottom: 1px solid #f3f4f6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  tr { cursor: default; }
+  tr:hover td { background: var(--sub); }
+  tr.playing td { background: var(--accent-bg); color: var(--accent); }
+  td.play-cell { color: var(--accent); text-align: center; cursor: pointer; }
+  td.num { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 48px; }
+  td.dur { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 64px; }
+  td.act { width: 84px; text-align: right; }
+  .link { color: var(--dim); font-size: 11px; cursor: pointer; text-decoration: underline; }
+  .link:hover { color: var(--accent); }
+
+  /* 下端: フォルダ設定と状態 */
+  #foot {
+    flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--sub);
+    padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  #folders { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+  .chip {
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 8px; font-size: 11px; color: var(--dim);
+    display: inline-flex; align-items: center; gap: 6px; max-width: 380px;
+  }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip b { cursor: pointer; color: #9ca3af; font-weight: 400; }
+  .chip b:hover { color: #b91c1c; }
+  #status { color: var(--dim); font-size: 11px; }
+  #tabs { flex: 0 0 auto; display: flex; gap: 4px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .tab.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #listtools { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--sub); flex-wrap: wrap; }
+  #listtools:empty { display: none; }
+  td.pick { width: 34px; text-align: center; }
+  td.move { width: 62px; text-align: right; white-space: nowrap; }
+  .mini { border: 1px solid var(--line); background: #fff; border-radius: 3px; font-size: 11px; padding: 1px 5px; cursor: pointer; color: var(--dim); }
+  .mini:hover { border-color: var(--accent); color: var(--accent); }
+  .mini:disabled { color: #e5e7eb; cursor: default; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--dim); line-height: 2; }
+</style>
+</head>
+<body>
+
+<div id="now">
+  <div id="art"></div>
+  <div id="meta">
+    <div id="title">曲を選んでください</div>
+    <div id="sub">&nbsp;</div>
+    <div id="bar">
+      <button class="btn" id="prev" title="前の曲" disabled>⏮</button>
+      <button class="btn" id="play" disabled>▶</button>
+      <button class="btn" id="next" title="次の曲" disabled>⏭</button>
+      <button class="btn" id="repeat" title="繰り返し">🔁 しない</button>
+      <button class="btn" id="shuffle" title="シャッフル">🔀 オフ</button>
+      <button class="btn on" id="level" title="曲ごとの音量差をならす">🔊 音量そろえる</button>
+      <!-- ★音量そのもののつまみ（本人の希望 2026-08-25）。
+           「音量そろえる」は曲ごとの差をならすもので、全体の大きさは別物。 -->
+      <span id="volwrap" title="音量">
+        <span id="volicon">🔉</span>
+        <input type="range" id="vol" value="100" min="0" max="100">
+      </span>
+      <input type="range" id="seek" value="0" min="0" max="1000" disabled>
+      <span id="time">0:00 / 0:00</span>
+    </div>
+  </div>
+</div>
+
+<div id="cols">
+  <div class="col"><h2>ジャンル</h2><ul id="c-genre"></ul></div>
+  <div class="col"><h2>アーティスト</h2><ul id="c-artist"></ul></div>
+  <div class="col"><h2>アルバム</h2><ul id="c-album"></ul></div>
+</div>
+<!-- ★3カラムの高さを、掴んで上下に変えられるようにする（本人の希望 2026-08-25）。
+     列の幅は横に掴んで変えられるのに、高さだけ 240px で固定だった。 -->
+<div id="colsizer" title="上下にドラッグして、3カラムの高さを変える"></div>
+
+<div id="tabs"></div>
+<div id="listtools"></div>
+<div id="list">
+  <div class="empty" id="empty">
+    下の「フォルダを追加」から、MP3 の入ったフォルダを選んでください。
+  </div>
+  <table id="table" style="display:none">
+    <thead><tr><th class="num"></th><th>曲名</th><th>アーティスト</th><th>アルバム</th><th class="dur">長さ</th><th class="plays">再生</th><th class="act"></th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div id="foot">
+  <button class="btn" id="add">フォルダを追加</button>
+  <button class="btn" id="rescan">再スキャン</button>
+  <!-- ★タグの無い曲を隠す（本人の希望 2026-08-25）。
+       理由: バンドで作った試作品が混ざっていて、再生したくない。
+       以前は問答無用で消していたが、消えた理由が分からないほうが困るので選べるようにした。 -->
+  <button class="btn on" id="untagged" title="曲名やアーティストの入っていない曲を、一覧にも出さず再生もしない">
+    🏷 タグ無しを隠す
+  </button>
+  <!-- ★外したものを戻すボタン（2026-08-25）。
+       「（「外したものを戻す」で戻せます）」と案内しておきながら、
+       **その操作がどこにも無かった。** 一度外すと二度と戻せない状態だった。
+       実際これで「足したのに読み込まれない」という報告になった
+       （足し直したファイルが、前に外した道と同じだった）。
+       外したものが 1 件も無いときは出さない。 -->
+  <button class="btn" id="unhide" style="display:none" title="「一覧から外す」で外した曲を、すべて一覧に戻す"></button>
+  <div id="folders"></div>
+  <div id="status"></div>
+</div>
+
+<audio id="audio"></audio>
+<script src="shuffle.js"></script>
+<script src="loudness.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

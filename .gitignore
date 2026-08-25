@@ -1,0 +1,42 @@
+# 入れないもの
+#
+# ★node_modules は入れない。
+#   89 個の依存が入っていて、数百 MB になる。
+#   package.json と package-lock.json があれば `npm install` で同じものが入る。
+node_modules/
+
+# 作った実行ファイル
+dist/
+out/
+build/
+*.exe
+*.dmg
+*.AppImage
+
+# ★音楽ファイルは 1 つも入れない。
+#
+# 他人の著作物を配ることになる。
+# 実際 test-music に、確かめるために置いた市販の音源が 1 曲混ざっていた。
+#
+# ★除外の例外（! で戻す）に頼らないこと。
+# git は「親フォルダを除外すると、中のファイルを ! で戻せない」ので、
+# 書いたつもりの例外が**黙って効かない。**
+# 1 つも置かなければ、間違いようがない。
+#
+# 検査用の MP3 は `node tools/make-test-music.js` で作る（無音のファイル）。
+*.mp3
+*.m4a
+*.flac
+*.wav
+test-music/
+
+# 設定・覚え書き（人によって中身が違う。パスも入っている）
+settings.json
+library-cache.json
+
+# 編集ソフトや OS が作るもの
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log

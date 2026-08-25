@@ -1,0 +1,84 @@
+{
+  "name": "otogura",
+  "productName": "Otogura",
+  "version": "0.1.0",
+  "private": false,
+  "description": "音蔵 — 大きな音楽ライブラリのためのプレイヤー",
+  "author": {
+    "name": "Masanori Chida"
+  },
+  "license": "MIT",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test-music": "node tools/make-test-music.js",
+    "check": "node check-shuffle.js && node check-loudness.js && node check-playlist.js && node check-url.js && node check-tags.js && node check-cache.js && node check-sort.js && node check-ui.js",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "com.xmichinokux.otogura",
+    "productName": "Otogura",
+    "copyright": "Copyright (c) 2026 Masanori Chida",
+    "directories": {
+      "output": "dist",
+      "buildResources": "."
+    },
+    "files": [
+      "src/**/*",
+      "icon.ico",
+      "package.json",
+      "!**/*.map"
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "音蔵",
+      "artifactName": "Otogura-Setup-${version}.exe",
+      "uninstallDisplayName": "音蔵 (Otogura)"
+    },
+    "portable": {
+      "artifactName": "Otogura-Portable-${version}.exe"
+    }
+  },
+  "dependencies": {
+    "music-metadata": "^11.15.0",
+    "node-id3": "^0.2.9"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "keywords": [
+    "music-player",
+    "mp3",
+    "electron",
+    "windows",
+    "otogura",
+    "音蔵"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xmichinokux/otogura"
+  }
+}

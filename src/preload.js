@@ -1,0 +1,65 @@
+'use strict';
+
+/**
+ * 画面側に渡す窓口。ここに書いたものだけが使える。
+ * **ファイルを消す機能は用意しない**（指示書: 削除は一覧から外すだけ）。
+ */
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('mp3', {
+  設定を取る: () => ipcRenderer.invoke('settings:get'),
+  フォルダを足す: () => ipcRenderer.invoke('folders:add'),
+  フォルダを外す: (folder) => ipcRenderer.invoke('folders:remove', folder),
+  // ★覚えている一覧をすぐ出す（走査を待たない）
+  覚えている一覧: () => ipcRenderer.invoke('library:cached'),
+  // ★アプリ名を変えたときの引き継ぎ結果。黙って済ませない
+  引っ越しの結果: () => ipcRenderer.invoke('migration:get'),
+  走査する: () => ipcRenderer.invoke('scan'),
+  // ★走査の進み具合。170,000 曲だと数えるだけで 5 分かかるので、無言にしない
+  走査の進みを受ける: (fn) => ipcRenderer.on('scan:progress', (_e, p) => fn(p)),
+  走査の途中経過を受ける: (fn) => ipcRenderer.on('scan:partial', (_e, a) => fn(a)),
+  // ★アートワークは再生する 1 曲だけ読む（全曲ぶんは 17.8 GB になる）
+  アートワークを取る: (filePath) => ipcRenderer.invoke('artwork:get', filePath),
+  // ★タグを直したあと、その曲だけ読み直す（全走査を避けるため）
+  // ★まとめて渡す。1曲ずつだと、60MB の覚え書きを曲数ぶん書き直すことになる
+  まとめて読み直す: (paths) => ipcRenderer.invoke('track:reread', paths),
+  一覧から外す: (filePath) => ipcRenderer.invoke('tracks:hide', filePath),
+  // ★まとめて外す。1曲ずつだと設定ファイルを曲数ぶん書き直すことになる
+  まとめて一覧から外す: (paths) => ipcRenderer.invoke('tracks:hideMany', paths),
+  外したものを戻す: () => ipcRenderer.invoke('tracks:unhideAll'),
+
+  // 再生リスト
+  リストを取る: () => ipcRenderer.invoke('lists:get'),
+  リストを作る: (name) => ipcRenderer.invoke('lists:create', name),
+  リストを消す: (id) => ipcRenderer.invoke('lists:remove', id),
+  リスト名を変える: (id, name) => ipcRenderer.invoke('lists:rename', id, name),
+  リストに足す: (id, paths) => ipcRenderer.invoke('lists:add', id, paths),
+  リストの中身を入れ替える: (id, paths) => ipcRenderer.invoke('lists:setTracks', id, paths),
+  m3uに書き出す: (id, 曲情報) => ipcRenderer.invoke('lists:exportM3u', id, 曲情報),
+  m3uを読み込む: () => ipcRenderer.invoke('lists:importM3u'),
+
+  // 再生回数（シャッフルで『忘れている曲』を選ぶために使う）
+  再生回数を取る: () => ipcRenderer.invoke('plays:get'),
+  再生回数を足す: (filePath) => ipcRenderer.invoke('plays:bump', filePath),
+
+  // タグの編集（このアプリで唯一、ファイルそのものを書き換える）
+  // 音量そろえ
+  音を読む: (filePath) => ipcRenderer.invoke('audio:bytes', filePath),
+  倍率を取る: () => ipcRenderer.invoke('gains:get'),
+  倍率を覚える: (filePath, 倍率) => ipcRenderer.invoke('gains:set', filePath, 倍率),
+
+  // 音量（覚える）
+  音量を取る: () => ipcRenderer.invoke('volume:get'),
+  音量を覚える: (v) => ipcRenderer.invoke('volume:set', v),
+
+  // タグの無い曲を隠すか
+  タグ無しを隠すか: () => ipcRenderer.invoke('untagged:get'),
+  タグ無しを隠す設定: (v) => ipcRenderer.invoke('untagged:set', v),
+
+  // 一覧の列幅
+  列幅を取る: () => ipcRenderer.invoke('widths:get'),
+  列幅を覚える: (幅) => ipcRenderer.invoke('widths:set', 幅),
+
+  タグを書く: (filePath, 変更) => ipcRenderer.invoke('tags:write', filePath, 変更),
+});
