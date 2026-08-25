@@ -282,13 +282,25 @@ async function 覚え書きを読む() {
   }
 }
 
+/**
+ * 覚え書きを書く。**失敗したら、その理由を返す。**
+ *
+ * ★ここは以前 console.warn だけだった（2026-08-25、Aegis の指摘で直した）。
+ * 「黙って失敗させない」とコメントしておきながら、
+ * **出していたのは開発者用の窓で、使う人には見えなかった。**
+ * コメントは、失敗を見せてくれない。
+ *
+ * 覚えられなくても走査そのものは成り立つので、**止めはしない。**
+ * ただし黙りもしない。171,085 曲では読み直しに 50 分かかる。
+ * それが毎回捨てられていることに気づけないのが、いちばん困る。
+ */
 async function 覚え書きを書く(v) {
   try {
     await fs.mkdir(path.dirname(覚え書きファイル()), { recursive: true });
     await fs.writeFile(覚え書きファイル(), JSON.stringify(v), 'utf8');
+    return { ok: true };
   } catch (e) {
-    // ★黙って失敗させない。覚えられなくても走査は成り立つので、止めはしない
-    console.warn('覚え書きを保存できませんでした:', e && e.message);
+    return { ok: false, error: (e && e.message) ? e.message : '不明' };
   }
 }
 
@@ -381,7 +393,7 @@ ipcMain.handle('scan', async (e) => {
     },
   );
 
-  await 覚え書きを書く(r.覚え書き);
+  const 保存 = await 覚え書きを書く(r.覚え書き);
 
   // ★走査のたびに再生リストも掃除する。
   // 起動時だけだと、アプリを開いたまま MP3 を消したときに保存データが古いまま残る
@@ -393,6 +405,8 @@ ipcMain.handle('scan', async (e) => {
     tracks: r.tracks, 見つかった: r.found, 読めなかった: r.unreadable, hidden: r.hidden,
     使い回し: r.使い回し,
     lists: 掃除.lists, リストから落とした: 掃除.落とした,
+    // ★覚え書きを残せなかったら、その理由も返す。黙って捨てない
+    覚え書きの保存: 保存,
   };
 });
 
