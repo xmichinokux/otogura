@@ -337,6 +337,60 @@ const 版 = /const\s+読み方の版\s*=\s*(\d+)/.exec(libSrc);
   確認('「._」で始まるものは拾わない', !集めた.includes('._e.m4a'));
   確認('拾ったのはこの 3 件だけ', 集めた.length === 3, `${集めた.length} 件: ${集めた.join(' / ')}`);
 
+  /*
+   * ★鳴らせない形式の見分け（2026-08-28 実測。**.m4a を拾うようにして作った穴**）。
+   *
+   * ALAC も拡張子は .m4a なので、一覧に出るのに押しても鳴らない。
+   * 本人のライブラリで数えると E:\iTunes Music に **437 曲**あった。
+   *
+   * 実物で確かめた値（canPlayType は自己申告なので当てにしない）:
+   *   ALAC      鳴らない  DEMUXER_ERROR_NO_SUPPORTED_STREAMS
+   *   AAC+MP4S  鳴る      150.999365 秒
+   *   AAC       鳴る      167.764172 秒
+   *
+   * ★ここは文字列を渡すだけの検査にする。
+   * 本人の音源を指す検査は書かない（公開する前提のファイルなので）。
+   */
+  console.log('\n[7] 鳴らせない形式を見分けられるか');
+
+  確認('ALAC は鳴らせない', lib.鳴らせるか('ALAC') === false);
+  確認('MPEG-4/AAC は鳴らせる', lib.鳴らせるか('MPEG-4/AAC') === true);
+  確認(
+    '★AAC+MP4S を巻き込まない',
+    lib.鳴らせるか('MPEG-4/AAC+MP4S') === true,
+    '実測で鳴った 3 件。ここを含めると鳴る曲まで止めてしまいます',
+  );
+  確認('MPEG 1 Layer 3 は鳴らせる', lib.鳴らせるか('MPEG 1 Layer 3') === true);
+  確認(
+    '★知らないコーデックは鳴る扱いにする',
+    lib.鳴らせるか('なにかの新しい形式') === true && lib.鳴らせるか(undefined) === true,
+    '「知っているものだけ鳴る」にすると、測っていない形式を黙って消すことになります',
+  );
+
+  /*
+   * ★読み方を変えた形式だけ読み直す（2026-08-28）。
+   *
+   * 全体の版を上げると、**mp3 86,074 曲まで読み直しになる**（冷えたファイルで
+   * 36 ms/曲 ≒ 50 分）。読み方を変えたのは .m4a だけなので、そこだけ食い違わせる。
+   */
+  console.log('\n[8] .m4a だけ読み直す');
+
+  const 仮2 = fs.mkdtempSync(path.join(os.tmpdir(), 'otogura-mark-'));
+  const m3 = path.join(仮2, 'a.mp3');
+  const m4 = path.join(仮2, 'a.m4a');
+  fs.writeFileSync(m3, 'x'); fs.writeFileSync(m4, 'x');
+  const 印3 = await lib.目印(m3);
+  const 印4 = await lib.目印(m4);
+  fs.rmSync(仮2, { recursive: true, force: true });
+
+  確認('mp3 の目印は、いまの読み方の版のまま', typeof 印3 === 'string' && 印3.startsWith(`v${版 ? 版[1] : '?'}:`), `${印3}`);
+  確認('★m4a の目印は mp3 と食い違う', 印3 !== 印4, `mp3: ${印3} / m4a: ${印4}`);
+  確認(
+    '★m4a の版を上げても、mp3 の目印は変わらない',
+    typeof 印3 === 'string' && !/m\d/.test(印3.split(':')[0]),
+    `mp3 側に m4a の版が混ざると、86,074 曲の読み直しになります（${印3}）`,
+  );
+
   console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
   process.exit(失敗 ? 1 : 0);
 })();

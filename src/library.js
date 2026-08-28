@@ -82,6 +82,33 @@ const 同時に読む数 = 8;
 const 拾う拡張子 = ['.mp3', '.m4a'];
 
 /**
+ * このコーデックを音蔵で鳴らせるか。
+ *
+ * ■ ★なぜ要るか（2026-08-28 実測。**上の変更で私が作った穴**）
+ * 「.m4a を拾う」と決めたとき、**ALAC も拡張子が .m4a だと分かっていなかった。**
+ * ALAC は Apple のロスレスで、Chromium（Electron）は鳴らせない。
+ * つまりあの変更は、**一覧に出るのに押しても鳴らない曲**を作っていた。
+ *
+ * 本人のライブラリで数えた結果:
+ *   Documents\MP3   m4a  540 件 … 全部 AAC。無事
+ *   E:\iTunes Music m4a 8,345 件 … AAC 7,904 ／ **ALAC 437** ／ AAC+MP4S 3 ／ 読めない 1
+ *
+ * ★実物で確かめた（canPlayType は自己申告なので当てにしない）。
+ *   ALAC      鳴らない  DEMUXER_ERROR_NO_SUPPORTED_STREAMS
+ *   AAC+MP4S  鳴る      150.999365 秒   ← これは弾かなくてよい
+ *   AAC       鳴る      167.764172 秒
+ *
+ * ★「鳴らせないと分かっているもの」だけ false にする。
+ * 知らないコーデックは true のままにしておく。
+ * ここを「知っているものだけ true」にすると、**測っていない形式を黙って消す**ことになる。
+ * それは、このアプリが 2026-08-25 にやめたはずのことなので、繰り返さない。
+ */
+function 鳴らせるか(codec) {
+  if (typeof codec !== 'string') return true;    // 分からないものは、鳴る扱いにしておく
+  return !/^ALAC\b/i.test(codec.trim());
+}
+
+/**
  * フォルダを再帰的にたどって曲を集める。
  * ★見つけるたびに知らせる。170,000 曲だと数えるだけで 5 分かかるので、
  * 「全部数え終わってから動く」作りにすると、その間ずっと画面が空になる。
@@ -216,6 +243,16 @@ async function readTags(file) {
       ).trim() || 'ジャンル名無し',
       track: typeof c.track?.no === 'number' ? c.track.no : null,
       duration: meta.format?.duration ?? null,
+      /*
+       * ★鳴らせるか。**一覧からは消さない**（本人の選択 2026-08-28）。
+       * 出したうえで、押したときに理由を言う。
+       * ここは事実だけを返し、どう見せるかは画面側が決める。
+       *
+       * ★ここを読むのに、追加のファイル読み込みは要らない。
+       * meta は上ですでに読んでいるので、見るだけ。
+       */
+      鳴らせる: 鳴らせるか(meta.format?.codec),
+      codec: meta.format?.codec ?? null,
       /**
        * ★タグが入っているか。バンドの試作品を隠すために使う。
        * 曲名が無い、または（アーティストもアルバムも無い）なら「タグなし」。
@@ -260,11 +297,30 @@ async function アートワークを読む(file) {
  */
 const 読み方の版 = 2;
 
+/**
+ * ★.m4a だけ、別に数える（2026-08-28）。
+ *
+ *   1 … .m4a を拾うようにした
+ *   2 … 鳴らせるか（ALAC かどうか）も見るようにした
+ *
+ * ■ なぜ全体の版を上げないか
+ * 版を上げると**その形式の覚え書きが全部食い違い、読み直しになる。**
+ * 読み方を変えたのは .m4a だけなのに、全体の版を上げると
+ * **mp3 86,074 曲まで読み直すことになる**（冷えたファイルで 36 ms/曲 ≒ 50 分）。
+ * .m4a だけなら 8,885 曲 ≒ 5 分で済む。
+ *
+ * ★「読み方を変えた形式だけ読み直す」。変えていないものは触らない。
+ */
+const m4aの読み方の版 = 2;
+
 /** ファイルの目印。これが同じなら、タグを読み直さなくてよい */
 async function 目印(file) {
   try {
     const st = await fs.stat(file);
-    return `v${読み方の版}:${st.mtimeMs}:${st.size}`;
+    const 版 = path.extname(file).toLowerCase() === '.m4a'
+      ? `v${読み方の版}m${m4aの読み方の版}`
+      : `v${読み方の版}`;
+    return `${版}:${st.mtimeMs}:${st.size}`;
   } catch {
     return null;
   }
@@ -401,4 +457,4 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
   };
 }
 
-module.exports = { collectTracks, 拾う拡張子, readTags, scanLibrary, アートワークを読む, 目印 };
+module.exports = { collectTracks, 拾う拡張子, 鳴らせるか, readTags, scanLibrary, アートワークを読む, 目印 };
