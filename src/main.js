@@ -48,7 +48,7 @@ app.setName('Otogura');
 /** 設定（スキャン対象フォルダ・一覧から外した曲）の置き場 */
 const 設定ファイル = () => path.join(app.getPath('userData'), 'settings.json');
 
-const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true };
+const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [] };
 
 async function 設定を読む() {
   try {
@@ -78,6 +78,12 @@ async function 設定を読む() {
        * （消えた理由が分からないほうが困る）。
        */
       タグ無しを隠す: v.タグ無しを隠す !== false,
+      /*
+       * ★シャッフルに入れない曲（本人の希望 2026-08-29）。
+       * 「一覧から外す」（hidden）とは別物。**一覧には残り、押せば鳴る。**
+       * くじを引くときだけ候補から外す。
+       */
+      シャッフル除外: Array.isArray(v.シャッフル除外) ? v.シャッフル除外.filter((x) => typeof x === 'string') : [],
     };
   } catch {
     return { ...既定の設定 };
@@ -255,6 +261,28 @@ ipcMain.handle('tracks:hideMany', async (_e, paths) => {
   }
   await 設定を書く(s);
   return s.hidden.length;
+});
+
+/*
+ * ── シャッフルに入れない曲 ──────────────────────────────
+ * ★「一覧から外す」と混ぜないこと。
+ *   一覧から外す … 一覧に出ない。押せない
+ *   シャッフル除外 … 一覧に出る。押せば鳴る。くじに入らないだけ
+ * 本人は両方ほしいと言った（2026-08-29）ので、別々に持つ。
+ */
+ipcMain.handle('shuffleskip:get', async () => (await 設定を読む()).シャッフル除外);
+
+/** まとめて入れ替える。1 曲ずつだと設定ファイルを曲数ぶん書き直すことになる */
+ipcMain.handle('shuffleskip:set', async (_e, paths, 除外する) => {
+  const s = await 設定を読む();
+  const 集合 = new Set(s.シャッフル除外);
+  for (const p of (Array.isArray(paths) ? paths : [])) {
+    if (typeof p !== 'string') continue;
+    if (除外する) 集合.add(p); else 集合.delete(p);
+  }
+  s.シャッフル除外 = [...集合];
+  await 設定を書く(s);
+  return s.シャッフル除外;
 });
 
 ipcMain.handle('tracks:unhideAll', async () => {

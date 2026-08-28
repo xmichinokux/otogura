@@ -45,7 +45,44 @@ let タグ無しを隠す = true;
 /** 音量 0〜1。★覚えないと、開くたびに大音量から始まる */
 let 音量 = 1;
 /** 絞り込みの選択。null = 指定なし */
+/*
+ * 3 カラムで選んでいるもの。**null = すべて**、それ以外は選んだ名前の集合。
+ *
+ * ■ ★1 つだけ → 複数に変えた（2026-08-29 本人の希望）
+ *   > シャッフルの対象範囲の指定と、シャッフルの対象にしたくないものの指定をしたい
+ *   > 3カラム部分をctrlやshiftを押しながらクリックすることで複数選べるようにできないかな
+ *
+ * 絞り込みは 絞る() の 1 か所に集まっているので、ここを集合にすれば
+ * **下の一覧も、シャッフルの対象も、次の曲も、まとめてついてくる。**
+ *
+ * ★中身は小文字にして持つ。列の見出しは「The Beatles / the beatles」を
+ * まとめて 1 つに見せているので（まとめる()）、選んだかどうかも同じ規則で見る。
+ * ここを厳密比較にすると「まとめて出したのに、選ぶと片方しか出ない」が起きる。
+ *
+ * ★空集合は作らない。最後の 1 つを外したら null（すべて）に戻す。
+ * 空のまま残すと、下の一覧が 0 件になって「壊れた」ようにしか見えない。
+ */
 let sel = { genre: null, artist: null, album: null };
+
+/** 小文字にして比べる（列のまとめ方と同じ規則） */
+const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
+
+/*
+ * シャッフルに入れない曲（本人の希望 2026-08-29）。
+ *
+ * ★「一覧から外す」とは別物。混ぜないこと。
+ *   一覧から外す   … 一覧に出ない。押せない。走査でも省く
+ *   シャッフル除外 … **一覧に出る。押せば鳴る。** くじに入らないだけ
+ *
+ * 「聴きたくない曲」ではなく「不意に流れてほしくない曲」のための仕組み。
+ * 消すのではないので、設定に覚えておく（アプリを閉じても残る）。
+ */
+let シャッフル除外 = new Set();
+
+/** Shift の範囲選択で使う、直前に押した位置（列ごと） */
+let 列の起点 = { genre: null, artist: null, album: null };
+/** いま列に出している並び（Shift の範囲を数えるのに使う） */
+let 列の並び = { genre: [], artist: [], album: [] };
 /** いま再生している曲の path */
 let nowPath = null;
 /** 再生リスト。{ id, name, tracks: string[] } */
@@ -209,9 +246,9 @@ function 絞る(level) {
   // 列でまとめたのと同じ規則で絞る。ここを厳密比較にすると、
   // 「まとめて表示したのに、選ぶと片方しか出ない」ことになる
   return 見える曲().filter((t) => {
-    if (level > 0 && sel.genre && !同じ名前(t.genre, sel.genre)) return false;
-    if (level > 1 && sel.artist && !同じ名前(t.artist, sel.artist)) return false;
-    if (level > 2 && sel.album && !同じ名前(t.album, sel.album)) return false;
+    if (level > 0 && sel.genre && !sel.genre.has(小文字(t.genre))) return false;
+    if (level > 1 && sel.artist && !sel.artist.has(小文字(t.artist))) return false;
+    if (level > 2 && sel.album && !sel.album.has(小文字(t.album))) return false;
     return true;
   });
 }
@@ -237,9 +274,6 @@ function まとめる(値の並び) {
     .sort(名前で並べる);
 }
 
-/** その名前に当てはまるか（大文字小文字を区別しない） */
-const 同じ名前 = (a, b) =>
-  a.toLocaleLowerCase('ja') === b.toLocaleLowerCase('ja');
 
 function 列を描く(ulId, level, 値を取る, 選択中, key) {
   const ul = $(ulId);
@@ -258,7 +292,10 @@ function 列を描く(ulId, level, 値を取る, 選択中, key) {
   if (全部.length > 200 || 語) 列の絞りを作る(ul, key, 全部.length);
 
   const すべて = document.createElement('li');
+  const 選んだ数 = 選択中 ? 選択中.size : 0;
   すべて.textContent = 語 ? `合うもの（${一覧.length}）` : `すべて（${一覧.length}）`;
+  // ★何個選んでいるかを出す。複数選べるようにすると、見ないと分からなくなる
+  if (選んだ数) すべて.textContent += `　― ${選んだ数} 個を選択中`;
   すべて.className = 選択中 === null ? 'on' : '';
   すべて.onclick = () => 選ぶ(level, null);
   ul.appendChild(すべて);
@@ -282,12 +319,15 @@ function 列を描く(ulId, level, 値を取る, 選択中, key) {
    * 列は中身が軽いので、10,000 件までは待てる範囲。
    */
   const 上限 = 10000;
+  // ★Shift の範囲は「いま見えている並び」で数える。
+  //   打ち込んで絞ったあとなら、その絞った並びの中での範囲になる。
+  列の並び[key] = 一覧.slice(0, 上限);
   for (const v of 一覧.slice(0, 上限)) {
     const li = document.createElement('li');
     li.textContent = v;
     li.title = v;
-    li.className = v === 選択中 ? 'on' : '';
-    li.onclick = () => 選ぶ(level, v);
+    li.className = 選択中 && 選択中.has(小文字(v)) ? 'on' : '';
+    li.onclick = (e) => 選ぶ(level, v, e);
     ul.appendChild(li);
   }
 
@@ -334,11 +374,52 @@ function 列の絞りを作る(ul, key, 件数) {
   ul.appendChild(li);
 }
 
-function 選ぶ(level, 値) {
-  // 上の列を選び直したら、下の選択は外す（合わない組み合わせを残さない）
-  if (level === 0) sel = { genre: 値, artist: null, album: null };
-  else if (level === 1) sel = { ...sel, artist: 値, album: null };
-  else sel = { ...sel, album: 値 };
+/**
+ * 列の項目を選ぶ。
+ *
+ * ・ふつうのクリック … その 1 つだけにする
+ * ・Ctrl+クリック    … 1 つずつ足す／外す（**外すのもここ**）
+ * ・Shift+クリック   … 直前に押したところからの範囲
+ * ・「すべて」       … その列の選択を空にする（＝絞らない）
+ *
+ * ★上の列を選び直したら、下の選択は外す（今までどおり）。
+ * 「ジャンルを 3 つ ＋ そこに無いアーティスト」のような、
+ * **実体の無い組み合わせ**が残ると、なぜ 0 件なのか分からなくなる。
+ */
+function 選ぶ(level, 値, e = null) {
+  const key = ['genre', 'artist', 'album'][level];
+
+  let 次 = null;                                 // null = すべて
+  if (値 !== null) {
+    const 今 = sel[key] ? new Set(sel[key]) : new Set();
+    const 並び = 列の並び[key] ?? [];
+    const 位置 = 並び.findIndex((v) => 小文字(v) === 小文字(値));
+
+    if (e && e.shiftKey && 列の起点[key] !== null && 位置 >= 0) {
+      // 範囲。起点そのものは残したまま、間を足す
+      const [a, b] = [列の起点[key], 位置].sort((x, y) => x - y);
+      for (const v of 並び.slice(a, b + 1)) 今.add(小文字(v));
+    } else if (e && (e.ctrlKey || e.metaKey)) {
+      // 1 つずつ足す／外す
+      const k = 小文字(値);
+      if (今.has(k)) 今.delete(k); else 今.add(k);
+      列の起点[key] = 位置;
+    } else {
+      // ふつうのクリックは、その 1 つだけ
+      今.clear();
+      今.add(小文字(値));
+      列の起点[key] = 位置;
+    }
+    // ★空集合は作らない。全部外したら「すべて」に戻す
+    次 = 今.size ? 今 : null;
+  } else {
+    列の起点[key] = null;
+  }
+
+  if (level === 0) sel = { genre: 次, artist: null, album: null };
+  else if (level === 1) sel = { ...sel, artist: 次, album: null };
+  else sel = { ...sel, album: 次 };
+  if (level < 2) { 列の起点.album = null; if (level < 1) 列の起点.artist = null; }
   描き直す();
 }
 
@@ -552,6 +633,12 @@ function 一覧を描く() {
   描く分.forEach((t, i) => {
     const tr = document.createElement('tr');
     if (t.path === nowPath) tr.className = 'playing';
+    /*
+     * ★シャッフルから外してある曲は、見て分かるようにする（2026-08-29）。
+     * 印が無いと、なぜ流れてこないのかが分からない。**黙って外さない。**
+     * 薄くするだけにして、押せることは見た目でも分かるようにしておく。
+     */
+    if (シャッフル除外.has(t.path)) tr.classList.add('skip');
     // ★ダブルクリックだけだと、押せる場所が見えない（実地で「再生する導線が無い」と言われた）。
     // 1回のクリックでも鳴るようにし、行頭に ▶ も出す。
     // ただし**掴んで並べ替えた直後は鳴らさない**（並べ替えるたびに曲が変わってしまう）
@@ -649,7 +736,7 @@ function 一覧を描く() {
     頭.textContent = t.path === nowPath ? '♪' : '▶';
     頭.title = 'クリックで再生';
     tr.appendChild(頭);
-    tr.appendChild(td('', t.title));
+    tr.appendChild(td('title', t.title));   // ★class は印（🚫）を出すため。幅は colgroup 側
     tr.appendChild(td('', t.artist));
     tr.appendChild(td('', t.album));
     tr.appendChild(td('dur', 時間(t.duration)));
@@ -720,6 +807,29 @@ function 一覧を描く() {
         tracks = tracks.filter((x) => x.path !== t.path);
         描き直す();
       };
+    }
+    /*
+     * ★シャッフルに入れる／入れない（本人の希望 2026-08-29）。
+     * 「一覧から外す」の隣に置くが、**別の操作**だと分かる文言にする。
+     *   一覧から外す   … 一覧から消える。押せない
+     *   シャッフルに入れない … 一覧に残る。押せば鳴る。くじに入らないだけ
+     * 再生リストを開いているときは出さない（そこは手で並べる場所なので）。
+     */
+    if (!リスト) {
+      const 外れている = シャッフル除外.has(t.path);
+      const sk = document.createElement('span');
+      sk.className = 'link';
+      sk.textContent = 外れている ? 'シャッフルに戻す' : 'シャッフルに入れない';
+      sk.title = 外れている
+        ? 'くじで選ばれるように戻します'
+        : '一覧には残り、押せば鳴ります。くじで選ばれなくなるだけです';
+      sk.onclick = async (e) => {
+        e.stopPropagation();
+        シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([t.path], !外れている));
+        描き直す();
+      };
+      act.appendChild(sk);
+      act.appendChild(document.createTextNode('　'));
     }
     act.appendChild(a);
     tr.appendChild(act);
@@ -1057,6 +1167,28 @@ function 道具を描く() {
       });
 
       /*
+       * ★シャッフルから外す／戻すも、まとめてできるようにする（2026-08-29）。
+       * 1 曲ずつだと、アルバム単位で外したいときに使いものにならない。
+       * ★「外す」と「戻す」を別のボタンにする。1 つで切り替える形にすると、
+       *   外れているものと外れていないものが混ざったときに、どちらに転ぶか分からない。
+       */
+      const 外れ数 = [...選択中].filter((p) => シャッフル除外.has(p)).length;
+      if (外れ数 < n0) {
+        ボタン(`選んだ ${n0 - 外れ数} 曲をシャッフルに入れない`, async () => {
+          シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([...選択中], true));
+          描き直す();
+          $('status').textContent = `${(n0 - 外れ数).toLocaleString('ja-JP')} 曲をシャッフルから外しました（一覧には残ります）`;
+        });
+      }
+      if (外れ数) {
+        ボタン(`選んだ ${外れ数} 曲をシャッフルに戻す`, async () => {
+          シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([...選択中], false));
+          描き直す();
+          $('status').textContent = `${外れ数.toLocaleString('ja-JP')} 曲をシャッフルに戻しました`;
+        });
+      }
+
+      /*
        * ★「一覧から外す」もまとめてできるようにする（本人の希望 2026-08-25）。
        * ファイルは消さない。一覧から外すだけ、という約束は変えない。
        */
@@ -1368,8 +1500,14 @@ function 流し始める() {
   巡 = new Set();
   let t = 鳴る列[0];
   if (シャッフル) {
-    const p = 次を選ぶ(鳴る列.map((x) => x.path), 再生回数, 巡);
-    t = 鳴る列.find((x) => x.path === p) ?? 鳴る列[0];
+    // ★くじの候補からは、シャッフルに入れない曲を外す
+    const くじ列 = 鳴る列.filter((x) => !シャッフル除外.has(x.path));
+    if (!くじ列.length) {
+      $('sub').textContent = 'この範囲は、全部シャッフルから外してあります';
+      return;
+    }
+    const p = 次を選ぶ(くじ列.map((x) => x.path), 再生回数, 巡);
+    t = くじ列.find((x) => x.path === p) ?? くじ列[0];
   }
   再生する(t);
 }
@@ -1388,7 +1526,9 @@ function 次の曲(方向 = 1, 列 = いまの列()) {
   }
 
   if (シャッフル && 方向 === 1) {
-    const 候補 = 列.map((t) => t.path);
+    // ★くじのときだけ外す。並び順で送るときは、いままでどおり流す
+    const 候補 = 列.filter((t) => !シャッフル除外.has(t.path)).map((t) => t.path);
+    if (!候補.length) return null;               // 全部外していたら止まる
     if (巡が終わったか(候補, 巡)) {
       if (繰り返し !== 'all') return null;      // 最後まで行ったら止まる
       巡 = new Set();                            // 全体繰り返しなら、もう一巡
@@ -1843,6 +1983,8 @@ $('unhide').onclick = async () => {
   // 指示書:「元の MP3 を削除したら再生リストからも自動で削除される」
   // 起動時に掃除し、**減ったことを黙らせない**
   再生回数 = await window.mp3.再生回数を取る();
+  // ★シャッフルに入れない曲。読まないと、閉じるたびに外した指定が消える
+  シャッフル除外 = new Set(await window.mp3.シャッフル除外を取る());
   倍率表 = await window.mp3.倍率を取る();
   列幅 = await window.mp3.列幅を取る();
   // ★覚えた 3 カラムの高さを戻す

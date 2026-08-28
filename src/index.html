@@ -99,6 +99,9 @@
   tr { cursor: default; }
   tr:hover td { background: var(--sub); }
   tr.playing td { background: var(--accent-bg); color: var(--accent); }
+  /* シャッフルから外してある曲。一覧には残り、押せば鳴る（薄く見せるだけ） */
+  tr.skip td { opacity: .5; }
+  tr.skip td.title::before { content: '🚫 '; opacity: .8; }
   td.play-cell { color: var(--accent); text-align: center; cursor: pointer; }
   td.num { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 48px; }
   td.dur { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 64px; }
