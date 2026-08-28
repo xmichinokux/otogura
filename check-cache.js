@@ -300,6 +300,43 @@ const 版 = /const\s+読み方の版\s*=\s*(\d+)/.exec(libSrc);
     console.log('  --   test-music が無いので飛ばしました（npm run test-music で作れます）');
   }
 
+  /*
+   * ★どの拡張子を拾うか（2026-08-28 実地）。本人からの報告:
+   *   > 最近買ったスマホに転送する CD プレイヤー型エンコーダーで作った
+   *   > mp3 が同期しない
+   *
+   * 実物は MP3 ではなく **.m4a（AAC-LC 320kbps）**だった。
+   * 走査が `.mp3` だけを見ていたので、**そもそも見つけていなかった。**
+   * `Documents\MP3` を数えると mp3 1,079 曲に対し m4a 540 曲。
+   * 今回の 9 枚だけでなく、40 枚前後が最初から見えていなかった。
+   *
+   * ★ここは名前だけで決まる（中身は読まない）ので、空ファイルで確かめられる。
+   */
+  console.log('\n[6] 拾う拡張子');
+
+  const 仮置き = fs.mkdtempSync(path.join(os.tmpdir(), 'otogura-ext-'));
+  const 奥 = path.join(仮置き, '6A989AE5_Boundary： The True');
+  fs.mkdirSync(奥);
+  const 置く = (d, n) => fs.writeFileSync(path.join(d, n), '');
+  置く(仮置き, 'a.mp3');
+  置く(仮置き, 'b.M4A');                       // 大文字でも拾う
+  置く(仮置き, 'c.jpg');                       // 曲ではない
+  置く(仮置き, 'd.m4a.txt');                   // 途中に .m4a があるだけ
+  置く(仮置き, '.toc');                        // 取り込み機が置く目次
+  置く(奥, 'e.m4a');                           // 下の階層も見る
+  置く(奥, '._e.m4a');                         // macOS の付随ファイル
+
+  const 集めた = (await lib.collectTracks(仮置き, [])).map((p) => path.basename(p)).sort();
+  fs.rmSync(仮置き, { recursive: true, force: true });
+
+  確認('.mp3 を拾う', 集めた.includes('a.mp3'));
+  確認('★.m4a を拾う（大文字でも）', 集めた.includes('b.M4A'), `拾ったもの: ${集めた.join(' / ')}`);
+  確認('下の階層の .m4a も拾う', 集めた.includes('e.m4a'));
+  確認('曲でないものは拾わない', !集めた.includes('c.jpg') && !集めた.includes('.toc'));
+  確認('拡張子が末尾のものだけ拾う', !集めた.includes('d.m4a.txt'), '.m4a.txt を拾うと曲でないものが混ざります');
+  確認('「._」で始まるものは拾わない', !集めた.includes('._e.m4a'));
+  確認('拾ったのはこの 3 件だけ', 集めた.length === 3, `${集めた.length} 件: ${集めた.join(' / ')}`);
+
   console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
   process.exit(失敗 ? 1 : 0);
 })();

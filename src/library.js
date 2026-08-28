@@ -52,11 +52,41 @@ const fs = require('node:fs/promises');
 const 同時に読む数 = 8;
 
 /**
- * フォルダを再帰的にたどって .mp3 を集める。
+ * 曲として拾う拡張子。
+ *
+ * ■ ★なぜ .mp3 だけでは足りないのか（2026-08-28 実測。本人からの報告）
+ *   > 最近買ったスマホに転送する CD プレイヤー型エンコーダーで作った
+ *   > mp3 が同期しない
+ *
+ * 調べたら、**そのエンコーダーが書いていたのは MP3 ではなかった。**
+ * 先頭は `ftypM4A`、コーデックは AAC-LC 44.1kHz ステレオ 320kbps。
+ * つまり中身は `.m4a` で、ここが `.mp3` だけを見ていたので
+ * **一覧に出ないのではなく、そもそも見つけていなかった。**
+ * 覚え書き 86,044 件を数えたら `.m4a` は **0 件**だった。
+ *
+ * ★影響は今回のディスクだけではなかった。
+ * `Documents\MP3` を数えると **mp3 1,079 曲に対し m4a 540 曲**。
+ * CD から取り込んだ 9 枚（80 曲）どころか、**40 枚前後が最初から見えていなかった。**
+ *
+ * ★通すだけで直る、ということも確かめた（2026-08-28 実測）。
+ *   ・タグ … music-metadata が iTunes 形式で読める（曲名/演者/アルバム/ジャンル/曲順、欠けなし）
+ *   ・再生 … Electron で canPlayType('audio/mp4; codecs="mp4a.40.2"') が "probably"、
+ *            実際に読ませて duration 660.506667 秒（タグの値と一致）
+ * 読み取り側も再生側も、すでに対応できていた。**足りなかったのはここだけ。**
+ *
+ * ★いまは .m4a だけ足す。
+ * flac / opus / ogg なども同じ穴に落ちるが、**Electron が鳴らせるか測っていない。**
+ * 鳴らせない形式を一覧に出すと「押しても鳴らない曲」が混ざる。
+ * 測ってから足す。ここに並べるのは、**実際に鳴ることを確かめた形式だけ。**
+ */
+const 拾う拡張子 = ['.mp3', '.m4a'];
+
+/**
+ * フォルダを再帰的にたどって曲を集める。
  * ★見つけるたびに知らせる。170,000 曲だと数えるだけで 5 分かかるので、
  * 「全部数え終わってから動く」作りにすると、その間ずっと画面が空になる。
  */
-async function collectMp3(dir, out, depth = 0, 知らせる = null) {
+async function collectTracks(dir, out, depth = 0, 知らせる = null) {
   if (depth > 8) return out;                 // 深すぎるところで止まらないように
   let entries;
   try {
@@ -66,8 +96,8 @@ async function collectMp3(dir, out, depth = 0, 知らせる = null) {
   }
   for (const e of entries) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) await collectMp3(p, out, depth + 1, 知らせる);
-    else if (e.isFile() && e.name.toLowerCase().endsWith('.mp3')) {
+    if (e.isDirectory()) await collectTracks(p, out, depth + 1, 知らせる);
+    else if (e.isFile() && 拾う拡張子.includes(path.extname(e.name).toLowerCase())) {
       /*
        * ★「._」で始まるものは曲ではない（2026-08-25 実測で判明）。
        *
@@ -259,7 +289,7 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
   const 知らせる = (n) => 進み && 進み({ 段階: '数えています', 済み: n, 全体: null });
 
   const files = [];
-  for (const dir of folders) await collectMp3(dir, files, 0, 知らせる);
+  for (const dir of folders) await collectTracks(dir, files, 0, 知らせる);
   if (進み) 進み({ 段階: '数えました', 済み: files.length, 全体: files.length });
 
   const skip = new Set(hidden);
@@ -371,4 +401,4 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
   };
 }
 
-module.exports = { collectMp3, readTags, scanLibrary, アートワークを読む, 目印 };
+module.exports = { collectTracks, 拾う拡張子, readTags, scanLibrary, アートワークを読む, 目印 };

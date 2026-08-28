@@ -40,6 +40,30 @@ fs.writeFileSync(壊れ, Buffer.from('これは MP3 ではない'));
 const r4 = タグを書く(壊れ, { genre: 'X' });
 t('MP3 でないファイルには書かない', r4.ok === false, r4.error ?? '');
 
+/*
+ * 4-b. .m4a には書かないが、**壊れているとは言わない**（2026-08-28）
+ *
+ * .m4a を一覧に出すようにしたので、選んで「書く」を押せてしまう。
+ * node-id3 は ID3 タグ専用なので書けない。それはいい。
+ * ただし「MP3 ファイルではないようです」だけだと**壊れたファイルだと誤解される。**
+ * 壊れてはいない。書けないだけで、再生も読み取りもできる。
+ *
+ * ★中身の見分けは名前ではなく先頭バイトでする。
+ *   MP4 は 4 バイト目から "ftyp"（.m4a はこの形）。
+ */
+const 四 = path.resolve('test-music/_fake.m4a');
+const ftyp = Buffer.concat([
+  Buffer.from([0x00, 0x00, 0x00, 0x20]),
+  Buffer.from('ftypM4A ', 'latin1'),
+  Buffer.alloc(64),
+]);
+fs.writeFileSync(四, ftyp);
+const r4b = タグを書く(四, { genre: 'X' });
+t('m4a には書かない', r4b.ok === false, r4b.error ?? '');
+t('★m4a だと分かる断り方をする', /m4a/.test(r4b.error ?? ''), r4b.error ?? '');
+t('★m4a を「壊れている」扱いしない', !/ではないようです/.test(r4b.error ?? ''), r4b.error ?? '');
+t('m4a の中身を書き換えていない', fs.readFileSync(四).equals(ftyp));
+
 /* 5. 音の中身（タグの後ろ）が変わっていないか */
 const 元の音 = fs.readFileSync(元);
 const 後の音 = fs.readFileSync(試験);
@@ -47,7 +71,7 @@ const フレーム = (buf) => { const i = buf.indexOf(Buffer.from([0xff, 0xfb]))
 const a = フレーム(元の音); const b = フレーム(後の音);
 t('★音のデータが変わっていない', !!a && !!b && a.equals(b));
 
-fs.unlinkSync(試験); fs.unlinkSync(壊れ);              // 試験用に作ったものだけ片付ける
+fs.unlinkSync(試験); fs.unlinkSync(壊れ); fs.unlinkSync(四);   // 試験用に作ったものだけ片付ける
 
 console.log('');
 let ng = 0;
