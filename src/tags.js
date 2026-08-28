@@ -88,9 +88,34 @@ function タグを書く(filePath, 変更) {
   }
   if (!Object.keys(差分).length) return { ok: false, error: '変更するところがありません' };
 
+  /*
+   * ★書く前に日付を控え、書いたあと戻す（2026-08-29）。
+   *
+   * 一覧の「日付」はファイルの**更新日時**を出している
+   * （手に入れた時期の目安。理由は library.js の 目印から更新日時 を参照）。
+   * タグを書くとそこが「いま」に変わるので、**直した曲だけが
+   * 「いちばん新しい曲」として先頭に出てきてしまう。**
+   *
+   * ジャンルを直しただけで手に入れた時期の記録が消えるのは、
+   * このアプリが避けてきた「黙って壊す」に当たる。だから戻す。
+   *
+   * ★音のデータは触っていない（check-tags.js で確かめている）。
+   * ここで戻すのも日付だけで、中身には手を出さない。
+   */
+  let 元の日時 = null;
+  try {
+    const st = fs.statSync(filePath);
+    元の日時 = { atime: st.atime, mtime: st.mtime };
+  } catch { /* 取れなければ戻さないだけ。書き込みは止めない */ }
+
   // 1. update は既存のタグを保ったまま、渡した欄だけ差し替える
   const r = NodeID3.update(差分, filePath);
-  if (r === true) return { ok: true };
+  if (r === true) {
+    if (元の日時) {
+      try { fs.utimesSync(filePath, 元の日時.atime, 元の日時.mtime); } catch { /* 戻せなくても書き込みは成功している */ }
+    }
+    return { ok: true };
+  }
   // 4. 失敗の理由をそのまま返す
   return { ok: false, error: (r && r.message) ? r.message : '書き込みに失敗しました' };
 }

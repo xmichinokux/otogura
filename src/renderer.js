@@ -171,6 +171,15 @@ const 並びの取り出し = {
   album: (t) => t.album,
   // 再生回数は数として比べる。文字として比べると 10 が 2 より前に来る
   plays: (t) => 再生回数[t.path] ?? 0,
+  /*
+   * ★日付（2026-08-29 本人の希望）。
+   *   > 音楽データを生成日の新しい順に並べることってできますか？
+   *
+   * 中身はファイルの**更新日時**。実測で、これがいちばん実態に合っていた
+   * （作成日時はコピーした日に上書きされて全部同じ。くわしくは library.js）。
+   * ★日付の無い曲は 0 にして、新しい順のときに**いちばん下**へ回す。
+   */
+  date: (t) => t.更新日時 ?? 0,
 };
 
 /**
@@ -188,6 +197,8 @@ const 次に比べるもの = {
   album: [曲番号, (t) => t.title, (t) => t.artist],
   title: [(t) => t.artist, (t) => t.album],
   plays: [(t) => t.artist, (t) => t.album, 曲番号, (t) => t.title],
+  // 同じ日に入れたものは、まとめて 1 枚ずつ並ぶようにする
+  date: [(t) => t.artist, (t) => t.album, 曲番号, (t) => t.title],
 };
 
 /** 2 つの値を比べる。数どうしは数として、それ以外は名前として */
@@ -211,6 +222,17 @@ function 曲を並べる(a, b) {
   if (r === 0) r = 照合.compare(a.path, b.path);
   return 並び.逆 ? -r : r;
 }
+
+/**
+ * 日付の見せ方。分からないときは「—」。
+ * ★時刻までは出さない。列が広くなるだけで、探すときに使うのは日付まで。
+ */
+const 日付 = (ms) => {
+  if (!Number.isFinite(ms) || ms <= 0) return '—';
+  const d = new Date(ms);
+  const 二桁 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${二桁(d.getMonth() + 1)}-${二桁(d.getDate())}`;
+};
 
 const 時間 = (sec) => {
   if (!Number.isFinite(sec)) return '0:00';
@@ -430,7 +452,7 @@ function 選ぶ(level, 値, e = null) {
 const 既定の列幅 = {
   pick: 34, grip: 30, num: 40,
   title: 340, artist: 200, album: 240,
-  dur: 64, plays: 60, move: 68, act: 90,
+  dur: 64, date: 96, plays: 60, move: 68, act: 90,
 };
 
 /** 変えた幅を覚えておく。{ 列id: 画素 } */
@@ -555,6 +577,8 @@ function 一覧を描く() {
     ['', 'アーティスト', 'artist', 'artist'],
     ['', 'アルバム', 'album', 'album'],
     ['dur', '長さ', null, 'dur'],
+    // ★日付。押すと「新しい順」から始まる（下の 見出しを作る を参照）
+    ['date', '日付', 'date', 'date'],
     ['plays', '再生', 'plays', 'plays'],
     ...(リスト ? [['move', '並べ替え', null, 'move']] : []),
     ['act', '', null, 'act'],
@@ -589,7 +613,13 @@ function 一覧を描く() {
       if (並び.key === key) th.classList.add('sorted');
       th.title = `${label}で並べ替え`;
       th.onclick = () => {
-        並び = 並び.key === key ? { key, 逆: !並び.逆 } : { key, 逆: false };
+        /*
+         * ★日付だけは、最初に押したとき「新しい順」から始める（2026-08-29）。
+         * 頼まれたのが「**新しい順**に並べたい」なので、
+         * 1 回目に古い順を出して、もう一度押させるのは遠回り。
+         */
+        const 初手の逆 = key === 'date';
+        並び = 並び.key === key ? { key, 逆: !並び.逆 } : { key, 逆: 初手の逆 };
         一覧を描く();
       };
     } else {
@@ -740,6 +770,7 @@ function 一覧を描く() {
     tr.appendChild(td('', t.artist));
     tr.appendChild(td('', t.album));
     tr.appendChild(td('dur', 時間(t.duration)));
+    tr.appendChild(td('date', 日付(t.更新日時)));
     // シャッフルが『忘れている曲』を選んでいるか見えるように、回数を出す
     tr.appendChild(td('plays', String(再生回数[t.path] ?? 0)));
 

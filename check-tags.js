@@ -64,6 +64,27 @@ t('★m4a だと分かる断り方をする', /m4a/.test(r4b.error ?? ''), r4b.e
 t('★m4a を「壊れている」扱いしない', !/ではないようです/.test(r4b.error ?? ''), r4b.error ?? '');
 t('m4a の中身を書き換えていない', fs.readFileSync(四).equals(ftyp));
 
+/*
+ * 4-c. ★タグを書いても、ファイルの日付が動かないこと（2026-08-29）
+ *
+ * 一覧の「日付」はファイルの更新日時を出している（手に入れた時期の目安）。
+ * 書くとそこが「いま」になるので、直した曲だけが
+ * 「いちばん新しい曲」として先頭に出てきてしまう。
+ * ジャンルを直しただけで手に入れた時期の記録が消えるのは、黙って壊すのと同じ。
+ */
+const 日時試験 = path.resolve('test-music/_datetest.mp3');
+fs.copyFileSync(元, 日時試験);
+const 昔 = new Date('2014-09-15T10:20:30Z');
+fs.utimesSync(日時試験, 昔, 昔);
+const 書く前の日時 = fs.statSync(日時試験).mtimeMs;
+const r4c = タグを書く(日時試験, { genre: 'Powerviolence' });
+const 書いた後の日時 = fs.statSync(日時試験).mtimeMs;
+t('日時試験も書き込みは成功する', r4c.ok, r4c.error ?? '');
+t('タグは実際に入っている', NodeID3.read(日時試験).genre === 'Powerviolence');
+t('★書いてもファイルの日付が動かない', Math.abs(書いた後の日時 - 書く前の日時) < 2000,
+  `${new Date(書く前の日時).toISOString()} → ${new Date(書いた後の日時).toISOString()}`);
+fs.unlinkSync(日時試験);
+
 /* 5. 音の中身（タグの後ろ）が変わっていないか */
 const 元の音 = fs.readFileSync(元);
 const 後の音 = fs.readFileSync(試験);

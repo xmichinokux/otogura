@@ -402,6 +402,29 @@ const 版 = /const\s+読み方の版\s*=\s*(\d+)/.exec(libSrc);
     `mp3 側に m4a の版が混ざると、86,074 曲の読み直しになります（${印3}）`,
   );
 
+  /*
+   * ★日付は目印から取る（2026-08-29 本人の希望）。
+   *   > 音楽データを生成日の新しい順に並べることってできますか？
+   *
+   * 目印を作るのにすでに stat しているので、そこから取れば読み込みは増えない。
+   * ★どの日付かは実測で決めた（標本 400 件 × 2 か所）:
+   *   作成日時 … E:\iTunes Music の 400 件が全部 2026-08（コピーした日）
+   *   更新日時 … 112 種類の月に散らばる（手に入れた時期に沿う）
+   */
+  console.log('\n[9] 日付を目印から取れるか');
+
+  const 仮3 = fs.mkdtempSync(path.join(os.tmpdir(), 'otogura-date-'));
+  const 曲ファイル = path.join(仮3, 'a.mp3');
+  fs.writeFileSync(曲ファイル, 'x');
+  const 昔 = new Date('2014-09-15T10:20:30Z');
+  fs.utimesSync(曲ファイル, 昔, 昔);
+  const 印 = await lib.目印(曲ファイル);
+  const 取れた = lib.目印から更新日時(印);
+  fs.rmSync(仮3, { recursive: true, force: true });
+
+  確認('★目印から更新日時が取れる', Math.abs(取れた - 昔.getTime()) < 2000,
+    `目印: ${印} / 取れた値: ${取れた && new Date(取れた).toISOString()}`);
+  確認('壊れた目印では null', lib.目印から更新日時('こわれ') === null && lib.目印から更新日時(null) === null);
   console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
   process.exit(失敗 ? 1 : 0);
 })();
