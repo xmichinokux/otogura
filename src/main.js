@@ -601,11 +601,25 @@ ipcMain.handle('tags:write', async (_e, filePath, 変更) => {
    波形の取り込みは画面側（Web Audio）が行うので、ここは
    「ファイルの中身を渡す」ことと「測った結果を覚える」ことだけを担う。 */
 
-/** 測るために、ファイルの中身をそのまま渡す（再生とは別経路） */
-ipcMain.handle('audio:bytes', async (_e, filePath) => {
+/**
+ * 測るために、ファイルの中身をそのまま渡す（再生とは別経路）。
+ *
+ * ★上限を超えるファイルは、**読まずに大きさだけ返す**（2026-08-28）。
+ * .wav を拾うようにしたら、最大 1,095 MB のファイルが対象に入った。
+ * 画面側で「大きいから測らない」と判断するにしても、
+ * **ここで読んでから捨てたのでは、1 GB を IPC で運ぶ手間がそのまま残る**
+ * （実測: 読み込みだけで 13.0 秒）。だから stat で先に見て、断る。
+ *
+ * @returns { bytes } 渡せたとき ／ { 大きすぎる: バイト数 } ／ null（読めない）
+ */
+ipcMain.handle('audio:bytes', async (_e, filePath, 上限) => {
   try {
+    if (Number.isFinite(上限) && 上限 > 0) {
+      const st = await fs.stat(filePath);
+      if (st.size > 上限) return { 大きすぎる: st.size };
+    }
     const buf = await fs.readFile(filePath);
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    return { bytes: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
   } catch {
     return null;                                  // 読めなければ測らない（再生は止めない）
   }

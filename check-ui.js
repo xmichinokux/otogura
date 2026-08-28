@@ -63,7 +63,31 @@ if (process.versions.electron) {
       setTimeout(async () => {
         clearInterval(見張る);
         try {
-          const r = await win.webContents.executeJavaScript(`(() => {
+          /*
+           * ★「音を読む」を、本物のつなぎ（preload）を通して叩く（2026-08-28）。
+           *
+           * .wav を拾うようにしたとき、大きすぎるファイルを測らないよう
+           * 上限を渡す形に変えた。返り値も ArrayBuffer から
+           * { bytes } / { 大きすぎる } に変わっている。
+           * **画面・preload・本体の 3 か所が食い違うと、音量そろえが黙って止まる。**
+           * 型検査でも目視でも見つからない種類なので、実際に通す。
+           */
+          const 曲 = path.join(__dirname, 'test-music', 'b_song.mp3').split('\\').join('\\\\');
+          const r = await win.webContents.executeJavaScript(`(async () => {
+            const 音を読む検査 = await (async () => {
+              try {
+                const f = '${曲}';
+                const 超え = await window.mp3.音を読む(f, 1);            // 必ず上限を超える
+                const 普通 = await window.mp3.音を読む(f, 100 * 1024 * 1024);
+                const 無い = await window.mp3.音を読む('C:/存在しないはずのファイル.mp3', 100 * 1024 * 1024);
+                return {
+                  上限超えを断る: !!(超え && typeof 超え.大きすぎる === 'number'),
+                  中身が返る: !!(普通 && 普通.bytes && 普通.bytes.byteLength > 0),
+                  無いものはnull: 無い === null,
+                  曲がある: !!(普通 && (普通.bytes || 普通.大きすぎる)),
+                };
+              } catch (e) { return { 失敗: String(e && e.message || e) }; }
+            })();
             const み = (id) => {
               const e = document.getElementById(id);
               if (!e) return { ある: false };
@@ -77,6 +101,7 @@ if (process.versions.electron) {
               再スキャン: み('rescan'),
               一覧の行数: document.querySelectorAll('#tbody tr').length,
               エラー: window.__検査エラー || null,
+              音を読む検査,
             };
           })()`);
           r.時間の記録 = 記録;
@@ -138,6 +163,21 @@ const 時間切れ = setTimeout(() => { 子.kill(); }, 60000);
     const 出た = r.時間の記録.find((x) => x.見えている);
     const 最後 = r.時間の記録[r.時間の記録.length - 1];
     console.log(`  「戻す」ボタン: ${出た ? `${出た.秒} 秒で出ました（「${出た.文字}」）` : `${最後.秒} 秒たっても出ていません`}`);
+  }
+
+  /*
+   * ★音量そろえのつなぎ（画面 → preload → 本体）が食い違っていないか。
+   * .wav を拾うようにして、上限を渡す形に変えた（2026-08-28）。
+   */
+  const 音 = r.音を読む検査;
+  if (!音 || 音.失敗) {
+    確認('「音を読む」が画面から通る', false, 音 ? 音.失敗 : '結果が返っていません');
+  } else if (!音.曲がある) {
+    console.log('  --   「音を読む」は test-music が無いので飛ばしました（npm run test-music）');
+  } else {
+    確認('「音を読む」で中身が返る', 音.中身が返る, '返らないと音量そろえが黙って止まります');
+    確認('★上限を超えるファイルは、読まずに断る', 音.上限超えを断る, '断らないと 1 GB の wav をそのまま運びます');
+    確認('読めないファイルは null', 音.無いものはnull);
   }
 
   確認('再スキャンのボタンがある', r.再スキャン && r.再スキャン.見えている);

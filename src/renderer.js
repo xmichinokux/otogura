@@ -1247,13 +1247,44 @@ function 倍率をかける(倍率) {
   } catch { /* ignore */ }
 }
 
+/*
+ * ★大きすぎる曲は測らない（2026-08-28 実測。.wav を拾うようにして分かった）。
+ *
+ * 測定はファイル全体をメモリに載せて decodeAudioData する作りになっている。
+ * mp3 と m4a しか拾っていなかったときは、それで問題が無かった。
+ * だが wav を足すと桁が変わる。手元の wav は合計 55.6 GB、**最大 1,095 MB**。
+ *
+ * その 1,095 MB（49 分の録音）で実際に測った:
+ *   読み込み 13.0 秒（1,095 MB）→ decode 4.7 秒 → 波形 1,006 MB
+ *   **ピークで約 2.1 GB。合計 18 秒。**
+ *
+ * 落ちはしなかったが、**曲を 1 つ押しただけでこれは持てない。**
+ * 100 MB 超えは 25 件ある。アプリが落ちた元の原因（アートワーク 17.8 GB）と
+ * 同じ形の間違いなので、ここで止める。
+ *
+ * ★測らないだけで、再生は普通にできる。音量がそろわないだけ。
+ * 100 MB は、16bit/44.1kHz の wav でおよそ 10 分ぶん。ふつうの曲は超えない
+ * （実測: 4 分 56 秒の wav で 49.7 MB、10 分の 320kbps mp3 で 24 MB）。
+ */
+const 測る上限バイト = 100 * 1024 * 1024;
+
 /** まだ測っていない曲を測る。再生と並行して動かす */
 async function 測って覚える(t) {
   if (倍率表[t.path] !== undefined) return;
   const 配管 = 配管を作る();
   if (!配管) return;
   try {
-    const bytes = await window.mp3.音を読む(t.path);
+    const 返り = await window.mp3.音を読む(t.path, 測る上限バイト);
+    if (!返り) return;
+    if (返り.大きすぎる) {
+      // ★黙って飛ばさない。「そろっていない」ことが分かるようにする
+      if (t.path === nowPath) {
+        $('status').textContent =
+          `${Math.round(返り.大きすぎる / 1024 / 1024)} MB あるので、音量そろえは測っていません`;
+      }
+      return;
+    }
+    const bytes = 返り.bytes;
     if (!bytes) return;
     const buf = await 配管.ctx.decodeAudioData(bytes);
     const ch = [];

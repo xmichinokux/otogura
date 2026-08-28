@@ -45,7 +45,8 @@ contextBridge.exposeInMainWorld('mp3', {
 
   // タグの編集（このアプリで唯一、ファイルそのものを書き換える）
   // 音量そろえ
-  音を読む: (filePath) => ipcRenderer.invoke('audio:bytes', filePath),
+  // 上限を渡すと、それより大きいファイルは読まずに { 大きすぎる: バイト数 } が返る
+  音を読む: (filePath, 上限) => ipcRenderer.invoke('audio:bytes', filePath, 上限),
   倍率を取る: () => ipcRenderer.invoke('gains:get'),
   倍率を覚える: (filePath, 倍率) => ipcRenderer.invoke('gains:set', filePath, 倍率),
 
