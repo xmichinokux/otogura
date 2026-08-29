@@ -92,6 +92,26 @@
     border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--accent);
   }
   #resbar .restag:hover { background: var(--accent-bg); }
+  /*
+   * ★辿った言葉は「札 1 個」に見せる（2026-08-29 本人の指摘）。
+   *   > resonanceでできた項目の選択や編集の選択部分のデザインが少し煩雑
+   * 前は［言葉］［✎］［×］が**別々の丸**で、言葉 3 つで丸が 9 個並んでいた。
+   * 1 つのものなのに 3 つに見えるのが、ごちゃついて見える正体だった。
+   * 中に畳んで、触れたときだけ ✎ と × を濃くする。
+   */
+  #resbar .resword {
+    display: inline-flex; align-items: center; gap: 2px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: #fff; padding: 1px 4px 1px 10px; font-size: 11px; color: var(--accent);
+  }
+  #resbar .resword:hover { background: var(--accent-bg); }
+  #resbar .resword .resnum { color: var(--dim); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  #resbar .resword button {
+    font: inherit; font-size: 11px; line-height: 1; cursor: pointer;
+    border: 0; background: none; color: var(--dim); padding: 3px 4px; border-radius: 999px;
+  }
+  #resbar .resword button:hover { color: var(--accent); background: #fff; }
+  #resbar .resword .del:hover { color: #b91c1c; }
   /* ★確かめる候補（手元で見つからなかった名前）。開いたときだけ 2 段目に出す */
   #resbar .misslist { flex-basis: 100%; max-height: 190px; overflow-y: auto;
     margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
@@ -163,7 +183,14 @@
   .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip b { cursor: pointer; color: #9ca3af; font-weight: 400; }
   .chip b:hover { color: #b91c1c; }
-  #status { color: var(--dim); font-size: 11px; }
+  /*
+   * ★状態は、いつも自分の行に置く（2026-08-29 本人の指摘）。
+   *   > 下の欄のライブラリのところと下の欄の右のインフォが重なる
+   * フォルダの札は数も長さもまちまちなので、同じ行に並べると押し合う。
+   * ★短く切らずに、行を分ける。状態には「フォルダが登録されていません」のような
+   * 大事な文が出るので、「…」で消えるほうが困る。
+   */
+  #status { flex-basis: 100%; min-width: 0; color: var(--dim); font-size: 11px; line-height: 1.6; }
   #tabs { flex: 0 0 auto; display: flex; gap: 4px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
   .tab.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }

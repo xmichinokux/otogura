@@ -794,7 +794,27 @@ function 響きを合わせ直す() {
   }
 }
 
-/** 木を生やすときに渡す、手元の演者（曲数の多い順） */
+/**
+ * 木を生やすときに渡す、手元の演者。
+ *
+ * ■ ★厚いところと、細いところの両方を渡す（2026-08-29 本人の指摘）
+ *   > resonanceって…王道的なのが気になります。マニアックな文脈が苦手というか。
+ *
+ * ★実測（本人の 85,941 曲）で、渡し方の穴が分かった:
+ *
+ *   演者 5,860 組。**上位 150 組が占めるのは 15,226 曲（18%）だけ**
+ *   150 番目でも 61 曲ある。つまり上位だけ見せると
+ *   「たくさん持つ人」にしか見えず、**細いところを持っていることが伝わらない。**
+ *
+ *   1 曲だけ持っている演者    932 組（15.9%）
+ *   4〜10 曲だけの演者      1,895 組（32.3%）
+ *
+ * だから 3 分の 1 は「1〜数曲だけ持っている演者」から渡す。
+ * これが「どこまで踏み込んでよいか」の物差しになる。
+ *
+ * ★細いほうは曲数順に並べない。**散らして採る。**
+ * 並べると同じところ（名前順の頭）ばかりになって、蔵書の広さが伝わらない。
+ */
 function 手元の演者(何人) {
   const 数 = new Map();
   for (const t of 見える曲()) {
@@ -802,8 +822,31 @@ function 手元の演者(何人) {
     if (!a || a === "Unknown") continue;
     数.set(a, (数.get(a) ?? 0) + 1);
   }
-  return [...数.entries()].sort((a, b) => b[1] - a[1]).slice(0, 何人)
-    .map(([名前, 曲数]) => ({ 名前, 曲数 }));
+  const 全部 = [...数.entries()].sort((a, b) => b[1] - a[1]);
+
+  const 厚い数 = Math.max(1, Math.round(何人 * 2 / 3));
+  const 厚い = 全部.slice(0, 厚い数).map(([名前, 曲数]) => ({ 名前, 曲数, 細い: false }));
+
+  // ★1〜3 曲しか持っていない演者から、散らして採る
+  const 細い候補 = 全部.filter(([, c]) => c <= 3);
+  const 細い = [];
+  const 欲しい = Math.min(何人 - 厚い.length, 細い候補.length);
+  const 歩 = 欲しい > 0 ? Math.max(1, Math.floor(細い候補.length / 欲しい)) : 1;
+  for (let i = 0; 細い.length < 欲しい && i < 細い候補.length; i += 歩) {
+    細い.push({ 名前: 細い候補[i][0], 曲数: 細い候補[i][1], 細い: true });
+  }
+  return [...厚い, ...細い];
+}
+
+/** 蔵書の大きさ。「どこまで踏み込んでよいか」を AI に伝えるのに使う */
+function 蔵書の大きさ() {
+  const 見え = 見える曲();
+  const 組 = new Set();
+  for (const t of 見え) {
+    const a = (t.artist || "").trim();
+    if (a && a !== "Unknown") 組.add(小文字(a));
+  }
+  return { 演者数: 組.size, 曲数: 見え.length };
 }
 
 /**
@@ -817,7 +860,12 @@ function 手元の演者(何人) {
 async function 木を生やして足す(言葉, 言った) {
   const 大きさ = await window.mp3.木の大きさ();
   言った.textContent = `「${言葉}」から辿っています…`;
-  const r = await window.mp3.木を生やす({ 言葉, 手元の演者: 手元の演者(大きさ.見せる演者の数) });
+  const r = await window.mp3.木を生やす({
+    言葉,
+    手元の演者: 手元の演者(大きさ.見せる演者の数),
+    // ★蔵書の大きさも渡す。上位だけ見せると「たくさん持つ人」にしか見えないので
+    蔵書: 蔵書の大きさ(),
+  });
   if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return false; }
 
   響きの木 = r.木;
@@ -963,19 +1011,30 @@ function 響きの欄を描く() {
       setTimeout(() => { inp.focus(); inp.select(); }, 0);
       continue;
     }
+    /*
+     * ★1 つの札にまとめる（2026-08-29 本人の指摘）。
+     *   > resonanceでできた項目の選択や編集の選択部分のデザインが少し煩雑
+     * 前は［言葉］［✎］［×］が別々の丸で、言葉 3 つで丸が 9 個並んでいた。
+     * 1 つのものは 1 つに見せる。
+     */
     const 札 = document.createElement("span");
-    札.className = "restag";
-    札.style.cursor = "default";
-    札.textContent = e.keyword + "（" + e.nodes.length + "）";
+    札.className = "resword";
     札.title = e.savedAt ? ("辿った日: " + e.savedAt.slice(0, 10)) : "";
 
+    const 名 = document.createElement("span");
+    名.textContent = e.keyword;
+    const 数 = document.createElement("span");
+    数.className = "resnum";
+    数.textContent = e.nodes.length;
+    札.append(名, 数);
+
     const 直す = document.createElement("button");
-    直す.className = "restag"; 直す.textContent = "✎";
+    直す.textContent = "✎";
     直す.title = "この言葉の名前を変える";
     直す.onclick = () => { 言葉の名前変え = e.keyword; 描き直す(); };
 
     const 消す = document.createElement("button");
-    消す.className = "restag"; 消す.textContent = "×";
+    消す.className = "del"; 消す.textContent = "×";
     消す.title = "この言葉で辿ったものを消す（音楽ファイルには触りません）";
     消す.onclick = async () => {
       if (!confirm(`「${e.keyword}」で辿ったものを消しますか？\n\n曲は何も変わりません。`)) return;
@@ -987,7 +1046,8 @@ function 響きの欄を描く() {
       $("status").textContent = `「${e.keyword}」を消しました`;
     };
 
-    box.append(札, 直す, 消す);
+    札.append(直す, 消す);
+    box.appendChild(札);
   }
 
   // 全部忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
@@ -1191,10 +1251,16 @@ function 気分の欄を描く() {
       開いているID = null;
       /*
        * ★辿れたら記入欄を空にする（2026-08-29 本人の希望）。
-       * 下の 描き直す() で欄が作り直されるので、控えを先に消しておけば
-       * 作り直された欄も空になる。
+       *
+       * ★控えだけ消しても消えない（2026-08-29 実地。本人からの報告:
+       *   > 今resonanceで生成した記入欄に文字が残った）。
+       * 気分の欄は **描き直しても作り直されない** ―― 打っている途中に
+       * 欄が消えないよう、形（none/mood/key）が変わったときだけ作り直す作りだから。
+       * だから**画面の欄も直に消す**。気分のほうは最初からそうしていた。
        */
       打ちかけの辿る言葉 = "";
+      const 辿る欄 = $("restree");
+      if (辿る欄) 辿る欄.value = "";
 
       /*
        * ★辿ったあと、AI に一本を組ませない（2026-08-29 本人の指示）。
