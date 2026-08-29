@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('mp3', {
   // ★音蔵の中で木を生やす（Resonance が無くても使える）
   木を生やす: (手がかり) => ipcRenderer.invoke('ai:tree', 手がかり),
   木の大きさ: () => ipcRenderer.invoke('ai:treeSizes'),
+  // 辿った言葉ごとに、名前を変える／消す
+  響きの名前を変える: (旧, 新) => ipcRenderer.invoke('resonance:rename', 旧, 新),
+  響きをひとつ消す: (言葉) => ipcRenderer.invoke('resonance:remove', 言葉),
   // ★シャッフルに入れない曲。「一覧から外す」とは別（一覧には残り、押せば鳴る）
   シャッフル除外を取る: () => ipcRenderer.invoke('shuffleskip:get'),
   シャッフル除外を変える: (paths, 除外する) => ipcRenderer.invoke('shuffleskip:set', paths, 除外する),

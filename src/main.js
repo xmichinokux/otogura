@@ -376,6 +376,36 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
 
 ipcMain.handle('ai:treeSizes', async () => ({ 見せる演者の数 }));
 
+/** 辿った言葉ごとに、名前を変える／消す。★木の中身は触らない */
+async function 響きを書き換える(手当て) {
+  let 生;
+  try { 生 = JSON.parse(await fs.readFile(響きファイル(), 'utf8')); } catch { return { ok: false, error: '辿ったものがありません' }; }
+  if (!生 || !Array.isArray(生.entries)) return { ok: false, error: '中身が読めません' };
+  生.entries = 手当て(生.entries);
+  生.version = 1;
+  const 確かめ = 響きを読み込む(JSON.stringify(生));
+  if (!確かめ.ok) {
+    // ★全部消えた場合は、控えごと消す（空の木を置くと、次に読めない）
+    if (/使える木がありません/.test(確かめ.error)) {
+      try { await fs.unlink(響きファイル()); } catch { /* もともと無い */ }
+      return { ok: true, 木: null };
+    }
+    return { ok: false, error: 確かめ.error };
+  }
+  await fs.writeFile(響きファイル(), JSON.stringify(生, null, 2), 'utf8');
+  return { ok: true, 木: 確かめ.木 };
+}
+
+ipcMain.handle('resonance:rename', async (_e, 旧, 新) => {
+  if (typeof 旧 !== 'string' || typeof 新 !== 'string' || !新.trim()) return { ok: false, error: '名前が空です' };
+  return 響きを書き換える((es) => es.map((e) => (e && e.keyword === 旧 ? { ...e, keyword: 新.trim() } : e)));
+});
+
+ipcMain.handle('resonance:remove', async (_e, 言葉) => {
+  if (typeof 言葉 !== 'string') return { ok: false, error: '指定が正しくありません' };
+  return 響きを書き換える((es) => es.filter((e) => e && e.keyword !== 言葉));
+});
+
 ipcMain.handle('resonance:clear', async () => {
   // ★消すのはこの控えだけ。音楽ファイルには触らない
   try { await fs.unlink(響きファイル()); } catch { /* もともと無い */ }

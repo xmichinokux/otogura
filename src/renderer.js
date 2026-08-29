@@ -406,6 +406,8 @@ let AIが使える = false;
  * 再生リスト名と同じく、**画面の中に入力欄を出す**形にする。
  */
 let キー入力 = null;
+/** 打ちかけの言葉。描き直しで消えないように覚えておく */
+let 打ちかけの言葉 = "";
 /** AI がつけた 1 曲ごとのひとこと { パス: 文 }。その場かぎり（覚え書きには入れない） */
 const AIのひとこと = new Map();
 
@@ -585,7 +587,7 @@ async function 木を生やして足す(言葉, 言った) {
   const 大きさ = await window.mp3.木の大きさ();
   言った.textContent = `「${言葉}」から辿っています…`;
   const r = await window.mp3.木を生やす({ 言葉, 手元の演者: 手元の演者(大きさ.見せる演者の数) });
-  if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
+  if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return false; }
 
   響きの木 = r.木;
   響きを合わせ直す();
@@ -594,7 +596,7 @@ async function 木を生やして足す(言葉, 言った) {
    * ★描き直すと欄が作り直されるので、**さっきの 言った は捨てられている。**
    * 古いほうに書いても画面には出ない（実測でそうなっていた）。取り直す。
    */
-  言った = $('ressaid') || 言った;
+  言った = $('aisaid') || 言った;   // ★描き直しで欄が作り直されるので、取り直す
 
   // ★生やした木のうち、手元にあったもの／無かったものを数える
   const 生 = r.生やした.nodes;
@@ -605,161 +607,105 @@ async function 木を生やして足す(言葉, 言った) {
   $("status").textContent = `🌐「${言葉}」から ${生.length} 個辿りました`
     + `　手元にあった ${あった.length} 個: ${あった.slice(0, 6).map((n) => n.name).join(" / ")}`
     + (無かった.length ? `　／ 手元に無い ${無かった.length} 個（発見）: ${無かった.slice(0, 6).map((n) => n.name).join(" / ")}` : "");
+  // ★手元に 1 曲も無ければ、一本は組めない。呼んだ側に伝える
+  return あった.length > 0;
 }
+
+
+/** 名前を変えている最中の言葉（null なら変えていない） */
+let 言葉の名前変え = null;
 
 /**
- * 辿った結果を再生リストにする。
+ * 辿った言葉の管理欄。
  *
- * @param 混ぜる true ならシャッフルして並べる
+ * ★ここには入力欄も「一本にする」も置かない（2026-08-29 本人の整理）。
+ *   > 「このまま一本に」と「混ぜて一本に」が Resonance のところにあったので、
+ *   > resonance を使いながら生成するものだと思ってボタンを押してしまい、
+ *   > 何個も同じライブラリを生成してしまった。
+ * 押すものが並んでいると、押してしまう。**一本を作るのは上の 2 つのボタンだけ**にした。
  *
- * ★対象は「いま見えているもの」。響きタブで演者を選んでいれば、そのぶんだけ。
- * 何も選んでいなければ、当たった曲すべて。**画面と一致させる。**
- * ★AI は呼ばない。通信もお金もかからない。
+ * ここに置くのは、辿った言葉の**名前を変える／消す**だけ。
+ *   > resonanceで生成したカラムタブの名前変更や削除の機能がほしいです。
  */
-async function 響きを一本にする(混ぜる) {
-  if (!響きの当たり || !響きの当たり.曲.size) return;
-  // ★響きタブの絞り込みを効かせたいので、いったんそのタブの見え方で数える
-  const 元のタブ = カラムタブ;
-  カラムタブ = 'resonance';
-  const 対象 = 絞る(3).filter((t) => t.鳴らせる !== false);
-  カラムタブ = 元のタブ;
-
-  if (!対象.length) { $("status").textContent = "この範囲に、鳴らせる曲がありません"; return; }
-
-  let 並び;
-  if (混ぜる) {
-    /*
-     * ★いつものシャッフルのくじで並べる。
-     * 再生回数の重み（忘れている曲を拾う）と、同じ演者を続けない決まりが
-     * そのまま効く。ここで独自のシャッフルを書くと、2 種類の混ぜ方ができてしまう。
-     */
-    const 表 = new Map(対象.map((t) => [t.path, t]));
-    const 道 = 対象.map((t) => t.path);
-    const 済 = new Set();
-    並び = [];
-    let 前 = null;
-    while (並び.length < 道.length) {
-      const 手 = 前 ? { 直前: { artist: 前.artist, album: 前.album }, 情報: (p) => 表.get(p) ?? null } : null;
-      const p = 次を選ぶ(道, 再生回数, 済, Math.random, 手);
-      if (!p || 済.has(p)) break;
-      済.add(p);
-      前 = 表.get(p);
-      並び.push(p);
-    }
-  } else {
-    並び = [...対象].sort(曲を並べる).map((t) => t.path);
-  }
-  if (!並び.length) return;
-
-  // 名前は、選んでいる言葉から作る（選んでいなければ辿った言葉をまとめて）
-  const 言葉たち = sel.言葉 ? [...sel.言葉] : [...new Set(対象.map((t) => 響きの印(t, "keyword")).filter(Boolean))];
-  const 名 = "🌐 " + (言葉たち.slice(0, 2).join(" / ") || "響き").slice(0, 20) + (混ぜる ? "（混）" : "");
-
-  lists = await window.mp3.リストを作る(名);
-  const 新しいの = lists[lists.length - 1];
-  lists = await window.mp3.リストの中身を入れ替える(新しいの.id, 並び);
-  開いているID = 新しいの.id;
-  // ★並んだ順に流す。ここでシャッフルを入れると、並べた意味が無くなる
-  シャッフル = false;
-  $('shuffle').textContent = '🔀 オフ';
-  $('shuffle').classList.remove('on');
-  描き直す();
-
-  const 一曲目 = tracks.find((t) => t.path === 並び[0]);
-  if (一曲目) 再生する(一曲目);
-  $("status").textContent = `🌐 ${並び.length} 曲の一本を作りました: 「${名}」`
-    + (混ぜる ? "（混ぜました。同じ演者は続きません）" : "（並び順のまま）");
-}
-
 function 響きの欄を描く() {
   const box = $('resbar');
-  /*
-   * ★木がまだ無くても、キーがあれば「生やす欄」は出す。
-   * ここが Resonance の見本なので、入り口が見えないと始まらない。
-   */
-  if (!響きの木 && !AIが使える) { box.className = ''; box.innerHTML = ''; return; }
+  if (!響きの木 || !響きの当たり || !響きの当たり.曲.size) { box.className = ''; box.innerHTML = ''; return; }
   box.className = 'on';
   box.innerHTML = '';
 
-  if (AIが使える) {
-    // ★打ちかけの言葉を残す。描き直しのたびに消えると打てない
-    const 打ちかけ = ($("restree") || {}).value || "";
-    const 種 = document.createElement("input");
-    種.id = "restree";
-    // ★具体例は書かない（公開するので、作者の好みが出てしまう）
-    種.placeholder = "言葉を 1 つ入れて辿る";
-    種.value = 打ちかけ;
-    種.style.flex = "0 1 220px";
-    種.style.font = "inherit";
-    種.style.fontSize = "12px";
-    種.style.padding = "3px 8px";
-    種.style.border = "1px solid var(--line)";
-    種.style.borderRadius = "4px";
-    const 生やす = document.createElement("button");
-    生やす.className = "restag"; 生やす.id = "restreego"; 生やす.textContent = "🌱 辿る";
-    生やす.title = "その言葉から辿れる音楽を探して、手元にあるものを教えます（1 回およそ 4.5 円）";
-    const 言った = document.createElement("span");
-    言った.className = "said"; 言った.id = "ressaid";
-    const 走る = async () => {
-      const v = 種.value.trim();
-      if (!v) return;
-      生やす.disabled = true; 種.disabled = true;
-      try { await 木を生やして足す(v, 言った); } finally { 生やす.disabled = false; 種.disabled = false; }
-    };
-    生やす.onclick = 走る;
-    種.onkeydown = (e) => { if (e.key === "Enter") 走る(); };
-    box.append(種, 生やす, 言った);
-  }
-
-  if (!響きの木 || !響きの当たり) return;                 // 木がまだ無ければ、ここまで
   const 印 = document.createElement('span');
   印.textContent = '🌐';
   const 文 = document.createElement('span');
   文.className = 'said';
-  const 当 = 響きの当たり.当たり;
-  文.textContent = 当.length
-    ? `響き ${響きの木.木.length} 本から ${当.length} 組・${響きの当たり.曲.size.toLocaleString('ja-JP')} 曲が手元にありました`
-    : `響き ${響きの木.木.length} 本を読みましたが、手元に当たるものがありませんでした`;
-  文.title = 当.map((a) => `${a.artist}（${a.曲数}曲・深さ${a.depth}）… ${a.description}`).join('\n');
-
+  文.textContent = `${響きの当たり.当たり.length} 組・${響きの当たり.曲.size.toLocaleString("ja-JP")} 曲`;
   box.append(印, 文);
 
-  /*
-   * ★演者の札は、ここには出さない（2026-08-29 本人の希望）。
-   * カラムの「🌐 響き」タブに移した。横に並べると 10 個で打ち止めになり、
-   * 探すこともできなかった。カラムなら絞り込みも複数選択もそのまま使える。
-   */
+  // 辿った言葉ごとに、名前を変える／消す
+  for (const e of 響きの木.木) {
+    if (言葉の名前変え === e.keyword) {
+      const inp = document.createElement("input");
+      inp.value = e.keyword;
+      inp.style.font = "inherit"; inp.style.fontSize = "11px";
+      inp.style.padding = "1px 6px"; inp.style.border = "1px solid var(--line)";
+      inp.style.borderRadius = "10px"; inp.style.width = "140px";
+      const 決める = async () => {
+        const v = inp.value.trim();
+        言葉の名前変え = null;
+        if (v && v !== e.keyword) {
+          const r = await window.mp3.響きの名前を変える(e.keyword, v);
+          if (r && r.ok) { 響きの木 = r.木; 響きを合わせ直す(); }
+          else $("status").textContent = "名前を変えられませんでした（" + ((r && r.error) || "不明") + "）";
+        }
+        描き直す();
+      };
+      inp.onkeydown = (ev) => {
+        if (ev.key === "Enter") 決める();
+        if (ev.key === "Escape") { 言葉の名前変え = null; 描き直す(); }
+      };
+      inp.onblur = 決める;
+      box.appendChild(inp);
+      setTimeout(() => { inp.focus(); inp.select(); }, 0);
+      continue;
+    }
+    const 札 = document.createElement("span");
+    札.className = "restag";
+    札.style.cursor = "default";
+    札.textContent = e.keyword + "（" + e.nodes.length + "）";
+    札.title = e.savedAt ? ("辿った日: " + e.savedAt.slice(0, 10)) : "";
 
-  /*
-   * ★辿った結果を、そのまま／シャッフルして、再生リストに残す。
-   *   > プレイリストのようにResonaceが選んだリストを保存したい
-   *   > resonanceが選んだのを基準としたシャッフルプレイリストも作りたい
-   *
-   * ★どちらも AI を呼ばない。**通信もお金もかからない。**
-   * 「辿る」で 1 回呼んだ結果を並べ替えるだけ。
-   */
-  const 作る = (名, 説明, シャッフルするか) => {
-    const b = document.createElement("button");
-    b.className = "restag";
-    b.textContent = 名;
-    b.title = 説明;
-    b.onclick = () => 響きを一本にする(シャッフルするか);
-    box.appendChild(b);
-  };
-  作る("📃 このまま一本に", "いま見えている響きの曲を、並び順のまま再生リストにします", false);
-  作る("🔀 混ぜて一本に", "いま見えている響きの曲を、シャッフルして再生リストにします（同じ演者が続きません）", true);
+    const 直す = document.createElement("button");
+    直す.className = "restag"; 直す.textContent = "✎";
+    直す.title = "この言葉の名前を変える";
+    直す.onclick = () => { 言葉の名前変え = e.keyword; 描き直す(); };
 
-  // 忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
+    const 消す = document.createElement("button");
+    消す.className = "restag"; 消す.textContent = "×";
+    消す.title = "この言葉で辿ったものを消す（音楽ファイルには触りません）";
+    消す.onclick = async () => {
+      if (!confirm(`「${e.keyword}」で辿ったものを消しますか？\n\n曲は何も変わりません。`)) return;
+      const r = await window.mp3.響きをひとつ消す(e.keyword);
+      if (!r || !r.ok) { $("status").textContent = "消せませんでした（" + ((r && r.error) || "不明") + "）"; return; }
+      響きの木 = r.木;
+      響きを合わせ直す();
+      描き直す();
+      $("status").textContent = `「${e.keyword}」を消しました`;
+    };
+
+    box.append(札, 直す, 消す);
+  }
+
+  // 全部忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
   const 外す = document.createElement("button");
   外す.className = "restag";
-  外す.textContent = "× 響きを外す";
-  外す.title = "辿った木を忘れます（音楽ファイルには触りません）";
+  外す.textContent = "× 全部外す";
+  外す.title = "辿ったものを全部忘れます（音楽ファイルには触りません）";
   外す.onclick = async () => {
+    if (!confirm("辿ったものを全部忘れますか？\n\n曲は何も変わりません。")) return;
     await window.mp3.響きを消す();
     響きの木 = null; 響きの当たり = null;
-    響きを合わせ直す();                        // ★響きタブから抜けるのもここでやる
+    響きを合わせ直す();
     描き直す();
-    $("status").textContent = "響きを外しました";
+    $("status").textContent = "響きを全部外しました";
   };
   box.appendChild(外す);
 }
@@ -835,42 +781,69 @@ function 気分の欄を描く() {
     return;
   }
 
+  /*
+   * ★記入欄も、ボタンも 1 つ（2026-08-29 本人の整理）。
+   *   > AIがこちらの気分で選んだプレイリストと文脈で選んだプレイリストが欲しい
+   *   > あ、ボタンも一つにできますか？
+   *   > 記入欄の言葉でAIが気分なのか文脈なのか判断できると嬉しいのですか。
+   *
+   * 打つものは同じ（言葉）で、違うのは「どう使うか」だけだった。
+   * ★どちらかは **AI に読ませる**。1 段目の呼び出しに判定を足しただけなので、
+   * 通信は増えていない（ai.js の 頼み文 を参照）。
+   *
+   * ★どちらと読んだかは画面に出す。黙って振り分けると、
+   * なぜその選曲になったのか分からなくなる。
+   */
   const 印 = document.createElement("span");
-  印.textContent = "🤖";
+  印.textContent = "🎧";
   const 欄 = document.createElement("input");
   欄.id = "aiword";
   // ★具体例は書かない（公開するので、作者の好みが出てしまう）
-  欄.placeholder = "いまの気分を書く";
-  const 押す = document.createElement("button");
-  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "選んでもらう";
+  欄.placeholder = "言葉を書く";
+  欄.value = 打ちかけの言葉;
+  欄.oninput = () => { 打ちかけの言葉 = 欄.value; };
+
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
+  const 押す = document.createElement("button");
+  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "一本を組む";
+  押す.title = "書いた言葉を AI が読んで、気分なら合うジャンルから、名前ならそこから辿って、一本を組みます";
+
   const 走る = async () => {
-    const 気分 = 欄.value.trim();
-    if (!気分) return;
+    const v = 欄.value.trim();
+    if (!v) return;
     押す.disabled = true; 欄.disabled = true;
-    言った.textContent = "聞いています…";
-    const r = await window.mp3.気分でおすすめ({
-      気分, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
-    });
-    押す.disabled = false; 欄.disabled = false;
-    if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
-    /*
-     * ★2 段構え（2026-08-29 本人の選択）。
-     *   1 段目 気分 → 絞り込み（約 1.0 円）… どの範囲から選ぶかを決める
-     *   2 段目 その範囲から 200 曲引いて → 30 曲の一本に並べる（約 7.3 円）
-     *
-     * ★1 段目を挟むのは、86,000 曲から無作為に 200 曲引いても
-     * 気分に合わないから。先に範囲を絞ってから引く。
-     * 絞り込みは 3 カラムに出るので、**AI がどこから選んだかが見える。**
-     */
-    当てはめる(r.結果);
-    押す.disabled = true; 欄.disabled = true;
+    言った.textContent = "読んでいます…";
     try {
-      await AIに一本組ませる(気分, 言った);
+      const r = await window.mp3.気分でおすすめ({
+        気分: v, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
+      });
+      if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
+
+      if (r.結果.種類 === "文脈") {
+        /*
+         * ★名前だと読んだ → 辿ってから、見つかったものだけで一本を組む。
+         * 辿って終わりにしない。押したら一本できる、が分かりやすい
+         * （ボタンが並んでいると押してしまう、と実地で言われた）。
+         */
+        $("status").textContent = `「${v}」を**名前**と読みました ― そこから辿ります`;
+        const 足りた = await 木を生やして足す(v, $("aisaid") || 言った);
+        if (!足りた) return;
+        カラムタブ = "resonance";
+        sel = { ...sel, 言葉: new Set([小文字(v)]), 響演者: null, 響盤: null };
+        描き直す();
+        await AIに一本組ませる(v, $("aisaid") || 言った);
+        return;
+      }
+
+      // 気分だと読んだ → いままでどおり、絞り込んでから一本を組む
+      当てはめる(r.結果);
+      await AIに一本組ませる(v, $("aisaid") || 言った);
     } finally {
-      押す.disabled = false; 欄.disabled = false;
+      const b = $("aigo"); const i = $("aiword");
+      if (b) b.disabled = false;
+      if (i) i.disabled = false;
     }
   };
   押す.onclick = 走る;
@@ -906,7 +879,7 @@ function 当てはめる(結果) {
   const 無し = 結果.無かったもの.length ? "／手元に無かったもの: " + 結果.無かったもの.join(", ") : "";
   const 言った = $("aisaid");
   if (言った) 言った.textContent = 結果.ひとこと || 選んだ;
-  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
+  $("status").textContent = `「${打ちかけの言葉}」を**気分**と読みました ― ${選んだ} ／ ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
 }
 
 /** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
@@ -1988,8 +1961,26 @@ function 描き直す() {
  *   ・人の操作で状態が変わった → 必ず全部描き直す（描き直す）
  *   ・裏でデータが増えた       → 入力中なら触らない（ここ）
  */
+/**
+ * 裏（走査の途中経過など）からの描き直し。
+ *
+ * ★入力中は触らない。
+ * 2026-08-29 実地、本人からの報告:
+ *   > ライブラリの削除をした後に、resonanceやAIの記入欄に文字を入れようとしたら
+ *   > 文字を入れられなかった（スキャン中だから重くなってるだけかも？）
+ *
+ * 重かったのではなかった。**走査中は 1.5 秒ごとにここが呼ばれ、
+ * そのたびに欄が作り直されて、焦点も打った字も飛んでいた。**
+ *
+ * ★ここが守っていたのは、古い 2 つの入力だけだった。
+ * あとから欄を足すたびに、ここに足さないと同じ目に遭う。
+ * **だから個別に並べず、「いま文字を打っている最中か」で見る。**
+ */
 function 裏で描き直す() {
-  if (名前入力 || タグ編集) return;             // 入力中は触らない
+  if (名前入力 || タグ編集 || キー入力) return;
+  // いま画面のどこかの入力欄に焦点があるなら、触らない
+  const い = document.activeElement;
+  if (い && (い.tagName === 'INPUT' || い.tagName === 'TEXTAREA')) return;
   描き直す();
 }
 
