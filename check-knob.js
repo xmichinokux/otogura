@@ -277,6 +277,8 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
       const e = {
         style: {}, dataset: {}, children: [], textContent: '', className: '', id: '',
         append: (...xs) => e.children.push(...xs),
+        // ★組む範囲の欄を足したので（2026-08-30）
+        appendChild: (x) => { e.children.push(x); return x; },
       };
       作られたもの.push(e);
       return e;
@@ -298,6 +300,16 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
 
     const 行 = つまみの行();
     確認('行ができる', !!行 && 行.className === 'knobs');
+    /*
+     * ★どこから組むのかを出す欄が、行に付いているか（2026-08-30）。
+     * 本人が「プレイリスト内の曲内で再度プレイリストを作る誤爆」を繰り返した。
+     * 押す前に範囲が見えないと、また同じことが起きる。
+     */
+    確認(
+      '★組む範囲を出す欄が、行に付いている',
+      行.children.some((c) => c && c.className === 'scope'),
+      '押す前にどこから組むのかが見えないと、誤爆が続きます',
+    );
     const 全部 = (e) => (e ? [e, ...e.children.flatMap(全部)] : []);
     const 中身 = 全部(行);
     const 引く = (id) => 中身.find((e) => e.id === id);
@@ -712,6 +724,96 @@ console.log('\n[8-e] ★文脈の強度に、この人の蔵書という足場�
   );
 }
 
+console.log('\n[8-f] ★組む元は、開いている再生リストではなく、カラムの絞り込みか');
+/*
+ * ■ 本人の報告（2026-08-30）
+ *   > ライブラリを開いて聞いてる時に AI DJ や Resonance で新しいプレイリストを
+ *   > 作ろうとして、プレイリスト内の曲内で再度プレイリストを作る誤爆を
+ *   > 何度もやってしまいます。
+ *   > カラム上ではジャンル選択をするからちゃんと選んでる気になって操作してしまいます。
+ *
+ * ★こちらの作りが悪かった。いまの列() は**再生リストを開いていると、その中身**を返す。
+ * 流すときはそれで正しい。でも**組むときは違った。**
+ *
+ * ★実測（下の仕込みで再現する）:
+ *   ライブラリ 100 曲、カラムでジャンルを選んで 60 曲、開いている一本 3 曲
+ *     直す前 … AI に渡る候補 **3 曲**（カラムの 60 曲が丸ごと無視される）
+ *     直した後 … AI に渡る候補 **50 曲**（カラム通り）
+ *
+ * ★ここで見張るのは 2 つ。**両方**要る。
+ *   1. 組むときは、開いている一本を見ない
+ *   2. 流すときは、開いている一本を見る（こちらを巻き添えで壊さない）
+ */
+{
+  const 画面 = fs.readFileSync(path.join(__dirname, 'src/renderer.js'), 'utf8');
+  const 切る = (名) => {
+    const 頭 = 画面.indexOf(`function ${名}(`);
+    if (頭 < 0) throw new Error(名 + ' が無い');
+    return 画面.slice(頭, 画面.indexOf(String.fromCharCode(10) + '}', 頭) + 2);
+  };
+
+  const tracks = [];
+  for (let i = 0; i < 100; i += 1) {
+    tracks.push({
+      path: 'L' + i, artist: '演者' + (i % 20), title: '曲' + i, album: '盤' + (i % 7),
+      genre: i < 60 ? 'Metal Core' : 'Punk', 鳴らせる: true,
+    });
+  }
+  const リスト = { id: 1, name: 'ゆうべの一本', tracks: ['L0', 'L1', 'L2'] };
+  const 開いているリスト = () => リスト;
+  const sel = { genre: new Set(['Metal Core']), artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
+  const 曲を並べる = (a, b) => a.path.localeCompare(b.path);
+  const 絞る = () => tracks.filter((t) => !sel.genre || sel.genre.has(t.genre));
+  const シャッフル除外 = new Set();
+  const 響きの重み表 = () => null;
+  const 再生回数 = {};
+  const 小文字 = (x) => String(x ?? '').toLocaleLowerCase('ja');
+  const { 次を選ぶ } = require('./src/shuffle.js');
+  void 開いているリスト; void sel; void 曲を並べる; void 絞る; void シャッフル除外;
+  void 響きの重み表; void 再生回数; void 小文字; void 次を選ぶ; void tracks;
+
+  const 素 = [切る('まぜる'), 切る('組む範囲'), 切る('AIに渡す候補'), 切る('いまの列')].join(String.fromCharCode(10));
+  // eslint-disable-next-line no-eval
+  const 実 = eval(素 + String.fromCharCode(10) + '({範囲: 組む範囲, 候補: AIに渡す候補, 列: いまの列})');
+
+  確認(
+    '★組む元はカラムの絞り込み（60 曲）。開いている一本ではない',
+    実.範囲().length === 60,
+    `実際: ${実.範囲().length} 曲`,
+  );
+  確認(
+    '★AI に渡る候補が、開いている一本の 3 曲に縮まない',
+    実.候補(50).length > 3,
+    'これが誤爆の正体でした。カラムで選んだのに、開いている一本から引かれていました',
+  );
+  確認(
+    '★候補は全部、カラムで選んだジャンル',
+    実.候補(50).every((c) => tracks.find((t) => t.path === c.path).genre === 'Metal Core'),
+  );
+  確認(
+    '★流す側は変えない。いまの列() は開いた一本のまま',
+    実.列().length === 3,
+    '流すときに開いた一本を無視したら、それはそれで壊れています',
+  );
+
+  /* ★押す前に、どこから組むのかが見えるか */
+  const 生 = 画面.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  確認(
+    '★「組む範囲」を欄に出している',
+    /範囲\.className = "scope"/.test(生) && /function 組む範囲を書く/.test(生),
+  );
+  確認(
+    '★描き直すたびに書き換える（カラムを触ったら数が変わる）',
+    生.slice(生.indexOf('function 描き直す(')).includes('組む範囲を書く()'),
+    '呼ばないと、古い数が出たままになります',
+  );
+  確認(
+    '★再生リストを開いているときは、組む元が違うとはっきり断る',
+    /組む元はライブラリです/.test(画面),
+    '「聴いているもの」と「組む元」が違うことが、誤爆の正体でした',
+  );
+}
+
 console.log('\n[9] ★候補が、同じバンドに偏らないか');
 /*
  * ■ 実地の報告（2026-08-29）:
@@ -734,10 +836,14 @@ console.log('\n[9] ★候補が、同じバンドに偏らないか');
     const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
     let 台 = [];
     const いまの列 = () => 台;
+    // ★組む範囲() が使う（2026-08-30。組む元をカラムに移したので）
+    const 絞る = () => 台;
+    const 曲を並べる = () => 0;
     const シャッフル除外 = new Set();
     const 響きの重み表 = () => null;
     const 再生回数 = {};
     void 次を選ぶ; void 小文字; void いまの列; void シャッフル除外; void 響きの重み表; void 再生回数;
+    void 絞る; void 曲を並べる;
 
     // eslint-disable-next-line no-eval
     const [AIに渡す候補, まぜる, 台を置く] = eval(
