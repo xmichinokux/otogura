@@ -137,7 +137,7 @@
   td.play-cell { color: var(--accent); text-align: center; cursor: pointer; }
   td.num { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 48px; }
   td.dur { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 64px; }
-  td.act { width: 84px; text-align: right; }
+  td.act { text-align: right; }   /* 幅は colgroup 側で決める（既定の列幅）。ここに書くと二重管理になる */
   .link { color: var(--dim); font-size: 11px; cursor: pointer; text-decoration: underline; }
   .link:hover { color: var(--accent); }
 

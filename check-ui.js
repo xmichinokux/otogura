@@ -124,6 +124,61 @@ if (process.versions.electron) {
               } catch (e) { return { 失敗: String(e && e.message || e) }; }
             })();
 
+            /*
+             * ★操作の文字が、欄に収まっているか（2026-08-29 実地）。
+             *
+             * 本人からの報告:
+             *   > 一覧から外すの項目が狭すぎなのか一部しか表示されていない
+             *
+             * 測ったら、欄は 92px しかないのに文字は 187px 要った。
+             * td は overflow:hidden なので、**「一覧から外す」は 1 文字も出ていなかった。**
+             *
+             * ★これは開いて測るまで分からない種類。文字の幅は字体で決まるので、
+             * ソースを読んでも数えられない。だからここで測る。
+             */
+            const 操作欄検査 = (() => {
+              try {
+                const 元t = tracks; const 元l = lists; const 元id = 開いているID;
+                const 測る = (要素) => {
+                  const s = document.createElement('span');
+                  s.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:' + getComputedStyle(要素).font;
+                  s.textContent = 要素.textContent;
+                  document.body.appendChild(s);
+                  const w = Math.ceil(s.getBoundingClientRect().width);
+                  s.remove();
+                  return w;
+                };
+                const 見る = () => {
+                  const table = document.getElementById('table');
+                  const cell = table.querySelector('tbody tr td.act');
+                  if (!cell) return { 行なし: true };
+                  const 包み = table.parentElement;
+                  return {
+                    幅: Math.round(cell.getBoundingClientRect().width),
+                    要る: 測る(cell),
+                    文: cell.textContent,
+                    横棒が出る: 包み ? 包み.scrollWidth > 包み.clientWidth + 1 : false,
+                  };
+                };
+                const 作る = (i) => ({
+                  path: 'C:/検査/' + i + '.mp3', title: 'とても長い曲名のれんしゅう ' + i,
+                  artist: 'アーティスト名', album: 'アルバム名', genre: 'G', track: i,
+                  duration: 200, タグあり: true,
+                });
+                tracks = [作る(1), 作る(2)];
+
+                開いているID = null; lists = []; 一覧を描く();
+                const ライブラリ = 見る();
+
+                lists = [{ id: '検査用', name: '検査', tracks: tracks.map((t) => t.path) }];
+                開いているID = '検査用'; 一覧を描く();
+                const 再生リスト = 見る();
+
+                tracks = 元t; lists = 元l; 開いているID = 元id; 一覧を描く();
+                return { ライブラリ, 再生リスト };
+              } catch (e) { return { 失敗: String((e && e.message) || e) }; }
+            })();
+
             const み = (id) => {
               const e = document.getElementById(id);
               if (!e) return { ある: false };
@@ -139,6 +194,7 @@ if (process.versions.electron) {
               エラー: window.__検査エラー || null,
               音を読む検査,
               再生ボタン検査,
+              操作欄検査,
             };
           })()`);
           r.時間の記録 = 記録;
@@ -229,6 +285,33 @@ const 時間切れ = setTimeout(() => { 子.kill(); }, 60000);
     確認('★曲があれば ▶ が押せる', 再.曲があれば押せる, 'ここが NG だと、曲を選ぶまで ▶ を押せません');
     確認('曲が無ければ ▶ は押せない', 再.曲なしで押せない);
     確認('鳴らせない曲しか無ければ ▶ は押せない', 再.鳴らない曲だけなら押せない);
+  }
+
+  /*
+   * ★操作の文字が、欄に収まっているか（2026-08-29 実地）。
+   *
+   * 本人からの報告:
+   *   > 一覧から外すの項目が狭すぎなのか一部しか表示されていない
+   *
+   * 測ったら 92px の欄に 187px の文字で、**「一覧から外す」は 1 文字も出ていなかった。**
+   * 押せないより悪い ―― **そこにあることが分からない。**
+   *
+   * ★文字の幅は字体で決まるので、ソースを読んでも数えられない。開いて測るしかない。
+   * ★ついでに横棒（横スクロール）も見る。欄を広げて直すと、今度は表がはみ出す。
+   */
+  const 操作 = r.操作欄検査;
+  if (!操作 || 操作.失敗) {
+    確認('一覧の操作欄を測れる', false, 操作 ? 操作.失敗 : '結果が返っていません');
+  } else {
+    for (const [札, v] of [['ライブラリ', 操作.ライブラリ], ['再生リスト', 操作.再生リスト]]) {
+      if (!v || v.行なし) { 確認(`${札}の操作欄を測れる`, false, '行が出ていません'); continue; }
+      確認(
+        `★${札}: 操作の文字が切れていない`,
+        v.幅 >= v.要る,
+        `欄 ${v.幅}px / 文字 ${v.要る}px「${v.文}」― 足りないと、後ろの操作が見えません`,
+      );
+      確認(`${札}: 表が横にはみ出さない`, !v.横棒が出る, '欄を広げすぎると横棒が出ます');
+    }
   }
 
   確認('再スキャンのボタンがある', r.再スキャン && r.再スキャン.見えている);
