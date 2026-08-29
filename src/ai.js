@@ -45,6 +45,32 @@
  * ─────────────────────────────────────────────────────────
  */
 
+/*
+ * ★受け取り方は「流し込み（streaming）」にする（2026-08-29 実測）。
+ *
+ * ■ 本人からの報告:
+ *   > carcassを対象幅最大、選出量最大で試したらエラーが出ました。
+ *   > Streaming is required for operations that may take longer than 10 minutes.
+ *
+ * ★SDK の中に、はっきり境目が書いてある（client.js）:
+ *
+ *     expectedTime = 60分 × max_tokens / 128000
+ *     expectedTime > 10分 なら、流し込みでないと断る
+ *
+ *   つまり **max_tokens が 21,333 を超えたら、流し込みでないと通らない。**
+ *
+ * 0.18.1 で上限を上げたとき、幅5 が 25,500 になってこの線を越えた。
+ *   幅3 … 17,250（通る）／ 幅5 … 25,500（★通らない）
+ * 本人がちょうど幅を最大にしたので出た。
+ *
+ * ★上限を下げて逃げない。**流し込みにすれば、上限の縛りが無くなる。**
+ * 待ち時間の問題であって、長い返事が要ることは変わらないため。
+ *
+ * ★書き換えは小さい。stream() にして finalMessage() を待つだけ。
+ * 構造化した返事（parsed_output）は、流し込みでも同じように付いてくる
+ * （SDK の MessageStream が maybeParseMessage を通している）。
+ */
+
 /** 使う型。ここを変えたら README の「何を送るか」も直すこと */
 const 使うモデル = 'claude-opus-5';
 
@@ -251,7 +277,8 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
 
   try {
     const client = new Anthropic({ apiKey: キー });
-    const 返り = await client.messages.parse({
+    // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    const 返り = await client.messages.stream({
       model: 使うモデル,
       // ★短い返事だが、考えたぶんも含まれるので余裕を取る
       max_tokens: 8000,
@@ -263,7 +290,7 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
        * 高くすると待ち時間と費用が増えるだけ。
        */
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
-    });
+    }).finalMessage();
 
     if (返り.stop_reason === 'refusal') {
       return { ok: false, error: 'AI が答えを断りました（' + (返り.stop_details && 返り.stop_details.category ? 返り.stop_details.category : '理由不明') + '）' };
@@ -389,7 +416,8 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
 
   try {
     const client = new Anthropic({ apiKey: キー });
-    const 返り = await client.messages.parse({
+    // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    const 返り = await client.messages.stream({
       model: 使うモデル,
       /*
        * ★番号とひとことを曲数ぶん返させるので、ここは切り詰めない。
@@ -404,7 +432,7 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
       system: プレイリストの頼み文(気分.trim(), 頼む曲数, 響き, 演者の数),
       messages: [{ role: 'user', content: '■ 候補（番号／アーティスト／曲名／アルバム）\n' + 表 }],
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
-    });
+    }).finalMessage();
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました。「選出の量」を 1 つ減らして、もう一度お試しください' };
     const 出 = 返り.parsed_output;
@@ -679,7 +707,8 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
 
   try {
     const client = new Anthropic({ apiKey: キー });
-    const 返り = await client.messages.parse({
+    // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    const 返り = await client.messages.stream({
       model: 使うモデル,
       /*
        * ★返事の上限。**考えたぶんも、ここに含まれる。**
@@ -714,7 +743,7 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
        * 出てくるものが変わらなければ、low に戻すこと。
        */
       output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
-    });
+    }).finalMessage();
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     /*
      * ★何をすればいいかまで言う。「切れました」だけだと、

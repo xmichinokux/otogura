@@ -331,6 +331,87 @@ const 確認 = (名, 条件, 補足 = '') => {
     );
   }
 
+  console.log('\n[8-c] ★どのつまみでも、SDK に断られないか');
+  /*
+   * ■ 実地の不具合（2026-08-29）。本人からの報告:
+   *   > carcassを対象幅最大、選出量最大で試したらエラーが出ました。
+   *   > Streaming is required for operations that may take longer than 10 minutes.
+   *
+   * ★SDK の中に、はっきり境目が書いてある（client.js）:
+   *     expectedTime = 60分 × max_tokens / 128000
+   *     expectedTime > 10分 なら断る  →  **max_tokens 21,333 が上限**
+   *
+   * 0.18.1 で上限を上げたとき、幅5 が 25,500 になって越えた。
+   * 幅3（17,250）では起きないので、**いちばん広いところでしか出ない。**
+   *
+   * ★だから、つまみを端まで動かして確かめる。真ん中だけ見ても出ない。
+   * ★本物の API は呼ばない。届かない宛先に投げて、**断られ方だけ**を見る。
+   *   「Streaming is required」で止まれば SDK に断られている。
+   *   通信のところまで行けば、SDK は通したということ。
+   */
+  {
+    const ai = require('./src/ai');
+    const Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+    const { z } = require('zod');
+    const { zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod');
+
+    const かたち = z.object({ x: z.string() });
+    const 客 = new Anthropic({
+      apiKey: 'sk-ant-test-not-a-real-key',
+      baseURL: 'http://127.0.0.1:1/v1',   // 届かない宛先
+      maxRetries: 0,
+    });
+    const 投げる = async (max_tokens, effort) => {
+      try {
+        await 客.messages.stream({
+          model: 'claude-opus-5',
+          max_tokens, system: 'x', messages: [{ role: 'user', content: 'x' }],
+          output_config: { effort, format: zodOutputFormat(かたち) },
+        }).finalMessage();
+        return '通った';
+      } catch (e) {
+        const m = String((e && e.message) || e);
+        if (/Streaming is required/.test(m)) return 'SDK に断られた';
+        return '宛先まで行った';
+      }
+    };
+
+    /* 木（辿る）― 幅を端から端まで */
+    for (const 目盛 of [1, 3, 5]) {
+      const n = Math.max(16000, ai.幅を読む(目盛).名前 * 150 + 12000);
+      const r = await 投げる(n, 'medium');
+      確認(
+        `★辿る・幅${目盛}（max_tokens ${n}）が SDK を通る`,
+        r !== 'SDK に断られた',
+        `${r}（21,333 を超えるなら流し込みで受けること）`,
+      );
+    }
+
+    /* 一本を組む ― 量を端から端まで */
+    for (const 目盛 of [1, 3, 5]) {
+      const n = Math.max(16000, ai.量を読む(目盛).曲数 * 220 + 8000);
+      const r = await 投げる(n, 'low');
+      確認(
+        `★一本・量${目盛}（max_tokens ${n}）が SDK を通る`,
+        r !== 'SDK に断られた',
+        `${r}`,
+      );
+    }
+
+    /* 受け方が流し込みになっているか（書いてあることも見る） */
+    const 本文 = require('node:fs').readFileSync(require('node:path').join(__dirname, 'src/ai.js'), 'utf8');
+    確認(
+      '★3 か所とも流し込みで受けている',
+      (本文.match(/messages\.stream\(/g) || []).length === 3
+        && (本文.match(/\.finalMessage\(\)/g) || []).length === 3,
+      'messages.parse は 21,333 を超えると断られます',
+    );
+    確認(
+      '★流し込みでない受け方が残っていない',
+      !/messages\.parse\(/.test(本文),
+    );
+  }
+
   console.log('\n[9] ★木を生やすのも、キーが無ければ壊れない');
   for (const [名, 引数] of [
     ['キーなし', { 言葉: 'Unbroken' }],
