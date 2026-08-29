@@ -748,7 +748,11 @@ function AIに渡す候補(何曲) {
       引いた.add(p);
       盤数.set(盤の名(p), (盤数.get(盤の名(p)) ?? 0) + 1);
       const t = 表.get(p);
-      出.push({ 番号: 出.length + 1, path: p, artist: t.artist, title: t.title, album: t.album });
+      出.push({
+        番号: 出.length + 1, path: p, artist: t.artist, title: t.title, album: t.album,
+        // ★この範囲でその演者を何曲持っているか。文脈の強度の足場になる
+        曲数: 束.get(k).length,
+      });
       増えた += 1;
     }
     /*
@@ -793,11 +797,21 @@ async function AIに一本組ませる(気分, 言った) {
     言った.textContent = 'この範囲には、組める曲がありません';
     return false;
   }
-  言った.textContent = `${候補.length} 曲から組んでいます…`;
+  /*
+   * ★幅を広げても増えないときは、そう言う（2026-08-30 本人の指摘）。
+   *   > 対象幅や文脈の強度をいじって選んでたんですが、結果があまり変わらない
+   *
+   * 実測: ジャンル「Metal Core」は 2,843 曲・232 組。
+   * 幅4（候補 400）で **232 組ぜんぶ**が入る。幅5 にしても増えない。
+   * 効かないつまみを黙って置いておくと、動かし続けることになる。
+   */
+  const 頭打ち = 候補.length < 大きさ.候補の数;
+  言った.textContent = `${候補.length} 曲から組んでいます…`
+    + (頭打ち ? '（この範囲はこれで全部です）' : '');
 
   const r = await window.mp3.AIにプレイリストを作らせる({
     気分,
-    候補: 候補.map((c) => ({ 番号: c.番号, artist: c.artist, title: c.title, album: c.album })),
+    候補: 候補.map((c) => ({ 番号: c.番号, artist: c.artist, title: c.title, album: c.album, 曲数: c.曲数 })),
     // ★響きで当たったものを渡す。description が「なぜおすすめか」になる
     響き: (響きの当たり ? 響きの当たり.当たり : []).map((a) => ({
       artist: a.artist, description: a.description, keyword: a.keyword, depth: a.depth, 曲数: a.曲数,
@@ -873,7 +887,10 @@ async function AIに一本組ませる(気分, 言った) {
   const 散らし = 重なり
     ? `（${重なり} 組が 2 曲以上 ― この範囲には ${r.結果.演者の数 ?? 数.size} 組しかいません）`
     : '（すべて別の演者です）';
-  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${散らし}${落ち}${減り}　▶ で頭から流れます`;
+  const 打ち止め = 頭打ち
+    ? `　※ この範囲は ${候補.length} 曲で全部なので、対象の幅を広げても増えません`
+    : '';
+  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${散らし}${落ち}${減り}${打ち止め}　▶ で頭から流れます`;
   return true;
 }
 
