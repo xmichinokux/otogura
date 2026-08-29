@@ -31,7 +31,14 @@ Windows 用の音楽プレイヤー（Electron）。
 見分けがつきませんでした。中にも `#PLAYLIST:` で名前を書くので、
 プレイヤーの一覧にも音蔵と同じ名前で並びます。
 
+```
+Otogura_腐液のゴボゴボ行進/
+  腐液のゴボゴボ行進.m3u        ← 中に #PLAYLIST:腐液のゴボゴボ行進
+  01 - Napalm Death - Scum.mp3
+```
 
+★#PLAYLIST には**飾りを落とさない名前**を書きます。ファイル名のほうは
+スマホで使えない字を落とすので、絵文字や記号が変わることがあります。
 
 **左の一覧を狭めても、名前が潰れないようにしました。**
 幅で縮めると名前の頭だけが並んで、**どれがどれか分からなくなっていました。**
@@ -528,13 +535,13 @@ aiff と m4p は鳴らないので拾いません。
 PowerShell で次を実行し、下の値と一致するか見てください。
 
 ```
-Get-FileHash Otogura-Setup-0.22.0.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.22.1.exe -Algorithm SHA256
 ```
 
 | ファイル | SHA256 |
 |---|---|
-| `Otogura-Setup-0.22.0.exe` | `4cb30b8e717efa295143a3e41a354f3ff800812827918f1881dc1ddf4e53256f` |
-| `Otogura-Portable-0.22.0.exe` | `6ab52ab815d4e2680cd591f96772b7dba3b734d33155bc6243df2aa6d84a6f4f` |
+| `Otogura-Setup-0.22.1.exe` | `b47881e550ff91a6bf822e4158525f5a574dca9b6a1fdc6adfe742bb9afcadfd` |
+| `Otogura-Portable-0.22.1.exe` | `85f6bc241948b9b091ed7b5bfc95e78b53da03c1e84cb8ed462d5e5116b52c21` |
 
 ★これは**途中で書き換えられていないこと**の確認です。
 「作った人が信用できるか」は別の話なので、そこは中身を読んで判断してください。
