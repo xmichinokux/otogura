@@ -376,13 +376,13 @@ aiff と m4p は鳴らないので拾いません。
 PowerShell で次を実行し、下の値と一致するか見てください。
 
 ```
-Get-FileHash Otogura-Setup-0.18.0.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.18.1.exe -Algorithm SHA256
 ```
 
 | ファイル | SHA256 |
 |---|---|
-| `Otogura-Setup-0.18.0.exe` | `8d35d061b1df241e27d998a74b2e253028a78fceb5aa975e38cdb05184293bed` |
-| `Otogura-Portable-0.18.0.exe` | `1ada70c955c89e7774e163185770e811067f20783932cf2d8cd29a605796f865` |
+| `Otogura-Setup-0.18.1.exe` | `e341b4c1c76a69df1aad3dabcead1710e4e70e48056b26a437f147b81f0f9628` |
+| `Otogura-Portable-0.18.1.exe` | `fedb89c480426b07516e062ff83b8c61ff6c40e7f119c6779e8b406022d9bbdc` |
 
 ★これは**途中で書き換えられていないこと**の確認です。
 「作った人が信用できるか」は別の話なので、そこは中身を読んで判断してください。
