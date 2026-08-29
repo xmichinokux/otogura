@@ -62,7 +62,42 @@ let 音量 = 1;
  * ★空集合は作らない。最後の 1 つを外したら null（すべて）に戻す。
  * 空のまま残すと、下の一覧が 0 件になって「壊れた」ようにしか見えない。
  */
-let sel = { genre: null, artist: null, album: null };
+let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+
+/*
+ * 3 カラムに何を出すか（2026-08-29 本人の希望）。
+ *   > 「日付」タブみたいなものを用意して年、月、日を選べる感じで。
+ *   > そこでタブを切り替えて選べる、みたいな感じで。
+ *
+ * ★切り替えても、**前のタブの絞り込みは残す**（本人の選択）。
+ * 「ジャンル=Hardcore」を選んでから日付タブで「2015 年」を選ぶと、
+ * その掛け合わせになる。絞り込みは 絞る() 一か所に集まっているので、
+ * 両方を重ねるだけで済む。
+ * ★残す以上、**隠れている側に絞り込みがあることをタブに出す**。
+ * 出さないと「なぜこれしか出ないのか」が分からなくなる。
+ */
+let カラムタブ = 'tag';                                // 'tag' | 'date'
+
+/** 年月日を、そのタブの列に出す文字にする。日付が無ければ null */
+const 年月日 = {
+  年: (t) => (t.更新日時 > 0 ? String(new Date(t.更新日時).getFullYear()) : null),
+  月: (t) => (t.更新日時 > 0 ? 日付(t.更新日時).slice(0, 7) : null),
+  日: (t) => (t.更新日時 > 0 ? 日付(t.更新日時) : null),
+};
+
+/** タブごとの列の並び（左から） */
+const カラムタブの列 = {
+  tag: [
+    { key: 'genre', 見出し: 'ジャンル', 取る: (t) => t.genre },
+    { key: 'artist', 見出し: 'アーティスト', 取る: (t) => t.artist },
+    { key: 'album', 見出し: 'アルバム', 取る: (t) => t.album },
+  ],
+  date: [
+    { key: '年', 見出し: '年', 取る: 年月日.年, 新しい順: true },
+    { key: '月', 見出し: '月', 取る: 年月日.月, 新しい順: true },
+    { key: '日', 見出し: '日', 取る: 年月日.日, 新しい順: true },
+  ],
+};
 
 /** 小文字にして比べる（列のまとめ方と同じ規則） */
 const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
@@ -80,9 +115,9 @@ const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
 let シャッフル除外 = new Set();
 
 /** Shift の範囲選択で使う、直前に押した位置（列ごと） */
-let 列の起点 = { genre: null, artist: null, album: null };
+let 列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
 /** いま列に出している並び（Shift の範囲を数えるのに使う） */
-let 列の並び = { genre: [], artist: [], album: [] };
+let 列の並び = { genre: [], artist: [], album: [], 年: [], 月: [], 日: [] };
 /** いま再生している曲の path */
 let nowPath = null;
 /** 再生リスト。{ id, name, tracks: string[] } */
@@ -264,15 +299,34 @@ function 見える曲() {
   return タグ無しを隠す ? tracks.filter((t) => t.タグあり) : tracks;
 }
 
+/**
+ * ある曲が、そのタブの「左から n 列ぶん」の選択に合うか。
+ *
+ * ★列でまとめたのと同じ規則で見る（小文字にして比べる）。
+ * 厳密比較にすると「まとめて表示したのに、選ぶと片方しか出ない」ことになる。
+ */
+function タブに合う(t, タブ名, n) {
+  const 列 = カラムタブの列[タブ名];
+  for (let i = 0; i < n && i < 列.length; i += 1) {
+    const 選 = sel[列[i].key];
+    if (!選) continue;                             // すべて
+    const v = 列[i].取る(t);
+    if (v === null || !選.has(小文字(v))) return false;
+  }
+  return true;
+}
+
+/**
+ * 選択に合う曲。level より手前の選択だけを使う（列ごとの候補を出すため）。
+ *
+ * ★level が効くのは**いま開いているタブだけ**。
+ * 隠れているタブは、いつも全部の列を効かせる。
+ * こうしないと、タブを切り替えた瞬間に向こうの絞り込みが緩んで、
+ * **一覧に出る曲が勝手に増える。**「残す」と言った以上、残らないと嘘になる。
+ */
 function 絞る(level) {
-  // 列でまとめたのと同じ規則で絞る。ここを厳密比較にすると、
-  // 「まとめて表示したのに、選ぶと片方しか出ない」ことになる
-  return 見える曲().filter((t) => {
-    if (level > 0 && sel.genre && !sel.genre.has(小文字(t.genre))) return false;
-    if (level > 1 && sel.artist && !sel.artist.has(小文字(t.artist))) return false;
-    if (level > 2 && sel.album && !sel.album.has(小文字(t.album))) return false;
-    return true;
-  });
+  const 別 = カラムタブ === 'tag' ? 'date' : 'tag';
+  return 見える曲().filter((t) => タブに合う(t, カラムタブ, level) && タブに合う(t, 別, 3));
 }
 
 /**
@@ -297,10 +351,52 @@ function まとめる(値の並び) {
 }
 
 
-function 列を描く(ulId, level, 値を取る, 選択中, key) {
+/** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
+function カラムタブの選択数(タブ名) {
+  return カラムタブの列[タブ名].reduce((n, 列) => n + (sel[列.key] ? sel[列.key].size : 0), 0);
+}
+
+/**
+ * 3 カラムの中身を切り替えるタブ。
+ *
+ * ★隠れている側に絞り込みが残っていたら、そのタブに件数を出す。
+ * 「残す」と決めた以上、**見えないところで効いている絞り込み**ができる。
+ * 出さないと「なぜこれしか出ないのか」が分からなくなる。
+ */
+function カラムタブを描く() {
+  const box = $('coltabs');
+  box.innerHTML = '';
+  for (const [名, 表示] of [['tag', 'ジャンル / アーティスト / アルバム'], ['date', '日付（年 / 月 / 日）']]) {
+    const b = document.createElement('button');
+    b.textContent = 表示;
+    b.className = カラムタブ === 名 ? 'on' : '';
+    const 数 = カラムタブの選択数(名);
+    if (数 && カラムタブ !== 名) {
+      const m = document.createElement('span');
+      m.className = 'mark';
+      m.textContent = `● ${数}`;
+      b.appendChild(m);
+      b.title = `このタブで ${数} 個選んだままです（絞り込みは効いています）`;
+    }
+    b.onclick = () => { カラムタブ = 名; 描き直す(); };
+    box.appendChild(b);
+  }
+}
+
+function 列を描く(ulId, level, 定義) {
+  const { key, 取る: 値を取る } = 定義;
+  const 選択中 = sel[key];
   const ul = $(ulId);
   ul.innerHTML = '';
-  const 全部 = まとめる(絞る(level).map(値を取る));
+  /*
+   * ★null を落としてから、まとめる に渡す。
+   * 日付タブは、日付の分からない曲で null を返す。
+   * 落とさないと まとめる の中で小文字にしようとして落ちる。
+   */
+  const 素材 = 絞る(level).map(値を取る).filter((v) => v !== null && v !== undefined && v !== '');
+  const 全部 = まとめる(素材);
+  // ★日付の列は新しい順。古い順に並べても、探したいのはたいてい最近のもの
+  if (定義.新しい順) 全部.reverse();
 
   // 打ち込んだ字で絞る（大文字小文字は区別しない）
   const 語 = (列の絞り[key] || '').trim().toLocaleLowerCase('ja');
@@ -369,7 +465,7 @@ function 列を描く(ulId, level, 値を取る, 選択中, key) {
  * 一度に描けるのは 300 件までなので、**打ち込んで探せないと大半に手が届かない。**
  * 上限を上げると固まるので、探す手立てのほうを用意する。
  */
-let 列の絞り = { genre: '', artist: '', album: '' };
+let 列の絞り = { genre: '', artist: '', album: '', 年: '', 月: '', 日: '' };
 
 function 列の絞りを作る(ul, key, 件数) {
   const li = document.createElement('li');
@@ -409,7 +505,8 @@ function 列の絞りを作る(ul, key, 件数) {
  * **実体の無い組み合わせ**が残ると、なぜ 0 件なのか分からなくなる。
  */
 function 選ぶ(level, 値, e = null) {
-  const key = ['genre', 'artist', 'album'][level];
+  const 列 = カラムタブの列[カラムタブ];
+  const key = 列[level].key;
 
   let 次 = null;                                 // null = すべて
   if (値 !== null) {
@@ -438,10 +535,16 @@ function 選ぶ(level, 値, e = null) {
     列の起点[key] = null;
   }
 
-  if (level === 0) sel = { genre: 次, artist: null, album: null };
-  else if (level === 1) sel = { ...sel, artist: 次, album: null };
-  else sel = { ...sel, album: 次 };
-  if (level < 2) { 列の起点.album = null; if (level < 1) 列の起点.artist = null; }
+  /*
+   * ★上の列を選び直したら、**そのタブの**下の列だけ外す。
+   * 別のタブの選択には触らない（「切り替えても残す」と決めたので）。
+   */
+  sel = { ...sel, [key]: 次 };
+  for (let i = level + 1; i < 列.length; i += 1) {
+    sel[列[i].key] = null;
+    列の起点[列[i].key] = null;
+    列の絞り[列[i].key] = '';
+  }
   描き直す();
 }
 
@@ -1134,7 +1237,8 @@ function タグ編集を描く(box) {
      * 一覧から消えるので、**変わっていないように見える。**
      * 直したあとは、どこへ行ったか分かるように絞りを外して全部出す。
      */
-    sel = { genre: null, artist: null, album: null };
+    // ★日付タブぶんも一緒に外す。片方だけ残ると「絞ったつもりが無いのに出ない」になる
+    sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
     描き直す();
 
     // 黙って終わらせない。失敗があれば必ず見せる。何件読み直したかも出す
@@ -1287,9 +1391,14 @@ function 道具を描く() {
 }
 
 function 描き直す() {
-  列を描く('c-genre', 0, (t) => t.genre, sel.genre, 'genre');
-  列を描く('c-artist', 1, (t) => t.artist, sel.artist, 'artist');
-  列を描く('c-album', 2, (t) => t.album, sel.album, 'album');
+  const 列たち = カラムタブの列[カラムタブ];
+  ['c-genre', 'c-artist', 'c-album'].forEach((id, i) => {
+    // 見出しも中身に合わせて書き換える（ジャンル/アーティスト/アルバム ↔ 年/月/日）
+    const h = $(id).parentElement.querySelector('h2');
+    if (h) h.textContent = 列たち[i].見出し;
+    列を描く(id, i, 列たち[i]);
+  });
+  カラムタブを描く();
   タブを描く();
   道具を描く();
   一覧を描く();

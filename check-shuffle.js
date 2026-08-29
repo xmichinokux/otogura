@@ -261,7 +261,7 @@ const 台 = 台を作る();
    ─────────────────────────────────────────────── */
 console.log('\n■ 3 カラムの複数選択（絞る / 選ぶ）');
 
-const 始め5 = 画面.indexOf('function 絞る(level)');
+const 始め5 = 画面.indexOf('function タブに合う(t, タブ名, n)');
 const 終わり5 = 画面.indexOf('\n}', 画面.indexOf('function 選ぶ(level, 値, e = null)'));
 if (始め5 < 0 || 終わり5 < 0) {
   console.log('  NG   renderer.js から「絞る / 選ぶ」を切り出せませんでした');
@@ -274,14 +274,37 @@ function 列を走らせる(曲たち) {
   const 前置き = `
     const 見える曲 = () => 環境.tracks;
     const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
-    let sel = { genre: null, artist: null, album: null };
-    let 列の起点 = { genre: null, artist: null, album: null };
-    let 列の並び = { genre: [], artist: [], album: [] };
+    let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+    let カラムタブ = 環境.カラムタブ ?? 'tag';
+    // ★テンプレートリテラルは使わない。ここ自体が前置きのテンプレートの中なので、
+    //   ドル記号と波括弧の並びが、外側に食われるため（実際に一度やった）。
+    const 日付 = (ms) => { const d = new Date(ms); const 二 = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + 二(d.getMonth() + 1) + '-' + 二(d.getDate()); };
+    const 年月日 = {
+      年: (t) => (t.更新日時 > 0 ? String(new Date(t.更新日時).getFullYear()) : null),
+      月: (t) => (t.更新日時 > 0 ? 日付(t.更新日時).slice(0, 7) : null),
+      日: (t) => (t.更新日時 > 0 ? 日付(t.更新日時) : null),
+    };
+    const カラムタブの列 = {
+      tag: [
+        { key: 'genre', 取る: (t) => t.genre },
+        { key: 'artist', 取る: (t) => t.artist },
+        { key: 'album', 取る: (t) => t.album },
+      ],
+      date: [
+        { key: '年', 取る: 年月日.年, 新しい順: true },
+        { key: '月', 取る: 年月日.月, 新しい順: true },
+        { key: '日', 取る: 年月日.日, 新しい順: true },
+      ],
+    };
+    let 列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+    let 列の並び = { genre: [], artist: [], album: [], 年: [], 月: [], 日: [] };
     function 描き直す() { 環境.描き直した += 1; }
   `;
   // eslint-disable-next-line no-new-func
   const 動かす = new Function('環境', `${前置き}\n${切り出し5}\n`
-    + ' return { 絞る, 選ぶ, sel: () => sel, 並びを入れる: (k, a) => { 列の並び[k] = a; } };');
+    + ' return { 絞る, 選ぶ, sel: () => sel, タブを変える: (v) => { カラムタブ = v; },'
+    + ' 並びを入れる: (k, a) => { 列の並び[k] = a; } };');
   return { 環境, ...動かす(環境) };
 }
 
@@ -360,6 +383,64 @@ const 台5 = () => { const t = 列を走らせる(曲たち); t.並びを入れ�
   確認4('アルバムも選べる', sel().album !== null);
   選ぶ(1, 'い', {});                            // 上の列を選び直す
   確認4('★上の列を選び直すと、下の選択は外れる', sel().album === null, '実体の無い組み合わせが残ると 0 件の理由が分からなくなります');
+}
+
+/* ───────────────────────────────────────────────
+   6. タブを切り替えても、前のタブの絞り込みが残るか（2026-08-29 本人の選択）
+
+   ★これは「残す」と決めた仕様そのもの。緩んだら黙って曲が増える。
+   ─────────────────────────────────────────────── */
+console.log('\n■ タブの掛け合わせ');
+
+const 日時 = (s) => new Date(s).getTime();
+const 曲たち6 = [
+  { path: 'q1', genre: 'Hardcore', artist: 'あ', album: 'A', タグあり: true, 更新日時: 日時('2015-07-13') },
+  { path: 'q2', genre: 'Hardcore', artist: 'い', album: 'A', タグあり: true, 更新日時: 日時('2026-08-25') },
+  { path: 'q3', genre: 'Punk',     artist: 'う', album: 'A', タグあり: true, 更新日時: 日時('2015-07-13') },
+  { path: 'q4', genre: 'Punk',     artist: 'え', album: 'A', タグあり: true, 更新日時: 日時('2026-08-25') },
+  { path: 'q5', genre: 'Punk',     artist: 'お', album: 'A', タグあり: true, 更新日時: 0 },   // 日付なし
+];
+
+{
+  const { 絞る, 選ぶ, sel, タブを変える } = 列を走らせる(曲たち6);
+  確認4('はじめは全部出る', 絞る(3).length === 5, `${絞る(3).length} 曲`);
+
+  選ぶ(0, 'Hardcore', {});                       // タグタブ: ジャンル
+  確認4('ジャンルで絞れる', 絞る(3).length === 2, `${絞る(3).length} 曲`);
+
+  タブを変える('date');
+  確認4(
+    '★タブを切り替えても、前のタブの絞り込みが残る',
+    絞る(3).length === 2,
+    `${絞る(3).length} 曲（増えていたら、切り替えた瞬間に絞り込みが緩んでいます）`,
+  );
+
+  // 日付タブの「年」の候補は、Hardcore の中だけから出るはず
+  const 年の候補 = [...new Set(絞る(0).map((t) => (t.更新日時 > 0 ? String(new Date(t.更新日時).getFullYear()) : null)).filter(Boolean))].sort();
+  確認4('★隠れているタブの絞り込みが、こちらの候補にも効く', 年の候補.join(',') === '2015,2026', `候補: ${年の候補.join(',')}`);
+
+  選ぶ(0, '2015', {});                           // 日付タブ: 年
+  確認4('★掛け合わせになる（Hardcore かつ 2015）', 絞る(3).length === 1 && 絞る(3)[0].path === 'q1', JSON.stringify(絞る(3).map((t) => t.path)));
+
+  タブを変える('tag');
+  確認4('戻っても掛け合わせのまま', 絞る(3).length === 1, `${絞る(3).length} 曲`);
+  確認4('両方のタブに選択が残っている', !!sel().genre && !!sel().年);
+
+  選ぶ(0, null);                                 // タグタブの「すべて」
+  確認4(
+    '★片方を外しても、もう片方は残る',
+    絞る(3).length === 2 && !sel().genre && !!sel().年,
+    `${絞る(3).length} 曲（2015 の 2 曲になるはず）`,
+  );
+}
+
+/* 6-b. 日付の無い曲は、日付で絞ったら出ない */
+{
+  const { 絞る, 選ぶ, タブを変える } = 列を走らせる(曲たち6);
+  タブを変える('date');
+  選ぶ(0, '2026', {});
+  const 出た = 絞る(3).map((t) => t.path).sort().join(',');
+  確認4('★日付の無い曲は、日付で絞ったら出ない', 出た === 'q2,q4', `出たもの: ${出た}`);
 }
 
 console.log(失敗4 ? `\n★ ${失敗4} 件だめでした\n` : '\nすべて通りました\n');

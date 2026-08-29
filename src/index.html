@@ -60,6 +60,17 @@
   /* ★min-height:0 が無いと、中身の多い列が 240px に収まらず下まで伸び、
      その下の曲一覧が画面外へ押し出される（68アーティストで発覚。4曲では出なかった）*/
   #cols { display: flex; flex: 0 0 240px; min-height: 0; }
+  /* 3カラムの中身を切り替えるタブ */
+  #coltabs { display: flex; gap: 4px; padding: 4px 8px 0; background: var(--sub); border-bottom: 1px solid var(--line); }
+  #coltabs button {
+    font: inherit; font-size: 12px; padding: 4px 12px; cursor: pointer;
+    border: 1px solid var(--line); border-bottom: none; background: transparent;
+    color: var(--dim); border-radius: 4px 4px 0 0;
+  }
+  #coltabs button:hover { background: #fff; }
+  #coltabs button.on { background: #fff; color: var(--accent); font-weight: 600; }
+  /* ★隠れているタブに絞り込みが残っていることを出す（出さないと理由が分からない） */
+  #coltabs button .mark { color: var(--accent); font-weight: 700; margin-left: 4px; }
   /* 3カラムの高さを掴んで変える取っ手。細いと掴めないので、少し余裕をとる */
   #colsizer { flex: 0 0 6px; cursor: row-resize; background: var(--line); }
   #colsizer:hover { background: var(--accent); }
@@ -162,6 +173,11 @@
     </div>
   </div>
 </div>
+
+<!-- ★3カラムに何を出すかを切り替えるタブ（本人の希望 2026-08-29）。
+     切り替えても、前のタブの絞り込みは残す。だから隠れている側に
+     絞り込みがあることを、タブ自身に出す。 -->
+<div id="coltabs"></div>
 
 <div id="cols">
   <div class="col"><h2>ジャンル</h2><ul id="c-genre"></ul></div>
