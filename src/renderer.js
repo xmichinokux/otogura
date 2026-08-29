@@ -762,6 +762,20 @@ async function AIに一本組ませる(気分, 言った) {
    突き合わせは曲の側を 1 周するだけで、結果は覚えておく。
    実測 25 ms。走査（ディスク読み）ではなく、手元の配列を 1 周するだけ。 */
 
+/**
+ * ★確かめる候補（手元で見つからなかった名前）を開いているか。
+ *
+ * ■ 本人の依頼（2026-08-29）
+ *   > 響きの「外れ」（手元に無かった名前）を、画面に出せるようにしてください。
+ *
+ * ★もう計算はしてあった（resonance.js の 突き合わせる が返していた）。
+ * 画面が一度も読んでいなかっただけ。作ったのは出すところだけ。
+ *
+ * ★たたんでおく。当たり（鳴らせる曲）が主で、こちらは脇なので、
+ * 開いたときだけ場所を取るようにする。
+ */
+let 確かめる候補を開く = false;
+
 /** 読み込んだ木。null なら未読み込み（機能が出ないだけ） */
 let 響きの木 = null;
 /** 突き合わせた結果。tracks が変わったら作り直す */
@@ -844,6 +858,62 @@ let 言葉の名前変え = null;
  * ここに置くのは、辿った言葉の**名前を変える／消す**だけ。
  *   > resonanceで生成したカラムタブの名前変更や削除の機能がほしいです。
  */
+/**
+ * 確かめる候補を並べる。
+ *
+ * ■ ★「買い物リスト」として出さない（本人の指示）
+ *   > 外れには 3 種類が混ざっています。区別がつきません
+ *   >   ① 本当に持っていない
+ *   >   ② 持っているが、名前の書かれ方が違う
+ *   >   ③ AI が実在しないものを出した
+ *   > 見た目では見分けられないので、「買い物リスト」として出さないでください。
+ *   > 「確かめる候補」として出してください。見出しもそう書いてください。
+ *
+ * ★だから、ここから買う・落とす仕掛けは**一切置かない。** 出すのは一覧まで。
+ *
+ * ■ ★depth で意味が変わるので、depth も出す（本人の指示）
+ *   depth 1     … 入口を持っていない（意外な穴）
+ *   depth 3 以上 … まだ辿り着いていない場所（探索の先端）
+ *
+ * 並びは当たりと同じで重い順（深く・新しいほど上）。resonance.js で並べてある。
+ */
+function 確かめる候補を描く(box, 外れ) {
+  const 面 = document.createElement('div');
+  面.className = 'misslist';
+
+  const 頭 = document.createElement('div');
+  頭.className = 'misshead';
+  頭.textContent = '確かめる候補 ― 手元で見つからなかった名前です。'
+    + '演者名だけでなく、盤名・曲名にも当ててみて、それでも見つからなかったものだけ出しています。'
+    + 'それでも「持っているのに書かれ方が違う」「AI の思い違い」は残ります。'
+    + '買う前に確かめてください。';
+  面.appendChild(頭);
+
+  for (const m of 外れ) {
+    const 行 = document.createElement('div');
+    行.className = 'missrow';
+
+    const 深 = document.createElement('span');
+    深.className = 'missdepth';
+    深.textContent = '深さ' + m.depth;
+    深.title = m.depth <= 1
+      ? '入口を持っていません（意外な穴）'
+      : (m.depth >= 3 ? 'まだ辿り着いていない場所（探索の先端）' : '');
+
+    const 名 = document.createElement('span');
+    名.className = 'missname';
+    名.textContent = m.name;
+
+    const 説 = document.createElement('span');
+    説.className = 'said';
+    説.textContent = (m.description ? m.description + '　' : '') + '［「' + m.keyword + '」から］';
+
+    行.append(深, 名, 説);
+    面.appendChild(行);
+  }
+  box.appendChild(面);
+}
+
 function 響きの欄を描く() {
   const box = $('resbar');
   /*
@@ -921,6 +991,21 @@ function 響きの欄を描く() {
   }
 
   // 全部忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
+  /*
+   * ★確かめる候補（手元で見つからなかった名前）。
+   * 0 個なら出さない ―― 「0」を出しても押す用が無い。
+   */
+  const 外れ = (響きの当たり && Array.isArray(響きの当たり.外れ)) ? 響きの当たり.外れ : [];
+  if (外れ.length) {
+    const 開閉 = document.createElement("button");
+    開閉.className = "restag";
+    開閉.textContent = (確かめる候補を開く ? "▼ " : "▶ ") + "確かめる候補 " + 外れ.length;
+    開閉.title = "手元で見つからなかった名前です。演者名だけでなく盤名・曲名にも当てて、"
+      + "それでも無かったものだけ出しています（買い物リストではありません）";
+    開閉.onclick = () => { 確かめる候補を開く = !確かめる候補を開く; 描き直す(); };
+    box.appendChild(開閉);
+  }
+
   const 外す = document.createElement("button");
   外す.className = "restag";
   外す.textContent = "× 全部外す";
@@ -934,6 +1019,9 @@ function 響きの欄を描く() {
     $("status").textContent = "響きを全部外しました";
   };
   box.appendChild(外す);
+
+  // ★開いているときだけ場所を取る。当たり（鳴らせる曲）が主で、こちらは脇なので
+  if (確かめる候補を開く && 外れ.length) 確かめる候補を描く(box, 外れ);
 }
 
 /** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */

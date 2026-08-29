@@ -92,6 +92,14 @@
     border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--accent);
   }
   #resbar .restag:hover { background: var(--accent-bg); }
+  /* ★確かめる候補（手元で見つからなかった名前）。開いたときだけ 2 段目に出す */
+  #resbar .misslist { flex-basis: 100%; max-height: 190px; overflow-y: auto;
+    margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+  #resbar .misshead { font-size: 11px; color: var(--dim); line-height: 1.6; padding: 0 2px 6px; }
+  #resbar .missrow { display: flex; gap: 8px; align-items: baseline; padding: 2px; font-size: 12px; }
+  #resbar .missdepth { color: var(--dim); font-size: 11px; min-width: 3.8em; flex: 0 0 auto; }
+  #resbar .missname { color: var(--text); flex: 0 0 auto; }
+  #resbar .misslist .said { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* 3カラムの高さを掴んで変える取っ手。細いと掴めないので、少し余裕をとる */
   #colsizer { flex: 0 0 6px; cursor: row-resize; background: var(--line); }
   #colsizer:hover { background: var(--accent); }
