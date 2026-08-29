@@ -40,6 +40,53 @@ function 掃除する(lists) {
   return { lists: out, 落とした };
 }
 
+/*
+ * ★スマホへ持ち出すところ（2026-08-30 本人の希望）。
+ *
+ *   > 音蔵の作るプレイリストが最高なので自分のandroid端末で再生できないかな？
+ *   > プレイリストのデータはandoridに入っていないので、
+ *   > プレイリストに紐づいたデータだけ同期できないかな？と思ったんです。
+ *
+ * ★測ってから決めた（本人のライブラリ）:
+ *   1 曲の平均 4.6 MB ／ 一本 30 曲 ≒ 139 MB
+ *   ライブラリ全部は 388 GB ―― **スマホには入らない。**
+ *   でも一本ぶんなら軽い。だから「一本ぶんだけ運ぶ」。
+ *   形式は全 86,044 曲が .mp3 なので、変換は要らない。
+ *
+ * ★m3u の中は**相対の名前**にする。
+ * いまの書き出しは Windows の絶対パス（E:\\… ）なので、
+ * スマホにその場所が無く、1 曲も鳴らない。
+ */
+
+/**
+ * ファイル名に使えない字を落とす。
+ * ★スマホ側（FAT32 など）で使えない字は Windows より多い。
+ * 落とさないと、コピーはできても**スマホで開けないファイル**ができる。
+ */
+function 名前を安全に(名, 上限 = 80) {
+  const s = String(名 == null ? '' : 名)
+    .replace(/[\\/:*?"<>|]/g, '_')      // Windows と FAT32 で使えない字
+    .replace(/[\x00-\x1f]/g, '')          // 制御文字
+    .replace(/[. ]+$/, '')                 // 末尾の点と空白（Windows が嫌う）
+    .trim();
+  const 詰めた = s.length > 上限 ? s.slice(0, 上限) : s;
+  return 詰めた || '無題';
+}
+
+/**
+ * 持ち出す用の m3u。**相対の名前だけ**を書く。
+ * @param 並び [{ 名前, artist, title, duration }]
+ */
+function 持ち出すm3u(並び) {
+  const 行 = ['#EXTM3U'];
+  for (const x of 並び) {
+    const 秒 = Number.isFinite(x.duration) ? Math.round(x.duration) : -1;
+    行.push(`#EXTINF:${秒},${x.artist || ''} - ${x.title || ''}`);
+    行.push(x.名前);
+  }
+  return 行.join('\r\n') + '\r\n';
+}
+
 /**
  * m3u を書き出す。#EXTM3U 付きの拡張 m3u（他のプレイヤーで開ける）。
  * @param 曲情報 path → { title, artist, duration } の対応表（無ければパスだけ書く）
@@ -69,4 +116,5 @@ function m3uを読む(text, 基準フォルダ) {
   return out;
 }
 
-module.exports = { 実体のあるものだけ, 掃除する, m3uにする, m3uを読む };
+module.exports = {
+  名前を安全に, 持ち出すm3u, 実体のあるものだけ, 掃除する, m3uにする, m3uを読む };

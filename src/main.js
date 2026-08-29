@@ -24,7 +24,7 @@ const fs = require('node:fs/promises');
  * 下の catch が console.warn で握りつぶしていたので、画面には何も出なかった。
  */
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
-const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
+const { 掃除する, m3uにする, m3uを読む, 名前を安全に, 持ち出すm3u } = require('./playlists');
 const { タグを書く } = require('./tags');
 const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
   目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる } = require('./ai');
@@ -902,6 +902,115 @@ ipcMain.handle('lists:setTracks', async (_e, id, paths) => {
 });
 
 /** m3u で書き出す（他のプレイヤーでも開ける形式） */
+/**
+ * 一本ぶんの曲を、フォルダへコピーする（スマホへ持ち出す用）。
+ *
+ * ■ 本人の希望（2026-08-30）
+ *   > プレイリストに紐づいたデータだけ同期できないかな？
+ *
+ * ★やらないこと:
+ *   ・元のファイルを触らない（**コピーするだけ**。移動も削除もしない）
+ *   ・持ち出し先にある知らないファイルを消さない
+ *     （置き場を間違えて指されたときに、消してしまうほうが怖い。
+ *      残っているものは数えて画面に出し、消すかどうかは本人が決める）
+ *
+ * ★曲名の頭に番号を付ける。m3u を読まないプレイヤーでも並び順どおりに鳴る。
+ * ★1 曲ごとに息継ぎする。139 MB のコピー中に画面が固まらないように
+ *   （走査で踏んだのと同じ。本体が詰まるとキー入力が届かない）。
+ */
+ipcMain.handle('lists:exportFolder', async (e, id, 曲情報) => {
+  const s = await 設定を読む();
+  const l = s.lists.find((x) => x.id === id);
+  if (!l) return { ok: false, error: '再生リストが見つかりません' };
+  if (!l.tracks.length) return { ok: false, error: 'この再生リストは空です' };
+
+  const r = await dialog.showOpenDialog({
+    title: 'スマホへ持ち出す先を選ぶ（この中にフォルダを作ります）',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+
+  /*
+   * ★曲名と演者は、画面の言い値だけに頼らない。
+   * 一覧に出ていない曲（走査の途中・絞り込みの外）は画面が知らないので、
+   * **覚え書きからも引く。** 引けないと 01 - a_song.mp3 のような
+   * ファイル名そのままになり、スマホで誰の何か分からなくなる（実測で踏んだ）。
+   */
+  const 表 = new Map(Array.isArray(曲情報) ? 曲情報.map((t) => [t.path, t]) : []);
+  const 覚え = await 覚え書きを読む();
+  for (const 道 of l.tracks) {
+    if (表.has(道)) continue;
+    const v = 覚え[道];
+    if (v && v.track) 表.set(道, v.track);
+  }
+
+  const 先 = path.join(r.filePaths[0], 'Otogura_' + 名前を安全に(l.name, 60));
+  try {
+    await fs.mkdir(先, { recursive: true });
+  } catch (err) {
+    return { ok: false, error: '持ち出す先を作れませんでした（' + ((err && err.message) || '不明') + '）' };
+  }
+
+  const 送る = (種, 値) => { try { e.sender.send(種, 値); } catch { /* 窓が閉じた */ } };
+  const 息継ぎ = () => new Promise((res) => setImmediate(res));
+
+  const 並び = [];
+  const 見つからない = [];
+  const 運べなかった = [];
+  let 運んだ = 0;
+  let 大きさ = 0;
+
+  for (let i = 0; i < l.tracks.length; i += 1) {
+    const 道 = l.tracks[i];
+    const t = 表.get(道) || {};
+    const 拡張 = path.extname(道) || '.mp3';
+    const 番 = String(i + 1).padStart(2, '0');
+    const 元名 = [t.artist, t.title].filter(Boolean).join(' - ') || path.basename(道, 拡張);
+    const 名前 = `${番} - ${名前を安全に(元名, 70)}${拡張}`;
+
+    try {
+      const st = await fs.stat(道);
+      await fs.copyFile(道, path.join(先, 名前));
+      大きさ += st.size;
+      運んだ += 1;
+      並び.push({ 名前, artist: t.artist, title: t.title, duration: t.duration });
+    } catch (err) {
+      if (err && err.code === 'ENOENT') 見つからない.push(道);
+      else 運べなかった.push(path.basename(道) + '（' + ((err && err.message) || '不明') + '）');
+    }
+
+    送る('export:progress', { 済み: i + 1, 全体: l.tracks.length, 大きさ });
+    // ★1 曲ごとに順番を譲る。詰めると、コピー中ずっと画面が固まる
+    await 息継ぎ();
+  }
+
+  if (!並び.length) {
+    return { ok: false, error: '運べる曲がありませんでした', 見つからない: 見つからない.length };
+  }
+
+  try {
+    await fs.writeFile(path.join(先, 'playlist.m3u'), 持ち出すm3u(並び), 'utf8');
+  } catch (err) {
+    return { ok: false, error: '並び順の書き出しに失敗しました（' + ((err && err.message) || '不明') + '）' };
+  }
+
+  /*
+   * ★前に置いたぶんが残っていないか数える。**消さない。**
+   * 置き場を間違えて指されたときに消してしまうほうが怖い。
+   */
+  let 余り = 0;
+  try {
+    const 置いた = new Set(並び.map((x) => x.名前).concat(['playlist.m3u']));
+    for (const 名 of await fs.readdir(先)) if (!置いた.has(名)) 余り += 1;
+  } catch { /* 数えられなくても、運んだことは変わらない */ }
+
+  return {
+    ok: true, 先, 運んだ, 大きさ, 余り,
+    見つからない: 見つからない.length,
+    運べなかった,
+  };
+});
+
 ipcMain.handle('lists:exportM3u', async (_e, id, 曲情報) => {
   const s = await 設定を読む();
   const l = s.lists.find((x) => x.id === id);

@@ -63,6 +63,9 @@ contextBridge.exposeInMainWorld('mp3', {
   リストに足す: (id, paths) => ipcRenderer.invoke('lists:add', id, paths),
   リストの中身を入れ替える: (id, paths) => ipcRenderer.invoke('lists:setTracks', id, paths),
   m3uに書き出す: (id, 曲情報) => ipcRenderer.invoke('lists:exportM3u', id, 曲情報),
+  // ★一本ぶんの曲を、フォルダへコピーする（スマホへ持ち出す用。元は触らない）
+  スマホへ持ち出す: (id, 曲情報) => ipcRenderer.invoke('lists:exportFolder', id, 曲情報),
+  持ち出しの進みを受ける: (fn) => ipcRenderer.on('export:progress', (_e, p) => fn(p)),
   m3uを読み込む: () => ipcRenderer.invoke('lists:importM3u'),
 
   // 再生回数（シャッフルで『忘れている曲』を選ぶために使う）
