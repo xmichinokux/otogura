@@ -597,9 +597,12 @@ async function 覚え書きを書く(v) {
  * 覚え書きから作れば、待ち時間ゼロで前回の一覧が出る。
  * 変わったぶんは、そのあと裏で走査して追いつく。
  */
-ipcMain.handle('library:cached', async () => {
-  const s = await 設定を読む();
-  const 覚え = await 覚え書きを読む();
+/**
+ * 覚え書きから一覧を作る。
+ * ★走査せずに出すところと、フォルダが無いときの戻り値で、同じものを使う。
+ * 2 か所に書くと、片方だけ直す事故になる。
+ */
+function 覚えている曲(s, 覚え) {
   const 隠す = new Set(s.hidden);
   const tracks = [];
   for (const [p, v] of Object.entries(覚え)) {
@@ -608,6 +611,12 @@ ipcMain.handle('library:cached', async () => {
     if (p.replace(/^.*[\\/]/, '').startsWith('._')) continue;
     if (v && v.track) tracks.push(v.track);
   }
+  return tracks;
+}
+
+ipcMain.handle('library:cached', async () => {
+  const s = await 設定を読む();
+  const tracks = 覚えている曲(s, await 覚え書きを読む());
   return { tracks, 件数: tracks.length };
 });
 
@@ -638,6 +647,37 @@ ipcMain.handle('scan', async (e) => {
   止めてほしい = false;                        // 押し直したら、また最初から
   const s = await 設定を読む();
   const 覚え = await 覚え書きを読む();
+
+  /*
+   * ★フォルダが 1 つも登録されていなければ、走査しない（2026-08-29）。
+   *
+   * scanLibrary は「見つかったものが、そのまま新しい全部」という作り。
+   * フォルダが無いと 0 件見つかるので、**覚え書きを {} で上書きして
+   * 86,044 件を消し、一覧も 0 曲にする。**
+   *
+   * 実測（本人の覚え書きで確かめた）:
+   *   フォルダ 0 個で走査 → 曲 0 / 覚え書き 0 件（86,044 件が消える）
+   *
+   * 「止めたら消えた」（0.14.1）と同じ形の間違い。あちらは途中で止めたとき、
+   * こちらは**そもそも探す場所が無いとき**。どちらも「見つからない」を
+   * 「無くなった」と取り違えている。
+   *
+   * ★登録し忘れただけで 50 分ぶんが飛ぶ。**覚え書きには指一本触れない。**
+   * 覚えている一覧をそのまま返して、フォルダが無いことを画面に言わせる。
+   */
+  if (!s.folders.length) {
+    const tracks = 覚えている曲(s, 覚え);
+    return {
+      フォルダが無い: true,
+      止めた: false,
+      tracks,
+      見つかった: 0, 読めなかった: 0, hidden: s.hidden.length,
+      使い回し: tracks.length,
+      lists: s.lists, リストから落とした: 0,
+      覚え書きの保存: { ok: true },
+      補った: 0,
+    };
+  }
   const 送る = (種, 値) => { try { e.sender.send(種, 値); } catch { /* 窓が閉じた */ } };
 
   /*
