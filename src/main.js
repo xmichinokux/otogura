@@ -26,7 +26,7 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
-const { おすすめを聞く } = require('./ai');   // 一覧は画面側が作る（見える曲だけを対象にするため）
+const { おすすめを聞く, プレイリストを作らせる, 候補の数, 作る曲数 } = require('./ai');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
  * ★アプリ名を、ここで決め打ちする（2026-08-25 実地）。
@@ -272,6 +272,20 @@ ipcMain.handle('ai:suggest', async (_e, 手がかり) => {
     気分: 手がかり && 手がかり.気分,
     ジャンル一覧: 手がかり && 手がかり.ジャンル一覧,
     年一覧: (手がかり && 手がかり.年一覧) || [],
+  });
+});
+
+/** 何曲渡して何曲作らせるか。画面が候補を選ぶのに使う */
+ipcMain.handle('ai:sizes', async () => ({ 候補の数, 作る曲数 }));
+
+/** @param 手がかり { 気分, 候補 } ―― 候補は画面が 200 曲だけ選んで渡す */
+ipcMain.handle('ai:playlist', async (_e, 手がかり) => {
+  const キー = await キーを読む();
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  return プレイリストを作らせる({
+    キー,
+    気分: 手がかり && 手がかり.気分,
+    候補: 手がかり && 手がかり.候補,
   });
 });
 

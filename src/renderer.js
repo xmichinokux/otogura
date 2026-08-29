@@ -375,6 +375,98 @@ let AIが使える = false;
  * 再生リスト名と同じく、**画面の中に入力欄を出す**形にする。
  */
 let キー入力 = null;
+/** AI がつけた 1 曲ごとのひとこと { パス: 文 }。その場かぎり（覚え書きには入れない） */
+const AIのひとこと = new Map();
+
+/**
+ * AI が選んだ範囲から、候補を引く。
+ *
+ * ★くじは いつものシャッフルのもの（次を選ぶ）を使う。
+ * 均等に引くと、曲数の多いアーティストばかり候補に入る。
+ * 再生回数の重みを効かせたまま引けば、**忘れている曲が候補に入りやすい**
+ * という、このアプリの性格をそのまま持ち込める。
+ *
+ * ★鳴らせない曲（ALAC）と、シャッフルから外した曲は最初から入れない。
+ * 候補に入れて選ばれると、押しても鳴らない一本ができあがる。
+ */
+function AIに渡す候補(何曲) {
+  const 母集団 = いまの列().filter((t) => t.鳴らせる !== false && !シャッフル除外.has(t.path));
+  if (!母集団.length) return [];
+  const 表 = new Map(母集団.map((t) => [t.path, t]));
+  const 道 = 母集団.map((t) => t.path);
+  const 引いた = new Set();
+  const 出 = [];
+  const 上限 = Math.min(何曲, 道.length);
+  // ★引けなくなったら止める。無限に回さない
+  for (let i = 0; i < 上限 * 3 && 出.length < 上限; i += 1) {
+    const p = 次を選ぶ(道, 再生回数, 引いた);
+    if (!p || 引いた.has(p)) break;
+    引いた.add(p);
+    const t = 表.get(p);
+    出.push({ 番号: 出.length + 1, path: p, artist: t.artist, title: t.title, album: t.album });
+  }
+  return 出;
+}
+
+/**
+ * AI にプレイリストを組ませて、再生リストとして残す。
+ *
+ * ★残す形にするのは、**あとから手で直せるから**。
+ * 気に入らなければ並べ替えられるし、消せるし、m3u に書き出せる。
+ * その仕組みはもうあるので、そこに乗せる。
+ */
+async function AIに一本組ませる(気分, 言った) {
+  const 大きさ = await window.mp3.AIの大きさ();
+  const 候補 = AIに渡す候補(大きさ.候補の数);
+  if (候補.length < 2) {
+    言った.textContent = 'この範囲には、組める曲がありません';
+    return;
+  }
+  言った.textContent = `${候補.length} 曲から組んでいます…`;
+
+  const r = await window.mp3.AIにプレイリストを作らせる({ 気分, 候補: 候補.map((c) => ({ 番号: c.番号, artist: c.artist, title: c.title, album: c.album })) });
+  if (!r || !r.ok) { 言った.textContent = 'だめでした（' + ((r && r.error) || '不明') + '）'; return; }
+
+  const 番号表 = new Map(候補.map((c) => [c.番号, c]));
+  const 道 = [];
+  for (const 項 of r.結果.並び) {
+    const c = 番号表.get(項.番号);
+    if (!c) continue;
+    道.push(c.path);
+    if (項.ひとこと) AIのひとこと.set(c.path, 項.ひとこと);
+  }
+  if (!道.length) { 言った.textContent = 'AI が曲を選べませんでした'; return; }
+
+  // 名前は AI がつけたもの。無ければ気分をそのまま使う
+  const 名 = '🤖 ' + (r.結果.題 || 気分).slice(0, 24);
+  lists = await window.mp3.リストを作る(名);
+  const 新しいの = lists[lists.length - 1];
+  lists = await window.mp3.リストの中身を入れ替える(新しいの.id, 道);
+  開いているID = 新しいの.id;
+
+  /*
+   * ★組んだ一本は、**並んだ順に流す。**
+   * ここでシャッフルを入れると、せっかくの流れ（入り・中盤・締め）が壊れる。
+   * 本人が欲しかったのは「AI が選んだ順」なので、シャッフルは切る。
+   */
+  シャッフル = false;
+  $('shuffle').textContent = '🔀 オフ';
+  $('shuffle').classList.remove('on');
+
+  描き直す();
+  言った.textContent = r.結果.題 || 気分;
+
+  // 頭から流す
+  const 一曲目 = tracks.find((t) => t.path === 道[0]);
+  if (一曲目) 再生する(一曲目);
+
+  /*
+   * ★状態の文字は、再生したあとに出す。
+   * 先に出すと 再生する() の中の 一覧を描く() に上書きされて、消える（実測）。
+   */
+  const 落ち = r.結果.落とした ? `（${r.結果.落とした} 件は候補に無くて落としました）` : '';
+  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}`;
+}
 
 /** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */
 function AIに渡すジャンル() {
@@ -467,7 +559,22 @@ function 気分の欄を描く() {
     });
     押す.disabled = false; 欄.disabled = false;
     if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
+    /*
+     * ★2 段構え（2026-08-29 本人の選択）。
+     *   1 段目 気分 → 絞り込み（約 1.0 円）… どの範囲から選ぶかを決める
+     *   2 段目 その範囲から 200 曲引いて → 30 曲の一本に並べる（約 7.3 円）
+     *
+     * ★1 段目を挟むのは、86,000 曲から無作為に 200 曲引いても
+     * 気分に合わないから。先に範囲を絞ってから引く。
+     * 絞り込みは 3 カラムに出るので、**AI がどこから選んだかが見える。**
+     */
     当てはめる(r.結果);
+    押す.disabled = true; 欄.disabled = true;
+    try {
+      await AIに一本組ませる(気分, 言った);
+    } finally {
+      押す.disabled = false; 欄.disabled = false;
+    }
   };
   押す.onclick = 走る;
   欄.onkeydown = (e) => { if (e.key === "Enter") 走る(); };
@@ -502,7 +609,7 @@ function 当てはめる(結果) {
   const 無し = 結果.無かったもの.length ? "／手元に無かったもの: " + 結果.無かったもの.join(", ") : "";
   const 言った = $("aisaid");
   if (言った) 言った.textContent = 結果.ひとこと || 選んだ;
-  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}`;
+  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
 }
 
 /** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
@@ -1616,7 +1723,12 @@ function 再生する(t, { 列を保つ = false } = {}) {
 
   nowPath = t.path;
   $('title').textContent = t.title;
-  $('sub').textContent = `${t.artist} — ${t.album}`;
+  /*
+   * ★AI が組んだ一本なら、その曲を選んだ理由を出す（2026-08-29）。
+   * 出さないと、ただ曲が並んでいるのと見分けがつかない。
+   */
+  const 一言 = AIのひとこと.get(t.path);
+  $('sub').textContent = 一言 ? `${t.artist} — ${t.album}　🤖 ${一言}` : `${t.artist} — ${t.album}`;
   /*
    * ★アートワークは、この 1 曲ぶんだけ今読む。
    * 一覧に全曲ぶん持たせていたのが、アプリが落ちた直接の原因だった

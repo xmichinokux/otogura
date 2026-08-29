@@ -193,4 +193,133 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
   }
 }
 
-module.exports = { 使うモデル, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く };
+/* ── ここから下は「AI がプレイリストを作る」──────────────────
+   本人の希望（2026-08-29）:
+     > AIがDJになって1曲ずつセレクトしてシャッフルしてかける感じにしたい
+     > それじゃあ、AIがプレイリストを作るのは費用としてどうなりますか？
+     > Bでお願いします。
+
+   ★1 曲ずつ聞くのはやめて、**一度に並べさせる**。測って決めた。
+   1 時間（21 曲）聴いたときの費用（Opus 5、150円/ドル）:
+
+     1 曲ずつ DJ（候補 40）        21 回呼ぶ   **25.0 円**
+     プレイリスト（候補200→30曲）   1 回呼ぶ   ** 7.3 円**  ← これ
+
+   ★安さより、こちらのほうが**DJ として良い仕事ができる**のが大きい。
+   1 曲ずつ聞く形だと、AI はその先を知らないまま毎回選ぶことになる。
+   目隠しで 1 手ずつ指すのと同じで、**流れ（起伏）が作れない。**
+   30 曲を一度に見渡せば、「軽く入って、中盤で上げて、長い曲で締める」
+   といった組み立てができる。DJ がやっているのは、まさにそれ。
+
+   ★待ち時間も違う。1 曲ずつだと曲の変わり目ごとに通信が要る。
+   こちらは最初の 1 回だけで、あとは普通に流れる。
+   ────────────────────────────────────────────────── */
+
+/** 1 回に渡す候補の数。増やすほど選びしろが増えるが、高く・遅くなる */
+const 候補の数 = 200;
+/** 作らせる曲数 */
+const 作る曲数 = 30;
+
+/** 長い名前は切る。200 曲ぶん積むので、1 行の長さが効く */
+const 短く = (v, n) => { const s = String(v ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
+
+function プレイリストの頼み文(気分, 曲数) {
+  return [
+    'あなたは DJ です。その人の手元にある曲から、**流す順番に並べた一本**を組みます。',
+    '',
+    '■ その人が言った気分',
+    気分,
+    '',
+    '■ 決まり',
+    `・候補から **${曲数} 曲**選び、**流す順に**並べてください`,
+    '・番号は候補に**実際にある番号**だけ。無い番号は返さない。同じ番号を 2 回使わない',
+    '・**同じアーティストを続けない。** 同じアルバムも続けない',
+    '・★ただ合う曲を並べるのではなく、**流れを作ってください。**',
+    '　入りは軽く、中盤で上げて、終わりは落ち着かせる ―― といった起伏を意識する',
+    '・「ひとこと」は日本語で 1 文、20 字程度。**なぜその位置にその曲を置いたか**',
+    '・「題」は、この一本につける短い名前（日本語 15 字程度）',
+  ].join('\n');
+}
+
+/**
+ * プレイリストを作らせる。
+ *
+ * ★失敗しても例外を投げない。呼んだ側は、だめなら普通のシャッフルのままにする。
+ *
+ * @param 候補 [{ 番号, artist, title, album }]（画面側が 200 曲だけ選んで渡す）
+ * @returns { ok: true, 結果: { 題, 並び: [{番号, ひとこと}] } } | { ok: false, error }
+ */
+async function プレイリストを作らせる({ キー, 気分, 候補, 曲数 = 作る曲数 }) {
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  if (typeof 気分 !== 'string' || !気分.trim()) return { ok: false, error: '気分が空です' };
+  if (!Array.isArray(候補) || !候補.length) return { ok: false, error: '候補がありません' };
+
+  let Anthropic; let z; let zodOutputFormat;
+  try {
+    Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+    ({ z } = require('zod'));
+    ({ zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod'));
+  } catch {
+    return { ok: false, error: 'AI の部品が読み込めません' };
+  }
+
+  const 表 = 候補
+    .map((c) => `${c.番号}\t${短く(c.artist, 28)}\t${短く(c.title, 40)}\t${短く(c.album, 28)}`)
+    .join('\n');
+  const かたち = z.object({
+    題: z.string(),
+    並び: z.array(z.object({ 番号: z.number(), ひとこと: z.string() })),
+  });
+
+  try {
+    const client = new Anthropic({ apiKey: キー });
+    const 返り = await client.messages.parse({
+      model: 使うモデル,
+      /*
+       * ★30 曲ぶんの番号とひとことを返させるので、ここは切り詰めない。
+       * 足りないと途中で切れて、並びが尻切れになる。
+       */
+      max_tokens: 8000,
+      system: プレイリストの頼み文(気分.trim(), 曲数),
+      messages: [{ role: 'user', content: '■ 候補（番号／アーティスト／曲名／アルバム）\n' + 表 }],
+      output_config: { effort: 'low', format: zodOutputFormat(かたち) },
+    });
+    if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
+    if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました' };
+    const 出 = 返り.parsed_output;
+    if (!出) return { ok: false, error: 'AI の返事を読み取れませんでした' };
+    return { ok: true, 結果: 並びを確かめる(出, 候補) };
+  } catch (e) {
+    const 名 = e && e.constructor ? e.constructor.name : '';
+    if (名 === 'AuthenticationError') return { ok: false, error: 'APIキーが正しくないようです' };
+    if (名 === 'RateLimitError') return { ok: false, error: '短い間に呼びすぎました。少し待ってからもう一度' };
+    if (名 === 'APIConnectionError') return { ok: false, error: 'つながりませんでした（ネットワークを確認してください）' };
+    return { ok: false, error: (e && e.message) ? e.message : '不明な失敗' };
+  }
+}
+
+/**
+ * 返ってきた並びを、候補と照らし合わせる。
+ *
+ * ★ここも鵜呑みにしない。**候補に無い番号は返ってくる。**
+ * そのまま使うと、無い曲を流そうとして止まる。
+ * ・候補に無い番号は落とす
+ * ・同じ番号が 2 回出たら、後のほうを落とす（同じ曲が 2 回流れないように）
+ * ・落とした数は呼んだ側に返す。黙って短くしない
+ */
+function 並びを確かめる(生, 候補) {
+  const ある = new Map(候補.map((c) => [c.番号, c]));
+  const 見た = new Set();
+  const 並び = [];
+  let 落とした = 0;
+  for (const 項 of (Array.isArray(生 && 生.並び) ? 生.並び : [])) {
+    const n = 項 && typeof 項.番号 === 'number' ? 項.番号 : null;
+    if (n === null || !ある.has(n) || 見た.has(n)) { 落とした += 1; continue; }
+    見た.add(n);
+    並び.push({ 番号: n, ひとこと: (項 && typeof 項.ひとこと === 'string') ? 項.ひとこと.trim() : '' });
+  }
+  const 題 = (生 && typeof 生.題 === 'string' && 生.題.trim()) ? 生.題.trim() : '';
+  return { 題, 並び, 落とした };
+}
+
+module.exports = { 使うモデル, 候補の数, 作る曲数, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる };

@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('mp3', {
   AIのキーを入れる: (キー) => ipcRenderer.invoke('ai:setKey', キー),
   AIのキーを消す: () => ipcRenderer.invoke('ai:clearKey'),
   気分でおすすめ: (手がかり) => ipcRenderer.invoke('ai:suggest', 手がかり),
+  AIの大きさ: () => ipcRenderer.invoke('ai:sizes'),
+  AIにプレイリストを作らせる: (手がかり) => ipcRenderer.invoke('ai:playlist', 手がかり),
   // ★シャッフルに入れない曲。「一覧から外す」とは別（一覧には残り、押せば鳴る）
   シャッフル除外を取る: () => ipcRenderer.invoke('shuffleskip:get'),
   シャッフル除外を変える: (paths, 除外する) => ipcRenderer.invoke('shuffleskip:set', paths, 除外する),
