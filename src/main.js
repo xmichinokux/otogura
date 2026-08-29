@@ -988,8 +988,14 @@ ipcMain.handle('lists:exportFolder', async (e, id, 曲情報) => {
     return { ok: false, error: '運べる曲がありませんでした', 見つからない: 見つからない.length };
   }
 
+  /*
+   * ★m3u の名前も、音蔵で付けた名前にする（2026-08-30 本人の希望）。
+   * playlist.m3u のままだと、スマホで取り込んだときに
+   * **どれも「playlist」という名前**になって見分けがつかない。
+   */
+  const 題ファイル = 名前を安全に(l.name, 60) + '.m3u';
   try {
-    await fs.writeFile(path.join(先, 'playlist.m3u'), 持ち出すm3u(並び), 'utf8');
+    await fs.writeFile(path.join(先, 題ファイル), 持ち出すm3u(並び, l.name), 'utf8');
   } catch (err) {
     return { ok: false, error: '並び順の書き出しに失敗しました（' + ((err && err.message) || '不明') + '）' };
   }
@@ -1000,12 +1006,12 @@ ipcMain.handle('lists:exportFolder', async (e, id, 曲情報) => {
    */
   let 余り = 0;
   try {
-    const 置いた = new Set(並び.map((x) => x.名前).concat(['playlist.m3u']));
+    const 置いた = new Set(並び.map((x) => x.名前).concat([題ファイル]));
     for (const 名 of await fs.readdir(先)) if (!置いた.has(名)) 余り += 1;
   } catch { /* 数えられなくても、運んだことは変わらない */ }
 
   return {
-    ok: true, 先, 運んだ, 大きさ, 余り,
+    ok: true, 先, 運んだ, 大きさ, 余り, 題ファイル,
     見つからない: 見つからない.length,
     運べなかった,
   };

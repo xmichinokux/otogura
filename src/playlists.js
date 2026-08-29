@@ -75,10 +75,20 @@ function 名前を安全に(名, 上限 = 80) {
 
 /**
  * 持ち出す用の m3u。**相対の名前だけ**を書く。
+ *
+ * ★題も書く（2026-08-30 本人の希望）:
+ *   > 書き出したプレイリストのフォルダー内にあるプレイリストのタイトルは
+ *   > 音蔵についてるプレイリストの名前と同じにしてほしいです。
+ * #PLAYLIST は m3u の決まりごとで、プレイヤーが一覧の名前として読む。
+ * ファイル名だけだと、取り込んだときに「playlist」という名前になってしまう。
+ *
  * @param 並び [{ 名前, artist, title, duration }]
+ * @param 題   再生リストの名前（音蔵で付けたものそのまま）
  */
-function 持ち出すm3u(並び) {
+function 持ち出すm3u(並び, 題 = '') {
   const 行 = ['#EXTM3U'];
+  // ★飾りを落とさず、音蔵で付けた名前をそのまま書く
+  if (題) 行.push('#PLAYLIST:' + 題);
   for (const x of 並び) {
     const 秒 = Number.isFinite(x.duration) ? Math.round(x.duration) : -1;
     行.push(`#EXTINF:${秒},${x.artist || ''} - ${x.title || ''}`);

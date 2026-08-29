@@ -595,9 +595,32 @@ console.log('\n[8-d] ★自分で絞った範囲・響き・左の一覧');
     /#tabs \{[\s\S]{0,200}?flex-direction: column/.test(html),
     '横一列だと、増えたぶんが右へ流れて見えなくなります',
   );
+  /*
+   * ★名前は潰さない（2026-08-30 本人の指摘）:
+   *   > プレイリストのタイトルが潰れるのでタイトルは狭めずスクロールするように
+   * 幅で縮めると、名前の頭だけが並んでどれがどれか分からなくなる。
+   */
+  確認(
+    '★名前を「…」で切らない',
+    html.includes('text-overflow: clip'),
+    '切ると、頭が同じ名前を見分けられません',
+  );
+  確認(
+    '★枠も名前ぶんの幅にする',
+    html.includes('min-width: max-content'),
+    '狭いままだと、色や下線が名前の途中で切れます',
+  );
+  確認(
+    '★縮ませない',
+    html.includes('#tabs > * { flex: 0 0 auto; }'),
+  );
+  確認(
+    '★横にも送れる',
+    html.includes('overflow: auto; background: var(--sub)'),
+  );
   確認(
     '★左の一覧は縦に送れる',
-    /#tabs \{[\s\S]{0,260}?overflow-y: auto/.test(html),
+    html.includes('overflow: auto; background: var(--sub)'),
   );
   確認(
     '★左右の幅を変えられる',
