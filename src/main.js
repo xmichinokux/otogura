@@ -26,7 +26,7 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
-const { おすすめを聞く, プレイリストを作らせる, 候補の数, 作る曲数 } = require('./ai');
+const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数 } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
@@ -334,6 +334,47 @@ ipcMain.handle('resonance:get', async () => {
     return null;
   }
 });
+
+/**
+ * 言葉から木を生やして、控えに足す。
+ *
+ * ★生やした木と、読み込んだ木を**同じ置き場に混ぜる**。
+ * 形をそろえてあるので（ai.js の 木を生やす を参照）、
+ * この先はまったく同じ道を通る。分けると片方だけ直す事故になる。
+ */
+ipcMain.handle('ai:tree', async (_e, 手がかり) => {
+  const キー = await キーを読む();
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  const r = await 木を生やす({
+    キー,
+    言葉: 手がかり && 手がかり.言葉,
+    手元の演者: (手がかり && 手がかり.手元の演者) || [],
+  });
+  if (!r.ok) return r;
+
+  // 控えに足す。同じ言葉で生やし直したら、古いほうを差し替える
+  let 前 = { version: 1, entries: [] };
+  try {
+    const 文 = await fs.readFile(響きファイル(), 'utf8');
+    const p = JSON.parse(文);
+    if (p && Array.isArray(p.entries)) 前 = p;
+  } catch { /* まだ無い */ }
+  前.version = 1;
+  前.exportedAt = new Date().toISOString();
+  前.entries = [r.結果, ...前.entries.filter((e) => e && e.keyword !== r.結果.keyword)];
+
+  const 確かめ = 響きを読み込む(JSON.stringify(前));
+  if (!確かめ.ok) return { ok: false, error: '生やした木を保存できませんでした（' + 確かめ.error + '）' };
+  try {
+    await fs.mkdir(path.dirname(響きファイル()), { recursive: true });
+    await fs.writeFile(響きファイル(), JSON.stringify(前, null, 2), 'utf8');
+  } catch (e) {
+    return { ok: false, error: '保存できませんでした（' + ((e && e.message) || '不明') + '）' };
+  }
+  return { ok: true, 生やした: r.結果, 木: 確かめ.木 };
+});
+
+ipcMain.handle('ai:treeSizes', async () => ({ 見せる演者の数 }));
 
 ipcMain.handle('resonance:clear', async () => {
   // ★消すのはこの控えだけ。音楽ファイルには触らない

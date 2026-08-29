@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('mp3', {
   響きを読み込む: () => ipcRenderer.invoke('resonance:load'),
   響きを取る: () => ipcRenderer.invoke('resonance:get'),
   響きを消す: () => ipcRenderer.invoke('resonance:clear'),
+  // ★音蔵の中で木を生やす（Resonance が無くても使える）
+  木を生やす: (手がかり) => ipcRenderer.invoke('ai:tree', 手がかり),
+  木の大きさ: () => ipcRenderer.invoke('ai:treeSizes'),
   // ★シャッフルに入れない曲。「一覧から外す」とは別（一覧には残り、押せば鳴る）
   シャッフル除外を取る: () => ipcRenderer.invoke('shuffleskip:get'),
   シャッフル除外を変える: (paths, 除外する) => ipcRenderer.invoke('shuffleskip:set', paths, 除外する),

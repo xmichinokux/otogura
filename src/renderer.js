@@ -522,12 +522,92 @@ function 響きを合わせ直す() {
   響きの当たり = 響きの木 ? 突き合わせる(響きの木, tracks) : null;
 }
 
+/** 木を生やすときに渡す、手元の演者（曲数の多い順） */
+function 手元の演者(何人) {
+  const 数 = new Map();
+  for (const t of 見える曲()) {
+    const a = (t.artist || "").trim();
+    if (!a || a === "Unknown") continue;
+    数.set(a, (数.get(a) ?? 0) + 1);
+  }
+  return [...数.entries()].sort((a, b) => b[1] - a[1]).slice(0, 何人)
+    .map(([名前, 曲数]) => ({ 名前, 曲数 }));
+}
+
+/**
+ * 言葉から木を生やす。
+ *
+ * ★これが Resonance の見本になる（本人の言）。
+ *   > resonanceのデモンストレーションとして音蔵を使うので。
+ * だから**何が起きたかを見せる**。当たったものと、手元に無かったものを分けて出す。
+ * 手元に無い名前こそ「発見」なので、隠さない。
+ */
+async function 木を生やして足す(言葉, 言った) {
+  const 大きさ = await window.mp3.木の大きさ();
+  言った.textContent = `「${言葉}」から辿っています…`;
+  const r = await window.mp3.木を生やす({ 言葉, 手元の演者: 手元の演者(大きさ.見せる演者の数) });
+  if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
+
+  響きの木 = r.木;
+  響きを合わせ直す();
+  描き直す();
+  /*
+   * ★描き直すと欄が作り直されるので、**さっきの 言った は捨てられている。**
+   * 古いほうに書いても画面には出ない（実測でそうなっていた）。取り直す。
+   */
+  言った = $('ressaid') || 言った;
+
+  // ★生やした木のうち、手元にあったもの／無かったものを数える
+  const 生 = r.生やした.nodes;
+  const 当 = new Set((響きの当たり ? 響きの当たり.当たり : []).map((a) => ならす(a.artist)));
+  const あった = 生.filter((n) => 当.has(ならす(n.name)));
+  const 無かった = 生.filter((n) => !当.has(ならす(n.name)));
+  言った.textContent = `「${言葉}」から ${生.length} 個 ― 手元に ${あった.length} 個`;
+  $("status").textContent = `🌐「${言葉}」から ${生.length} 個辿りました`
+    + `　手元にあった ${あった.length} 個: ${あった.slice(0, 6).map((n) => n.name).join(" / ")}`
+    + (無かった.length ? `　／ 手元に無い ${無かった.length} 個（発見）: ${無かった.slice(0, 6).map((n) => n.name).join(" / ")}` : "");
+}
+
 function 響きの欄を描く() {
   const box = $('resbar');
-  if (!響きの木 || !響きの当たり) { box.className = ''; box.innerHTML = ''; return; }
+  /*
+   * ★木がまだ無くても、キーがあれば「生やす欄」は出す。
+   * ここが Resonance の見本なので、入り口が見えないと始まらない。
+   */
+  if (!響きの木 && !AIが使える) { box.className = ''; box.innerHTML = ''; return; }
   box.className = 'on';
   box.innerHTML = '';
 
+  if (AIが使える) {
+    // ★打ちかけの言葉を残す。描き直しのたびに消えると打てない
+    const 打ちかけ = ($("restree") || {}).value || "";
+    const 種 = document.createElement("input");
+    種.id = "restree";
+    種.placeholder = "言葉を入れて辿る（例: Unbroken）";
+    種.value = 打ちかけ;
+    種.style.flex = "0 1 220px";
+    種.style.font = "inherit";
+    種.style.fontSize = "12px";
+    種.style.padding = "3px 8px";
+    種.style.border = "1px solid var(--line)";
+    種.style.borderRadius = "4px";
+    const 生やす = document.createElement("button");
+    生やす.className = "restag"; 生やす.id = "restreego"; 生やす.textContent = "🌱 辿る";
+    生やす.title = "その言葉から辿れる音楽を探して、手元にあるものを教えます（1 回およそ 4.5 円）";
+    const 言った = document.createElement("span");
+    言った.className = "said"; 言った.id = "ressaid";
+    const 走る = async () => {
+      const v = 種.value.trim();
+      if (!v) return;
+      生やす.disabled = true; 種.disabled = true;
+      try { await 木を生やして足す(v, 言った); } finally { 生やす.disabled = false; 種.disabled = false; }
+    };
+    生やす.onclick = 走る;
+    種.onkeydown = (e) => { if (e.key === "Enter") 走る(); };
+    box.append(種, 生やす, 言った);
+  }
+
+  if (!響きの木 || !響きの当たり) return;                 // 木がまだ無ければ、ここまで
   const 印 = document.createElement('span');
   印.textContent = '🌐';
   const 文 = document.createElement('span');

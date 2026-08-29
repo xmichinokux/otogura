@@ -324,4 +324,143 @@ function 並びを確かめる(生, 候補) {
   return { 題, 並び, 落とした };
 }
 
-module.exports = { 使うモデル, 候補の数, 作る曲数, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる };
+/* ── 音蔵の中で「木」を生やす ──────────────────────────────
+   本人の選択（2026-08-29）:
+     > 理想はresonanceの機能を内部に持つか…jsonを書き出すのは面倒なので。
+     > Aで大丈夫です。resonanceのデモンストレーションとして音蔵を使うので。
+
+   ■ ★なぜ中で生やすのか
+   Kokoro OS の Resonance（木を生やすアプリ）は**まだ公開されていない**。
+   音蔵は近日公開する。つまり公開版では、落とした人のほぼ全員が
+   Resonance を持っていない ―― **使えない機能が目立つ場所に残る。**
+
+   中身を読んだら、Resonance の木を生やす処理は
+   **LLM を 1 回呼ぶだけ**だった（言葉 → 頼み文 → JSON の木）。
+   音蔵にはもう、キーも SDK も構造化出力も、木を曲と突き合わせる処理もある。
+   足りないのは一往復だけだった。
+
+   ■ ★中でやるほうが、よく効く
+   Resonance はジャンルを越えて辿るのが値打ち（服・映画・場所まで）。
+   だが音蔵にとっては**そこが捨て札**になる。実測:
+
+     実物の木 147 ノード中、music は 43 個（3 割）
+     音楽以外の言葉で引いた木（人工知能・量子力学）… 当たり 0
+
+   中で生やすなら、最初から音楽だけを、しかも**手元の演者を見ながら**生やせる。
+
+   ■ 費用（実測、Opus 5・150円/ドル）
+     手元の演者を渡さない      1 本 3.7 円
+     上位 150 人を渡す        1 本 4.5 円  ← これにした
+     上位 500 人を渡す        1 本 6.5 円
+     全 5,860 人を渡す        1 本  37 円  ← 高いわりに、発見が減る
+
+   ★全員渡さないのは、費用だけの話ではない。
+   全部見せると「手元にあるものだけ」を並べがちになる。
+   **手元に無い名前が混ざるから、発見になる。**
+   ────────────────────────────────────────────────── */
+
+/** 手元の演者を何人まで渡すか */
+const 見せる演者の数 = 150;
+
+function 木の頼み文(手元の演者) {
+  const 一覧 = 手元の演者.length
+    ? 手元の演者.slice(0, 見せる演者の数).map((a) => `${a.名前}(${a.曲数})`).join(', ')
+    : '（分かりません）';
+  return [
+    'あなたは音楽に詳しい人です。ある言葉を起点に、**そこから辿れる音楽**を木の形で並べます。',
+    '',
+    '■ この人がよく持っているアーティスト（曲数の多い順・一部）',
+    一覧,
+    '',
+    '■ 決まり',
+    '・起点の言葉から、**3 段の木**を作ってください',
+    '　深さ1 … 起点から直接つながるもの 3〜4 個',
+    '　深さ2 … 各深さ1 から 2 個ずつ',
+    '　深さ3 … 各深さ2 から 1〜2 個ずつ',
+    '・**実在するアーティスト／バンド名だけ**を挙げてください。アルバム名や曲名は挙げない',
+    '　（この名前は、その人の手元のアーティスト名と突き合わせます）',
+    '・★**手元にあるものだけを並べない。** 上の一覧は「その人の好みの手がかり」です。',
+    '　半分くらいは一覧に無い名前を混ぜてください。**知らない名前があるから面白い**',
+    '・「description」は日本語で 20 字ほど。**なぜそこから繋がるのか**を書く',
+    '・同じ名前を 2 回出さない',
+  ].join('\n');
+}
+
+/**
+ * 言葉から木を生やす。
+ *
+ * ★返す形は、Resonance の書き出しと**同じ形**にする。
+ * こうすると、読み込んだ木と生やした木が、その先はまったく同じ道を通る
+ * （src/resonance.js の 突き合わせる がそのまま使える）。
+ * 形を分けると、片方だけ直す事故になる。
+ *
+ * @returns { ok: true, 結果: { keyword, savedAt, nodes: [{name, genre, description, depth}] } }
+ *        | { ok: false, error }
+ */
+async function 木を生やす({ キー, 言葉, 手元の演者 = [] }) {
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  if (typeof 言葉 !== 'string' || !言葉.trim()) return { ok: false, error: '言葉が空です' };
+
+  let Anthropic; let z; let zodOutputFormat;
+  try {
+    Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+    ({ z } = require('zod'));
+    ({ zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod'));
+  } catch {
+    return { ok: false, error: 'AI の部品が読み込めません' };
+  }
+
+  const かたち = z.object({
+    nodes: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      depth: z.number(),
+    })),
+  });
+
+  try {
+    const client = new Anthropic({ apiKey: キー });
+    const 返り = await client.messages.parse({
+      model: 使うモデル,
+      max_tokens: 4000,
+      system: 木の頼み文(手元の演者),
+      messages: [{ role: 'user', content: 言葉.trim() }],
+      output_config: { effort: 'low', format: zodOutputFormat(かたち) },
+    });
+    if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
+    if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました' };
+    const 出 = 返り.parsed_output;
+    if (!出 || !Array.isArray(出.nodes)) return { ok: false, error: 'AI の返事を読み取れませんでした' };
+
+    /*
+     * ★形をそろえて返す。
+     * genre は 'music' で固定する（音楽だけを頼んでいるので）。
+     * 同じ名前は落とす。深さは 0〜3 に丸める。
+     */
+    const 見た = new Set();
+    const nodes = [];
+    for (const n of 出.nodes) {
+      const name = (n && typeof n.name === 'string') ? n.name.trim() : '';
+      if (!name) continue;
+      const k = name.toLocaleLowerCase('ja');
+      if (見た.has(k)) continue;
+      見た.add(k);
+      nodes.push({
+        name,
+        genre: 'music',
+        description: (n && typeof n.description === 'string') ? n.description.trim() : '',
+        depth: Number.isFinite(n.depth) ? Math.max(0, Math.min(3, Math.round(n.depth))) : 1,
+      });
+    }
+    if (!nodes.length) return { ok: false, error: 'AI が名前を挙げませんでした' };
+    return { ok: true, 結果: { keyword: 言葉.trim(), savedAt: new Date().toISOString(), nodes } };
+  } catch (e) {
+    const 名 = e && e.constructor ? e.constructor.name : '';
+    if (名 === 'AuthenticationError') return { ok: false, error: 'APIキーが正しくないようです' };
+    if (名 === 'RateLimitError') return { ok: false, error: '短い間に呼びすぎました' };
+    if (名 === 'APIConnectionError') return { ok: false, error: 'つながりませんでした' };
+    return { ok: false, error: (e && e.message) ? e.message : '不明な失敗' };
+  }
+}
+
+module.exports = { 使うモデル, 候補の数, 作る曲数, 見せる演者の数, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };
