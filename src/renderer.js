@@ -408,6 +408,7 @@ let AIが使える = false;
 let キー入力 = null;
 /** 打ちかけの言葉。描き直しで消えないように覚えておく */
 let 打ちかけの言葉 = "";
+let 打ちかけの辿る言葉 = "";
 /** AI がつけた 1 曲ごとのひとこと { パス: 文 }。その場かぎり（覚え書きには入れない） */
 const AIのひとこと = new Map();
 
@@ -522,16 +523,21 @@ async function AIに一本組ませる(気分, 言った) {
   描き直す();
   言った.textContent = r.結果.題 || 気分;
 
-  // 頭から流す
-  const 一曲目 = tracks.find((t) => t.path === 道[0]);
-  if (一曲目) 再生する(一曲目);
+  /*
+   * ★作っただけで、勝手に流さない（2026-08-29 本人の指示）。
+   *   > プレイリストができた時に自動で再生されてびっくりしたので
+   *   > 再生されないようにしてほしいです。
+   *
+   * 一本ができた時点で、聴くかどうかは本人が決めること。
+   * いま鳴っているものを勝手に止めるのも、勝手に始めるのも、余計なお世話だった。
+   */
 
   /*
    * ★状態の文字は、再生したあとに出す。
    * 先に出すと 再生する() の中の 一覧を描く() に上書きされて、消える（実測）。
    */
   const 落ち = r.結果.落とした ? `（${r.結果.落とした} 件は候補に無くて落としました）` : '';
-  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}`;
+  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}　▶ で頭から流れます`;
 }
 
 /* ── Resonance（Kokoro OS のカルチャーツリー）───────────────
@@ -629,7 +635,16 @@ let 言葉の名前変え = null;
  */
 function 響きの欄を描く() {
   const box = $('resbar');
-  if (!響きの木 || !響きの当たり || !響きの当たり.曲.size) { box.className = ''; box.innerHTML = ''; return; }
+  /*
+   * ★響きタブを開いているときだけ出す（2026-08-29 本人の指示）。
+   *   > 響きの編集欄は響きタブを選んだ時のみ表示にしてほしいです。
+   *
+   * ここは「辿った言葉を直す・消す」ための欄。
+   * ほかのタブを見ているときに出ていても、押す用が無い。
+   */
+  if (カラムタブ !== 'resonance' || !響きの木 || !響きの当たり || !響きの当たり.曲.size) {
+    box.className = ''; box.innerHTML = ''; return;
+  }
   box.className = 'on';
   box.innerHTML = '';
 
@@ -782,74 +797,89 @@ function 気分の欄を描く() {
   }
 
   /*
-   * ★記入欄も、ボタンも 1 つ（2026-08-29 本人の整理）。
-   *   > AIがこちらの気分で選んだプレイリストと文脈で選んだプレイリストが欲しい
-   *   > あ、ボタンも一つにできますか？
-   *   > 記入欄の言葉でAIが気分なのか文脈なのか判断できると嬉しいのですか。
+   * ★記入欄は 2 つ（2026-08-29 本人の整理、2 度目）。
+   *   > AIシャッフルプレイリストを作る記入欄とresonanceの記入欄で２つに分けます。
    *
-   * 打つものは同じ（言葉）で、違うのは「どう使うか」だけだった。
-   * ★どちらかは **AI に読ませる**。1 段目の呼び出しに判定を足しただけなので、
-   * 通信は増えていない（ai.js の 頼み文 を参照）。
+   * 一度 1 つにまとめて、書いた言葉を AI に振り分けさせた。
+   * だが**押す前に何が起きるか分からない**のが不便だった。
+   * 分けたほうが、押す前に決まっている。
    *
-   * ★どちらと読んだかは画面に出す。黙って振り分けると、
-   * なぜその選曲になったのか分からなくなる。
+   * ★分けたので、頼み文からも判定を外した（ai.js）。
+   * 残したままだと「迷ったら文脈」が効いて、気分を書いても
+   * ジャンルが空で返り、絞り込みが効かなくなる。
    */
+
+  /* ── 気分から ── */
   const 印 = document.createElement("span");
   印.textContent = "🎧";
   const 欄 = document.createElement("input");
   欄.id = "aiword";
   // ★具体例は書かない（公開するので、作者の好みが出てしまう）
-  欄.placeholder = "言葉を書く";
+  欄.placeholder = "いまの気分を書く";
   欄.value = 打ちかけの言葉;
   欄.oninput = () => { 打ちかけの言葉 = 欄.value; };
+  const 押す = document.createElement("button");
+  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "一本を組む";
+  押す.title = "書いた気分に合うジャンルに絞って、そこから 30 曲の一本を組みます";
+
+  /* ── 言葉から辿る ── */
+  const 印2 = document.createElement("span");
+  印2.textContent = "🌱";
+  const 欄2 = document.createElement("input");
+  欄2.id = "restree";
+  欄2.placeholder = "言葉を 1 つ入れて辿る";
+  欄2.value = 打ちかけの辿る言葉;
+  欄2.oninput = () => { 打ちかけの辿る言葉 = 欄2.value; };
+  const 辿る = document.createElement("button");
+  辿る.className = "btn"; 辿る.id = "restreego"; 辿る.textContent = "辿る";
+  辿る.title = "その言葉から辿れる音楽を探し、手元にあったものだけで一本を組みます";
 
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
-  const 押す = document.createElement("button");
-  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "一本を組む";
-  押す.title = "書いた言葉を AI が読んで、気分なら合うジャンルから、名前ならそこから辿って、一本を組みます";
+  const 止める = (と) => {
+    for (const e of [押す, 欄, 辿る, 欄2]) e.disabled = と;
+  };
 
-  const 走る = async () => {
+  const 気分で = async () => {
     const v = 欄.value.trim();
     if (!v) return;
-    押す.disabled = true; 欄.disabled = true;
-    言った.textContent = "読んでいます…";
+    止める(true);
+    言った.textContent = "聞いています…";
     try {
       const r = await window.mp3.気分でおすすめ({
         気分: v, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
       });
       if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
-
-      if (r.結果.種類 === "文脈") {
-        /*
-         * ★名前だと読んだ → 辿ってから、見つかったものだけで一本を組む。
-         * 辿って終わりにしない。押したら一本できる、が分かりやすい
-         * （ボタンが並んでいると押してしまう、と実地で言われた）。
-         */
-        $("status").textContent = `「${v}」を**名前**と読みました ― そこから辿ります`;
-        const 足りた = await 木を生やして足す(v, $("aisaid") || 言った);
-        if (!足りた) return;
-        カラムタブ = "resonance";
-        sel = { ...sel, 言葉: new Set([小文字(v)]), 響演者: null, 響盤: null };
-        描き直す();
-        await AIに一本組ませる(v, $("aisaid") || 言った);
-        return;
-      }
-
-      // 気分だと読んだ → いままでどおり、絞り込んでから一本を組む
       当てはめる(r.結果);
       await AIに一本組ませる(v, $("aisaid") || 言った);
     } finally {
-      const b = $("aigo"); const i = $("aiword");
-      if (b) b.disabled = false;
-      if (i) i.disabled = false;
+      for (const id of ["aigo", "aiword", "restreego", "restree"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
-  押す.onclick = 走る;
-  欄.onkeydown = (e) => { if (e.key === "Enter") 走る(); };
 
-  box.append(印, 欄, 押す, 言った);
+  const 辿って = async () => {
+    const v = 欄2.value.trim();
+    if (!v) return;
+    止める(true);
+    try {
+      const 足りた = await 木を生やして足す(v, $("aisaid") || 言った);
+      if (!足りた) return;
+      カラムタブ = "resonance";
+      sel = { ...sel, 言葉: new Set([小文字(v)]), 響演者: null, 響盤: null };
+      描き直す();
+      await AIに一本組ませる(v, $("aisaid") || 言った);
+    } finally {
+      for (const id of ["aigo", "aiword", "restreego", "restree"]) { const e = $(id); if (e) e.disabled = false; }
+    }
+  };
+
+  押す.onclick = 気分で;
+  辿る.onclick = 辿って;
+  欄.onkeydown = (e) => { if (e.key === "Enter") 気分で(); };
+  欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
+
+  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 言った);
 }
 
 /**
@@ -879,7 +909,7 @@ function 当てはめる(結果) {
   const 無し = 結果.無かったもの.length ? "／手元に無かったもの: " + 結果.無かったもの.join(", ") : "";
   const 言った = $("aisaid");
   if (言った) 言った.textContent = 結果.ひとこと || 選んだ;
-  $("status").textContent = `「${打ちかけの言葉}」を**気分**と読みました ― ${選んだ} ／ ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
+  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
 }
 
 /** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
