@@ -867,6 +867,18 @@ async function AIに一本組ませる(気分, 言った) {
  */
 let 確かめる候補を開く = false;
 
+/**
+ * ★交差（いくつの言葉から辿り着いたか）を開いているか。
+ *
+ * ■ 本人の問い（2026-08-29）
+ *   > たくさん使えば何かいいことがある機能ってありますか？
+ *
+ * ★これがそれ。しかも**前は数えずに捨てていた。**
+ * 別々の言葉から同じ名前に行き着くのは偶然ではない。
+ * そして **1 本目では絶対に起きない。** 言葉を辿るほど出てくる。
+ */
+let 交差を開く = false;
+
 /** 読み込んだ木。null なら未読み込み（機能が出ないだけ） */
 let 響きの木 = null;
 /** 突き合わせた結果。tracks が変わったら作り直す */
@@ -1062,6 +1074,47 @@ let 言葉の名前変え = null;
  *
  * 並びは当たりと同じで重い順（深く・新しいほど上）。resonance.js で並べてある。
  */
+/**
+ * 交差を並べる ―― いくつの言葉から辿り着いたか。
+ *
+ * ★「使うほど増えるもの」なので、いま何組あるかを必ず出す。
+ * 0 のときも、どうすれば増えるかを書く（黙って空にしない）。
+ */
+function 交差を描く(box, 交差) {
+  const 面 = document.createElement('div');
+  面.className = 'misslist';
+
+  const 頭 = document.createElement('div');
+  頭.className = 'misshead';
+  頭.textContent = '交差 ― いくつもの言葉から辿り着いた名前です。'
+    + '別々の言葉が同じ名前を指すのは偶然ではありません。'
+    + 'その人の中で、いくつもの筋がそこへ通じているということです。'
+    + '★言葉を辿るほど増えます（1 本目では起きません）。選ばれやすさも上がります。';
+  面.appendChild(頭);
+
+  for (const a of 交差) {
+    const 行 = document.createElement('div');
+    行.className = 'missrow';
+
+    const 数 = document.createElement('span');
+    数.className = 'missdepth';
+    数.textContent = a.言葉数 + ' 本';
+    数.title = a.言葉数 + ' つの言葉から辿り着きました';
+
+    const 名 = document.createElement('span');
+    名.className = 'missname';
+    名.textContent = a.artist;
+
+    const 説 = document.createElement('span');
+    説.className = 'said';
+    説.textContent = `${a.曲数} 曲　［${a.言葉たち.join('・')}］`;
+
+    行.append(数, 名, 説);
+    面.appendChild(行);
+  }
+  box.appendChild(面);
+}
+
 function 確かめる候補を描く(box, 外れ) {
   const 面 = document.createElement('div');
   面.className = 'misslist';
@@ -1091,7 +1144,11 @@ function 確かめる候補を描く(box, 外れ) {
 
     const 説 = document.createElement('span');
     説.className = 'said';
-    説.textContent = (m.description ? m.description + '　' : '') + '［「' + m.keyword + '」から］';
+    // ★交差していれば、そう出す。手元に無いなかでも、いちばん確かめる値打ちがある
+    const 交差 = (m.言葉数 > 1)
+      ? `［${m.言葉数} 本の言葉から: ${m.言葉たち.join('・')}］`
+      : `［「${m.keyword}」から］`;
+    説.textContent = (m.description ? m.description + '　' : '') + 交差;
 
     行.append(深, 名, 説);
     面.appendChild(行);
@@ -1192,6 +1249,21 @@ function 響きの欄を描く() {
    * ★確かめる候補（手元で見つからなかった名前）。
    * 0 個なら出さない ―― 「0」を出しても押す用が無い。
    */
+  /*
+   * ★交差（2 本以上の言葉から辿り着いた名前）。
+   * 使うほど増えるものなので、増えたことが見えるようにする。
+   */
+  const 交差 = (響きの当たり && Array.isArray(響きの当たり.当たり))
+    ? 響きの当たり.当たり.filter((a) => (a.言葉数 ?? 1) > 1) : [];
+  if (交差.length) {
+    const 開閉 = document.createElement("button");
+    開閉.className = "restag";
+    開閉.textContent = (交差を開く ? "▼ " : "▶ ") + "交差 " + 交差.length;
+    開閉.title = "いくつもの言葉から辿り着いた名前です。言葉を辿るほど増えます";
+    開閉.onclick = () => { 交差を開く = !交差を開く; 描き直す(); };
+    box.appendChild(開閉);
+  }
+
   const 外れ = (響きの当たり && Array.isArray(響きの当たり.外れ)) ? 響きの当たり.外れ : [];
   if (外れ.length) {
     const 開閉 = document.createElement("button");
@@ -1225,6 +1297,7 @@ function 響きの欄を描く() {
   box.appendChild(外す);
 
   // ★開いているときだけ場所を取る。当たり（鳴らせる曲）が主で、こちらは脇なので
+  if (交差を開く && 交差.length) 交差を描く(box, 交差);
   if (確かめる候補を開く && 外れ.length) 確かめる候補を描く(box, 外れ);
 }
 

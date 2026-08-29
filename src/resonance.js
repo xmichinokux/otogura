@@ -146,7 +146,7 @@ function 重みを出す(depth, savedAt, いま) {
  * 持っていないものを見落とすより、持っているのに買わせるほうが困る。
  *
  * @returns {
- *   当たり: [{ artist, description, keyword, depth, savedAt, 重み, 曲数 }],  // 重い順
+ *   当たり: [{ artist, description, keyword, depth, savedAt, 重み, 曲数, 言葉数, 言葉たち }],  // 重い順
  *   曲: Map<パス, { artist, description, keyword, 重み }>,                  // 当たった曲
  *   外れ: [{ name, description, keyword, depth, savedAt, 重み }],           // 緩く探しても無かった。重い順
  * }
@@ -158,7 +158,25 @@ function 突き合わせる(木, tracks, いま = Date.now()) {
   /*
    * ★music のノードだけ拾う。
    * 同じ名前が複数の木に出ることがある（Minor Threat が 2 本に出ていた）。
-   * そのときは**重いほうを採る**（深く・新しいほうの理由が残る）。
+   * 理由（description）は**重いほうを採る**（深く・新しいほうが残る）。
+   *
+   * ■ ★「交差」＝ いくつの言葉から辿り着いたか（2026-08-29）
+   *
+   * 本人の問い:
+   *   > たくさん使えば何かいいことがある機能ってありますか？
+   *
+   * ★ここに 1 つあった。しかも**捨てていた。**
+   * 前は「重いほうを採る」だけで、**何本の言葉から辿り着いたかを数えていなかった。**
+   *
+   * 別々の言葉から同じ名前に行き着くのは、偶然ではない。
+   * 「その人の中で、いくつもの筋がそこへ通じている」ということ。
+   * ★そして**言葉を辿るほど増える。** 1 本目では絶対に起きない。
+   * 使うほど出てくる、という性質がここにある。
+   *
+   * ★強さは 言葉の数ぶん掛ける（3 倍で頭打ち）。
+   * 深さの差が 1〜4 倍なので、同じくらいの効き方になる。
+   * 頭打ちにするのは、言葉が増えたときに**よくある名前だけが上に居座る**のを
+   * 防ぐため。交差は「見つける」ためのものであって、順位を独占させない。
    */
   const 候補 = new Map();                                // ならした名前 → 情報
   for (const e of 木.木) {
@@ -168,10 +186,26 @@ function 突き合わせる(木, tracks, いま = Date.now()) {
       if (!k) continue;
       const 重み = 重みを出す(n.depth, e.savedAt, いま);
       const 前 = 候補.get(k);
-      if (!前 || 重み > 前.重み) {
-        候補.set(k, { name: n.name, description: n.description, keyword: e.keyword, depth: n.depth, savedAt: e.savedAt, 重み });
+      if (!前) {
+        候補.set(k, {
+          name: n.name, description: n.description, keyword: e.keyword,
+          depth: n.depth, savedAt: e.savedAt, 素の重み: 重み,
+          // ★どの言葉から辿り着いたか。同じ言葉は数えない
+          言葉たち: [e.keyword],
+        });
+      } else {
+        if (!前.言葉たち.includes(e.keyword)) 前.言葉たち.push(e.keyword);
+        if (重み > 前.素の重み) {
+          前.name = n.name; 前.description = n.description; 前.keyword = e.keyword;
+          前.depth = n.depth; 前.savedAt = e.savedAt; 前.素の重み = 重み;
+        }
       }
     }
+  }
+  // 交差のぶんを掛ける（3 倍で頭打ち）
+  for (const c of 候補.values()) {
+    c.言葉数 = c.言葉たち.length;
+    c.重み = c.素の重み * Math.min(3, c.言葉数);
   }
   if (!候補.size) return 空;
 
@@ -192,14 +226,16 @@ function 突き合わせる(木, tracks, いま = Date.now()) {
     曲.set(t.path, { artist: t.artist, description: c.description, keyword: c.keyword, 重み: c.重み });
   }
 
-  const 当たり = [...当たり表.values()].sort((a, b) => b.重み - a.重み || b.曲数 - a.曲数);
+  // ★重い順。同じなら交差の多い順、それも同じなら曲数の多い順
+  const 当たり = [...当たり表.values()]
+    .sort((a, b) => b.重み - a.重み || (b.言葉数 ?? 1) - (a.言葉数 ?? 1) || b.曲数 - a.曲数);
 
   /*
    * ★「持っていない」と言う前に、もう一度ゆるく探す。
    * 演者で当たらなかったものだけを見るので、ここを通るのは少数。
    */
   const 外れ = 緩く探す([...候補.entries()].filter(([k]) => !当たり表.has(k)), tracks)
-    .sort((a, b) => b.重み - a.重み || b.depth - a.depth);
+    .sort((a, b) => b.重み - a.重み || (b.言葉数 ?? 1) - (a.言葉数 ?? 1) || b.depth - a.depth);
 
   return { 当たり, 曲, 外れ };
 }
@@ -243,13 +279,24 @@ function 緩く探す(残り, tracks) {
 function 響きの一節(当たり, 上限 = 12) {
   if (!当たり || !当たり.length) return '';
   const 行 = 当たり.slice(0, 上限)
-    .map((a) => `・${a.artist}（${a.曲数}曲）… ${a.description}　［「${a.keyword}」から深さ${a.depth}］`);
+    .map((a) => {
+      /*
+       * ★交差（いくつの言葉から辿り着いたか）も書く。
+       * 別々の言葉が同じ名前を指すのは偶然ではない。AI にもそう伝える。
+       */
+      const 交差 = (a.言葉数 > 1)
+        ? `　★${a.言葉数} つの言葉から辿り着きました（${a.言葉たち.join('・')}）`
+        : '';
+      return `・${a.artist}（${a.曲数}曲）… ${a.description}　［「${a.keyword}」から深さ${a.depth}］${交差}`;
+    });
   return [
     '■ この人が最近「響いた」言葉と、その周りにあった名前',
     '（Kokoro OS の Resonance で辿ったもの。手元にある演者だけ載せています）',
     ...行,
     '',
     '★ここに挙がった演者は、**いま気になっている場所**です。気分に合うなら優先してください。',
+    '★とくに「★N つの言葉から辿り着きました」が付いているものは、',
+    '　いくつもの筋がそこへ通じている、いま特に強い場所です。',
     '★ただし気分が違う方を向いていれば、無理に入れないこと。',
   ].join('\n');
 }
