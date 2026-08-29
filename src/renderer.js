@@ -561,19 +561,31 @@ function つまみの行() {
   量棒.title = "一本を何曲にするか";
   const 量札 = 字("", "val"); 量札.id = "aimanylabel";
 
+  /*
+   * ★文脈の強度（2026-08-29 本人の希望）:
+   *   > AI DJとResonaceで文脈の王道を守ってほしいときと外してほしいときがある
+   * 前は決め打ちで、いつも「外す」側だった。守りたいときに守れなかった。
+   */
+  const 強棒 = 棒を作る("aistrict", AIのつまみ.目盛.強度 ?? 3);
+  強棒.title = "その言葉・気分の王道を守るか、外すか。外すほど深く考えさせるので、少し高くなります";
+  const 強札 = 字("", "val"); 強札.id = "aistrictlabel";
+
   const 説き = 字("", "said"); 説き.id = "aiknobsaid";
 
   const 札を直す = () => {
     const 幅 = AIのつまみ.幅の段[Number(幅棒.value) - 1];
     const 量 = AIのつまみ.量の段[Number(量棒.value) - 1];
+    const 強 = (AIのつまみ.強度の段 || [])[Number(強棒.value) - 1];
     if (!幅 || !量) return;
     幅札.textContent = 幅.札;
     量札.textContent = 量.曲数 + " 曲";
+    強札.textContent = 強 ? 強.札 : "";
     /*
      * ★何が変わるのかを、そのまま出す。
      * 「狭い〜広い」だけだと、押すまで何が起きるか分からない。
      */
     説き.textContent = `候補 ${幅.候補} 曲 ／ 辿る名前 ${幅.名前} 個 ／ ジャンル ${幅.ジャンル} まで`
+      + (強 ? `　文脈は「${強.札}」` : '')
       + `　→ ${量.曲数} 曲の一本（目安 ${つまみの目安円(幅, 量)} 円）`;
   };
 
@@ -583,14 +595,16 @@ function つまみの行() {
    */
   const 覚える = async () => {
     札を直す();
-    const r = await window.mp3.AIのつまみを変える({ 幅: Number(幅棒.value), 量: Number(量棒.value) });
+    const r = await window.mp3.AIのつまみを変える({
+      幅: Number(幅棒.value), 量: Number(量棒.value), 強度: Number(強棒.value),
+    });
     if (r && Number.isFinite(r.幅) && Number.isFinite(r.量)) AIのつまみ = { ...AIのつまみ, 目盛: r };
   };
-  幅棒.oninput = 札を直す; 量棒.oninput = 札を直す;
-  幅棒.onchange = 覚える; 量棒.onchange = 覚える;
+  幅棒.oninput = 札を直す; 量棒.oninput = 札を直す; 強棒.oninput = 札を直す;
+  幅棒.onchange = 覚える; 量棒.onchange = 覚える; 強棒.onchange = 覚える;
   札を直す();
 
-  行.append(字("対象の幅"), 幅棒, 幅札, 字("選出の量"), 量棒, 量札, 説き);
+  行.append(字("対象の幅"), 幅棒, 幅札, 字("選出の量"), 量棒, 量札, 字("文脈の強度"), 強棒, 強札, 説き);
   return 行;
 }
 
@@ -1419,7 +1433,7 @@ function 気分の欄を描く() {
     for (const e of [押す, 欄, 辿る, 欄2]) e.disabled = と;
     // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
     // 動かせるままだと「効かなかった」と見えるので、いっしょに止める
-    for (const id of ["aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = と; }
+    for (const id of ["aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = と; }
   };
 
   const 気分で = async () => {
@@ -1446,7 +1460,7 @@ function 気分の欄を描く() {
         if (欄い) 欄い.value = "";
       }
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = false; }
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
 
@@ -1501,7 +1515,7 @@ function 気分の欄を描く() {
       $("status").textContent = `🌐「${v}」で絞りました（${曲数.toLocaleString("ja-JP")} 曲）`
         + '　▶ で流せます。🔀 を押すとこの範囲でシャッフルします';
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = false; }
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
 
