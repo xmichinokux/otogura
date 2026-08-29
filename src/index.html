@@ -76,6 +76,15 @@
   #aibar.on { display: flex; }
   #aibar input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
   #aibar .said { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
+  /* Resonance（Kokoro OS の木）。読み込んだときだけ出す */
+  #resbar { display: none; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 8px; background: var(--sub); border-bottom: 1px solid var(--line); }
+  #resbar.on { display: flex; }
+  #resbar .said { color: var(--dim); font-size: 12px; }
+  #resbar .restag {
+    font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer;
+    border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--accent);
+  }
+  #resbar .restag:hover { background: var(--accent-bg); }
   /* 3カラムの高さを掴んで変える取っ手。細いと掴めないので、少し余裕をとる */
   #colsizer { flex: 0 0 6px; cursor: row-resize; background: var(--line); }
   #colsizer:hover { background: var(--accent); }
@@ -184,6 +193,7 @@
      絞り込みがあることを、タブ自身に出す。 -->
 <div id="coltabs"></div>
 <div id="aibar"></div>
+<div id="resbar"></div>
 
 <div id="cols">
   <div class="col"><h2>ジャンル</h2><ul id="c-genre"></ul></div>
@@ -212,6 +222,9 @@
   <!-- ★気分でおすすめ（本人の希望 2026-08-29）。
        このアプリで唯一、外に通信する機能。既定は切で、キーを入れるまで
        上の気分の欄は出ない。ここだけは、入れる道として常に出しておく。 -->
+  <button class="btn" id="resload" title="Kokoro OS の Resonance で書き出した JSON を読み込みます（読むだけ。音楽ファイルには触りません）">
+    🌐 響きを読み込む
+  </button>
   <button class="btn" id="aikey" title="気分を言うと、聴く範囲を選んでくれます（Anthropic の API キーが要ります）">
     🤖 気分で選ぶ
   </button>
@@ -234,6 +247,7 @@
 
 <audio id="audio"></audio>
 <script src="shuffle.js"></script>
+<script src="resonance.js"></script>
 <script src="loudness.js"></script>
 <script src="renderer.js"></script>
 </body>

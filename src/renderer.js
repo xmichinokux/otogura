@@ -389,6 +389,20 @@ const AIのひとこと = new Map();
  * ★鳴らせない曲（ALAC）と、シャッフルから外した曲は最初から入れない。
  * 候補に入れて選ばれると、押しても鳴らない一本ができあがる。
  */
+/**
+ * ★響きで当たった曲を、候補に入りやすくする。
+ *
+ * くじの重みは「再生回数が少ないほど重い」。そこに響きの重みを掛ける。
+ * 掛けるだけなので、**忘れている曲を拾う性格は残る。**
+ * 響きが無ければ 1 倍（＝これまでどおり）。
+ */
+function 響きの重み表() {
+  if (!響きの当たり || !響きの当たり.曲.size) return null;
+  const 表 = {};
+  for (const [p, v] of 響きの当たり.曲) 表[p] = v.重み;
+  return 表;
+}
+
 function AIに渡す候補(何曲) {
   const 母集団 = いまの列().filter((t) => t.鳴らせる !== false && !シャッフル除外.has(t.path));
   if (!母集団.length) return [];
@@ -396,10 +410,22 @@ function AIに渡す候補(何曲) {
   const 道 = 母集団.map((t) => t.path);
   const 引いた = new Set();
   const 出 = [];
+  // 響きで当たった曲は、回数を小さく見せて引かれやすくする（響きが無ければ素のまま）
+  const 響き表 = 響きの重み表();
+  const 響きこみの回数表 = 響き表 ? Object.fromEntries(母集団.map((t) => {
+    const n = 再生回数[t.path] ?? 0;
+    const w = 響き表[t.path];
+    return [t.path, w ? Math.max(0, (n + 1) / w - 1) : n];
+  })) : 再生回数;
   const 上限 = Math.min(何曲, 道.length);
   // ★引けなくなったら止める。無限に回さない
   for (let i = 0; i < 上限 * 3 && 出.length < 上限; i += 1) {
-    const p = 次を選ぶ(道, 再生回数, 引いた);
+    /*
+     * ★響きの重みを、再生回数の重みに掛ける。
+     * 次を選ぶ() は「回数表」の値が小さいほど重い（1/(n+1)）ので、
+     * 響きで当たった曲は**回数を小さく見せる**ことで重くする。
+     */
+    const p = 次を選ぶ(道, 響きこみの回数表, 引いた);
     if (!p || 引いた.has(p)) break;
     引いた.add(p);
     const t = 表.get(p);
@@ -424,7 +450,14 @@ async function AIに一本組ませる(気分, 言った) {
   }
   言った.textContent = `${候補.length} 曲から組んでいます…`;
 
-  const r = await window.mp3.AIにプレイリストを作らせる({ 気分, 候補: 候補.map((c) => ({ 番号: c.番号, artist: c.artist, title: c.title, album: c.album })) });
+  const r = await window.mp3.AIにプレイリストを作らせる({
+    気分,
+    候補: 候補.map((c) => ({ 番号: c.番号, artist: c.artist, title: c.title, album: c.album })),
+    // ★響きで当たったものを渡す。description が「なぜおすすめか」になる
+    響き: (響きの当たり ? 響きの当たり.当たり : []).map((a) => ({
+      artist: a.artist, description: a.description, keyword: a.keyword, depth: a.depth, 曲数: a.曲数,
+    })),
+  });
   if (!r || !r.ok) { 言った.textContent = 'だめでした（' + ((r && r.error) || '不明') + '）'; return; }
 
   const 番号表 = new Map(候補.map((c) => [c.番号, c]));
@@ -466,6 +499,78 @@ async function AIに一本組ませる(気分, 言った) {
    */
   const 落ち = r.結果.落とした ? `（${r.結果.落とした} 件は候補に無くて落としました）` : '';
   $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}`;
+}
+
+/* ── Resonance（Kokoro OS のカルチャーツリー）───────────────
+   本人の依頼（2026-08-29）:
+     > 「この人が響いた言葉の周りにある名前」から曲を出します。
+
+   ★AI に渡す前に、こちらで突き合わせて**画面に出す**。
+   何が当たったか見えないと、選曲が変わった理由が分からなくなる。
+
+   ★86,044 曲を何度も走査しない（本人の指示）。
+   突き合わせは曲の側を 1 周するだけで、結果は覚えておく。
+   実測 25 ms。走査（ディスク読み）ではなく、手元の配列を 1 周するだけ。 */
+
+/** 読み込んだ木。null なら未読み込み（機能が出ないだけ） */
+let 響きの木 = null;
+/** 突き合わせた結果。tracks が変わったら作り直す */
+let 響きの当たり = null;
+
+/** 突き合わせ直す（曲が増えた・木を入れ替えた とき） */
+function 響きを合わせ直す() {
+  響きの当たり = 響きの木 ? 突き合わせる(響きの木, tracks) : null;
+}
+
+function 響きの欄を描く() {
+  const box = $('resbar');
+  if (!響きの木 || !響きの当たり) { box.className = ''; box.innerHTML = ''; return; }
+  box.className = 'on';
+  box.innerHTML = '';
+
+  const 印 = document.createElement('span');
+  印.textContent = '🌐';
+  const 文 = document.createElement('span');
+  文.className = 'said';
+  const 当 = 響きの当たり.当たり;
+  文.textContent = 当.length
+    ? `響き ${響きの木.木.length} 本から ${当.length} 組・${響きの当たり.曲.size.toLocaleString('ja-JP')} 曲が手元にありました`
+    : `響き ${響きの木.木.length} 本を読みましたが、手元に当たるものがありませんでした`;
+  文.title = 当.map((a) => `${a.artist}（${a.曲数}曲・深さ${a.depth}）… ${a.description}`).join('\n');
+
+  box.append(印, 文);
+
+  // 当たった演者を、重い順に並べる。押すとその演者で絞れる
+  for (const a of 当.slice(0, 10)) {
+    const b = document.createElement('button');
+    b.className = 'restag';
+    b.textContent = `${a.artist}（${a.曲数}）`;
+    b.title = `${a.description}\n「${a.keyword}」から深さ ${a.depth}`;
+    b.onclick = () => {
+      /*
+       * ★押したら、その演者だけに絞る。
+       * AI を通さずに「当たったものをすぐ聴く」道も残しておく。
+       */
+      カラムタブ = 'tag';
+      sel = { genre: null, artist: new Set([小文字(a.artist)]), album: null, 年: null, 月: null, 日: null };
+      列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+      描き直す();
+      $('status').textContent = `${a.artist} で絞りました ―「${a.description}」`;
+    };
+    box.appendChild(b);
+  }
+
+  const 外す = document.createElement('button');
+  外す.className = 'restag';
+  外す.textContent = '× 響きを外す';
+  外す.title = '読み込んだ木を忘れます（音楽ファイルには触りません）';
+  外す.onclick = async () => {
+    await window.mp3.響きを消す();
+    響きの木 = null; 響きの当たり = null;
+    描き直す();
+    $('status').textContent = '響きを外しました';
+  };
+  box.appendChild(外す);
 }
 
 /** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */
@@ -1661,6 +1766,7 @@ function 描き直す() {
   });
   カラムタブを描く();
   気分の欄を描く();
+  響きの欄を描く();
   タブを描く();
   道具を描く();
   一覧を描く();
@@ -1728,7 +1834,15 @@ function 再生する(t, { 列を保つ = false } = {}) {
    * 出さないと、ただ曲が並んでいるのと見分けがつかない。
    */
   const 一言 = AIのひとこと.get(t.path);
-  $('sub').textContent = 一言 ? `${t.artist} — ${t.album}　🤖 ${一言}` : `${t.artist} — ${t.album}`;
+  /*
+   * ★響きで当たった曲なら、なぜおすすめかも出す（本人の指示）。
+   *   > description は「なぜおすすめか」です。曲を出すとき、
+   *   > なぜその曲なのかを画面に出すのに使ってください
+   * AI のひとことと両方あるときは、両方出す（別のことを言っているので）。
+   */
+  const 響き = (響きの当たり && 響きの当たり.曲.get(t.path)) || null;
+  const 印 = [一言 ? '🤖 ' + 一言 : '', 響き ? '🌐 ' + 響き.description : ''].filter(Boolean).join('　');
+  $('sub').textContent = 印 ? `${t.artist} — ${t.album}　${印}` : `${t.artist} — ${t.album}`;
   /*
    * ★アートワークは、この 1 曲ぶんだけ今読む。
    * 一覧に全曲ぶん持たせていたのが、アプリが落ちた直接の原因だった
@@ -2296,6 +2410,7 @@ async function 走査する(押された = false) {
   try {
     const r = await window.mp3.走査する();
     tracks = r.tracks;
+    響きを合わせ直す();                        // ★曲が入れ替わったので当たりを取り直す
     if (Array.isArray(r.lists)) lists = r.lists;   // 走査時に掃除された結果を反映
     // ★走査の終わりも「裏の更新」。入力中に入力欄を壊さない
     裏で描き直す();
@@ -2346,6 +2461,19 @@ $('add').onclick = async () => {
  * 読み返す手立ても作らない（本体側に「返す」窓口を置いていない）。
  * 画面から読めるようにすると、外から来た文字列で盗める形になりうる。
  */
+$('resload').onclick = async () => {
+  const r = await window.mp3.響きを読み込む();
+  if (!r || r.canceled) return;
+  if (!r.ok) { alert("読めませんでした: " + r.error); return; }
+  響きの木 = r.木;
+  響きを合わせ直す();
+  描き直す();
+  const 当 = 響きの当たり.当たり;
+  $("status").textContent = 当.length
+    ? `響き ${r.木.木.length} 本を読みました ― ${当.length} 組・${響きの当たり.曲.size.toLocaleString("ja-JP")} 曲が手元にありました`
+    : `響き ${r.木.木.length} 本を読みましたが、手元に当たるものがありませんでした（音楽の言葉で辿った木だと当たります）`;
+};
+
 $('aikey').onclick = async () => {
   const 状態 = await window.mp3.AIが使えるか();
   if (状態.使える) {
@@ -2463,6 +2591,11 @@ $('unhide').onclick = async () => {
     const 状態 = await window.mp3.AIが使えるか();
     AIが使える = !!(状態 && 状態.使える);
   } catch { AIが使える = false; }
+  /*
+   * ★響きも読む。**無くても壊れない。**
+   * 無ければ欄が出ないだけで、ほかは今までどおり。
+   */
+  try { 響きの木 = await window.mp3.響きを取る(); } catch { 響きの木 = null; }
   $('untagged').classList.toggle('on', タグ無しを隠す);
   $('untagged').textContent = タグ無しを隠す ? '🏷 タグ無しを隠す' : '🏷 タグ無しも出す';
 
@@ -2508,6 +2641,7 @@ $('unhide').onclick = async () => {
       const c = await window.mp3.覚えている一覧();
       if (c.tracks.length) {
         tracks = c.tracks;
+        響きを合わせ直す();                    // ★覚え書きから出したぶんも突き合わせる
         描き直す();
         $('status').textContent = (引き継ぎの知らせ ? 引き継ぎの知らせ + ' ／ ' : '')
           + `${c.件数.toLocaleString('ja-JP')} 曲（前回のぶん。いま確かめています…）`;

@@ -223,13 +223,15 @@ const 作る曲数 = 30;
 /** 長い名前は切る。200 曲ぶん積むので、1 行の長さが効く */
 const 短く = (v, n) => { const s = String(v ?? ''); return s.length > n ? s.slice(0, n) + '…' : s; };
 
-function プレイリストの頼み文(気分, 曲数) {
+function プレイリストの頼み文(気分, 曲数, 響き = '') {
   return [
     'あなたは DJ です。その人の手元にある曲から、**流す順番に並べた一本**を組みます。',
     '',
     '■ その人が言った気分',
     気分,
     '',
+    // ★Resonance で辿った名前。あれば差し込む（無ければ何も足さない）
+    ...(響き ? [響き, ''] : []),
     '■ 決まり',
     `・候補から **${曲数} 曲**選び、**流す順に**並べてください`,
     '・番号は候補に**実際にある番号**だけ。無い番号は返さない。同じ番号を 2 回使わない',
@@ -249,7 +251,7 @@ function プレイリストの頼み文(気分, 曲数) {
  * @param 候補 [{ 番号, artist, title, album }]（画面側が 200 曲だけ選んで渡す）
  * @returns { ok: true, 結果: { 題, 並び: [{番号, ひとこと}] } } | { ok: false, error }
  */
-async function プレイリストを作らせる({ キー, 気分, 候補, 曲数 = 作る曲数 }) {
+async function プレイリストを作らせる({ キー, 気分, 候補, 曲数 = 作る曲数, 響き = '' }) {
   if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
   if (typeof 気分 !== 'string' || !気分.trim()) return { ok: false, error: '気分が空です' };
   if (!Array.isArray(候補) || !候補.length) return { ok: false, error: '候補がありません' };
@@ -280,7 +282,7 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
        * 足りないと途中で切れて、並びが尻切れになる。
        */
       max_tokens: 8000,
-      system: プレイリストの頼み文(気分.trim(), 曲数),
+      system: プレイリストの頼み文(気分.trim(), 曲数, 響き),
       messages: [{ role: 'user', content: '■ 候補（番号／アーティスト／曲名／アルバム）\n' + 表 }],
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
     });

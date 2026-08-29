@@ -36,6 +36,11 @@ contextBridge.exposeInMainWorld('mp3', {
   気分でおすすめ: (手がかり) => ipcRenderer.invoke('ai:suggest', 手がかり),
   AIの大きさ: () => ipcRenderer.invoke('ai:sizes'),
   AIにプレイリストを作らせる: (手がかり) => ipcRenderer.invoke('ai:playlist', 手がかり),
+
+  // Resonance（Kokoro OS のカルチャーツリー）。★読むだけ
+  響きを読み込む: () => ipcRenderer.invoke('resonance:load'),
+  響きを取る: () => ipcRenderer.invoke('resonance:get'),
+  響きを消す: () => ipcRenderer.invoke('resonance:clear'),
   // ★シャッフルに入れない曲。「一覧から外す」とは別（一覧には残り、押せば鳴る）
   シャッフル除外を取る: () => ipcRenderer.invoke('shuffleskip:get'),
   シャッフル除外を変える: (paths, 除外する) => ipcRenderer.invoke('shuffleskip:set', paths, 除外する),

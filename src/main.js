@@ -26,7 +26,8 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
-const { おすすめを聞く, プレイリストを作らせる, 候補の数, 作る曲数 } = require('./ai');   // 一覧は画面側が作る（見える曲だけを対象にするため）
+const { おすすめを聞く, プレイリストを作らせる, 候補の数, 作る曲数 } = require('./ai');
+const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
  * ★アプリ名を、ここで決め打ちする（2026-08-25 実地）。
@@ -286,7 +287,58 @@ ipcMain.handle('ai:playlist', async (_e, 手がかり) => {
     キー,
     気分: 手がかり && 手がかり.気分,
     候補: 手がかり && 手がかり.候補,
+    // ★画面が突き合わせた結果を、そのまま頼み文に差し込む
+    響き: 響きの一節((手がかり && 手がかり.響き) || []),
   });
+});
+
+/* ── Resonance（Kokoro OS のカルチャーツリー）─────────────
+   ★読むだけ。音楽ファイルにも、ライブラリの保存先にも一切触らない。
+   ★置き場は settings.json とは別にする（あちらは人が開いて読むファイル。
+     木は 7 本で 20KB あり、混ぜると読めなくなる）。 */
+
+const 響きファイル = () => path.join(app.getPath('userData'), 'resonance.json');
+
+ipcMain.handle('resonance:load', async () => {
+  const r = await dialog.showOpenDialog({
+    title: 'Resonance の書き出し（JSON）を選ぶ',
+    filters: [{ name: 'Resonance の木', extensions: ['json'] }],
+    properties: ['openFile'],
+  });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  let 文;
+  try {
+    文 = await fs.readFile(r.filePaths[0], 'utf8');
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : '読めませんでした' };
+  }
+  // ★中身を確かめてから写す。壊れたものを置いて、次の起動で困らないように
+  const 確かめ = 響きを読み込む(文);
+  if (!確かめ.ok) return { ok: false, error: 確かめ.error };
+  try {
+    await fs.mkdir(path.dirname(響きファイル()), { recursive: true });
+    await fs.writeFile(響きファイル(), 文, 'utf8');
+  } catch (e) {
+    return { ok: false, error: '控えを保存できませんでした（' + ((e && e.message) || '不明') + '）' };
+  }
+  return { ok: true, 木: 確かめ.木, 元: r.filePaths[0] };
+});
+
+/** 前に読み込んだものを返す。無ければ null（**エラーにしない**） */
+ipcMain.handle('resonance:get', async () => {
+  try {
+    const 文 = await fs.readFile(響きファイル(), 'utf8');
+    const r = 響きを読み込む(文);
+    return r.ok ? r.木 : null;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('resonance:clear', async () => {
+  // ★消すのはこの控えだけ。音楽ファイルには触らない
+  try { await fs.unlink(響きファイル()); } catch { /* もともと無い */ }
+  return { ok: true };
 });
 
 ipcMain.handle('migration:get', async () => 引っ越しの結果);
