@@ -1,7 +1,7 @@
 {
   "name": "otogura",
   "productName": "Otogura",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "private": false,
   "description": "音蔵 — 大きな音楽ライブラリのためのプレイヤー",
   "author": {
