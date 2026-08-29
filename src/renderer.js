@@ -35,6 +35,92 @@ function 不具合を出す(何が, e) {
   } catch { /* 画面すら出せないときは、下の console に残る */ }
   console.error(`[${何が}]`, e);
 }
+/*
+ * ★OS のダイアログ（confirm / alert）は使わない（2026-08-29 実測）。
+ *
+ * 本人からの報告:
+ *   > 全部外すをやるとまだ文字が打てないのですが
+ *
+ * 測ったら、遅いのではなかった（描き直しは 148 ms）。
+ * **ダイアログを閉じたあと、窓が OS の焦点を失ったままだった。**
+ *   ダイアログの前  document.hasFocus() = true
+ *   閉じたあと      document.hasFocus() = **false**
+ *
+ * 欄の焦点（activeElement）は記入欄のままなので、**見た目は打てそうに見える。**
+ * でもキーは OS が焦点だと思っている別の窓へ行く。分かりにくい壊れ方。
+ *
+ * ★こちらから焦点を戻す道も試したが、**当てにならなかった。**
+ *   win.focus() … 効くときと効かないときがある（実測で両方見た）
+ *   Windows は「裏の窓が勝手に前へ出る」のを止めるので、戻せる保証が無い
+ *
+ * ★だから OS に出さない。**画面の中で訊く。**
+ * prompt() が使えなかったときと、まったく同じ答えになった。
+ * 画面の中なら、そもそも焦点が窓から出ない。
+ */
+
+/** 画面の中の確認欄。開いている間だけ 決着 が入る */
+let 訊いている = null;
+
+function 訊く欄を閉じる(答) {
+  const box = document.getElementById('ask');
+  if (box) box.className = '';
+  const 決着 = 訊いている;
+  訊いている = null;
+  if (決着) 決着(答);
+}
+
+/**
+ * 画面の中で訊く。OS のダイアログの代わり。
+ *
+ * @param 文     見せる文（改行そのまま）
+ * @param 選ぶか true なら「はい／やめる」、false なら「閉じる」だけ
+ * @returns はい なら true
+ */
+function 訊く(文, 選ぶか) {
+  const box = document.getElementById('ask');
+  // ★出せないときは黙って通さない。消す操作が黙って進むほうが怖い
+  if (!box) return Promise.resolve(!選ぶか);
+  // すでに開いていたら、そちらを閉じてから（重ねない）
+  if (訊いている) 訊く欄を閉じる(false);
+
+  box.querySelector('.msg').textContent = 文;
+  const 並び = box.querySelector('.row');
+  並び.innerHTML = '';
+
+  const 作る = (札, 答, 主) => {
+    const b = document.createElement('button');
+    b.textContent = 札;
+    if (主) b.className = 'main';
+    b.onclick = () => 訊く欄を閉じる(答);
+    並び.appendChild(b);
+    return b;
+  };
+
+  const 出来 = new Promise((決着) => { 訊いている = 決着; });
+  if (選ぶか) {
+    作る('やめる', false, false);
+    const はい = 作る('はい', true, true);
+    setTimeout(() => はい.focus(), 0);
+  } else {
+    const 閉 = 作る('閉じる', true, true);
+    setTimeout(() => 閉.focus(), 0);
+  }
+  box.className = 'on';
+  return 出来;
+}
+
+/** はい／やめる を訊く（confirm の代わり） */
+const 確かめる = (文) => 訊く(文, true);
+/** 知らせるだけ（alert の代わり） */
+const 知らせる = (文) => 訊く(文, false);
+
+/* Enter で「はい」、Escape で「やめる」。押しやすさは OS のものと同じにする */
+document.addEventListener('keydown', (e) => {
+  if (!訊いている) return;
+  if (e.key === 'Escape') { e.preventDefault(); 訊く欄を閉じる(false); }
+  if (e.key === 'Enter') { e.preventDefault(); 訊く欄を閉じる(true); }
+});
+
 window.addEventListener('error', (e) => 不具合を出す('画面', e.error || e.message));
 window.addEventListener('unhandledrejection', (e) => 不具合を出す('処理', e.reason));
 
@@ -1057,7 +1143,7 @@ function 響きの欄を描く() {
     消す.className = "del"; 消す.textContent = "×";
     消す.title = "この言葉で辿ったものを消す（音楽ファイルには触りません）";
     消す.onclick = async () => {
-      if (!confirm(`「${e.keyword}」で辿ったものを消しますか？\n\n曲は何も変わりません。`)) return;
+      if (!await 確かめる(`「${e.keyword}」で辿ったものを消しますか？\n\n曲は何も変わりません。`)) return;
       const r = await window.mp3.響きをひとつ消す(e.keyword);
       if (!r || !r.ok) { $("status").textContent = "消せませんでした（" + ((r && r.error) || "不明") + "）"; return; }
       響きの木 = r.木;
@@ -1091,7 +1177,14 @@ function 響きの欄を描く() {
   外す.textContent = "× 全部外す";
   外す.title = "辿ったものを全部忘れます（音楽ファイルには触りません）";
   外す.onclick = async () => {
-    if (!confirm("辿ったものを全部忘れますか？\n\n曲は何も変わりません。")) return;
+    if (!await 確かめる("辿ったものを全部忘れますか？\n\n曲は何も変わりません。")) return;
+    /*
+     * ★何をしているか出す（2026-08-29 本人の希望）。
+     *   > 処理に時間がかかるなら何かしらのインフォメーションは出せないですか？
+     * 実際は速い（描き直しで 148 ms）が、**黙って固まったように見えるより、
+     * 一言あるほうがいい。**
+     */
+    $("status").textContent = "響きを外しています…";
     await window.mp3.響きを消す();
     響きの木 = null; 響きの当たり = null;
     響きを合わせ直す();
@@ -1958,7 +2051,7 @@ function 一覧を描く() {
         // ★同名の曲が別フォルダにあると、曲名だけでは区別がつかない
         //   （指示書の「先に確かめたほうがいいこと」が、まさにここを警告していた）
         const 場所 = t.path.replace(/[\\/][^\\/]*$/, '');
-        if (!confirm(`「${t.title}」を一覧から外しますか？\n\n場所: ${場所}\n\nファイルは削除されません。`)) return;
+        if (!await 確かめる(`「${t.title}」を一覧から外しますか？\n\n場所: ${場所}\n\nファイルは削除されません。`)) return;
         await window.mp3.一覧から外す(t.path);
 
         /*
@@ -2195,11 +2288,11 @@ function タグ編集を描く(box) {
         + 'タグを書き換えられません。飛ばします。\nファイルは壊れていません。再生はできます。'
       : '';
     if (数 === 書けない数) {
-      alert('選んだ曲は MP3 ではないので（m4a など）、タグを書き換えられません。\n'
+      await 知らせる('選んだ曲は MP3 ではないので（m4a など）、タグを書き換えられません。\n'
         + 'ファイルは壊れていません。再生はできます。');
       return;
     }
-    if (!confirm(
+    if (!await 確かめる(
       `${(数 - 書けない数).toLocaleString('ja-JP')} 曲の MP3 ファイルを書き換えます。\n\n${中身}\n\n`
       + 'ファイルそのものが書き換わります（音のデータは変わりません）。'
       + `${書けない断り}${目安}\n\nよろしいですか？`,
@@ -2279,9 +2372,9 @@ function タグ編集を描く(box) {
     // 黙って終わらせない。失敗があれば必ず見せる。何件読み直したかも出す
     const 但し = 読み直した < 成功 ? `\n（うち ${成功 - 読み直した} 曲は一覧に見当たらず、表示を更新できませんでした）` : '';
     if (失敗.length) {
-      alert(`${成功} 曲を書き換えました。${但し}\n\n${失敗.length} 曲は失敗しました:\n${失敗.slice(0, 10).join('\n')}${覚え注意}`);
+      await 知らせる(`${成功} 曲を書き換えました。${但し}\n\n${失敗.length} 曲は失敗しました:\n${失敗.slice(0, 10).join('\n')}${覚え注意}`);
     } else {
-      alert(`${成功} 曲のタグを書き換えました。${但し}\n\n絞り込みを外したので、変えた内容が一覧で確かめられます。${覚え注意}`);
+      await 知らせる(`${成功} 曲のタグを書き換えました。${但し}\n\n絞り込みを外したので、変えた内容が一覧で確かめられます。${覚え注意}`);
     }
   };
 }
@@ -2363,7 +2456,7 @@ function 道具を描く() {
        * ファイルは消さない。一覧から外すだけ、という約束は変えない。
        */
       ボタン(`選んだ ${n0} 曲を一覧から外す`, async () => {
-        if (!confirm(
+        if (!await 確かめる(
           `${n0.toLocaleString('ja-JP')} 曲を一覧から外します。\n\n`
           + 'ファイルは削除されません。一覧に出なくなるだけです。\n'
           + '（「外したものを戻す」で戻せます）',
@@ -2407,8 +2500,8 @@ function 道具を描く() {
 
   ボタン('m3u で保存', async () => {
     const r = await window.mp3.m3uに書き出す(リスト.id, tracks);
-    if (r?.ok) alert(`保存しました\n${r.path}`);
-    else if (r && !r.canceled) alert(`保存できませんでした（${r.error ?? '不明'}）`);
+    if (r?.ok) await 知らせる(`保存しました\n${r.path}`);
+    else if (r && !r.canceled) await 知らせる(`保存できませんでした（${r.error ?? '不明'}）`);
   }, リスト.tracks.length === 0);
 
   ボタン('名前を変える', () => {
@@ -2418,7 +2511,7 @@ function 道具を描く() {
 
   // 指示書:「再生リストを削除するとき、確認ダイアログを出す: 出す」
   ボタン('この再生リストを削除', async () => {
-    if (!confirm(`再生リスト「${リスト.name}」を削除しますか？\n\n曲のファイルは削除されません。`)) return;
+    if (!await 確かめる(`再生リスト「${リスト.name}」を削除しますか？\n\n曲のファイルは削除されません。`)) return;
     lists = await window.mp3.リストを消す(リスト.id);
     開いているID = null;
     描き直す();
@@ -3089,7 +3182,7 @@ async function 走査する(押された = false) {
     if (押された) {
       const 経過 = 走査を始めた ? Math.round((Date.now() - 走査を始めた) / 1000) : 0;
       const 何分 = 経過 >= 60 ? `${Math.round(経過 / 60)} 分前` : `${経過} 秒前`;
-      alert(
+      await 知らせる(
         'いま確かめている最中です。\n\n'
         + `${何分}に始まり、まだ終わっていません。\n`
         + '終わるまで、もう一度は始められません（一覧が二重になるため）。\n\n'
@@ -3161,7 +3254,7 @@ async function 走査する(押された = false) {
      * 開発者用の窓にだけ出していたので、使う人には気づきようが無かった。
      */
     if (r.覚え書きの保存 && r.覚え書きの保存.ok === false) {
-      alert(
+      await 知らせる(
         '読み込んだ結果を保存できませんでした。\n\n'
         + `理由: ${r.覚え書きの保存.error}\n\n`
         + 'このままだと、次に開いたときに**また最初から読み直し**になります。\n'
@@ -3207,7 +3300,7 @@ $('add').onclick = async () => {
 if ($('resload')) $('resload').onclick = async () => {
   const r = await window.mp3.響きを読み込む();
   if (!r || r.canceled) return;
-  if (!r.ok) { alert("読めませんでした: " + r.error); return; }
+  if (!r.ok) { await 知らせる("読めませんでした: " + r.error); return; }
   響きの木 = r.木;
   響きを合わせ直す();
   描き直す();
@@ -3220,7 +3313,7 @@ if ($('resload')) $('resload').onclick = async () => {
 $('aikey').onclick = async () => {
   const 状態 = await window.mp3.AIが使えるか();
   if (状態.使える) {
-    if (confirm("APIキーを消しますか？\n\n「気分から一本を組む」と「言葉から辿る」が使えなくなります。\n曲は何も変わりません。")) {
+    if (await 確かめる("APIキーを消しますか？\n\n「気分から一本を組む」と「言葉から辿る」が使えなくなります。\n曲は何も変わりません。")) {
       await window.mp3.AIのキーを消す();
       AIが使える = false;
       キー入力 = null;
@@ -3230,7 +3323,7 @@ $('aikey').onclick = async () => {
     return;
   }
   if (!状態.しまえる) {
-    alert("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。");
+    await 知らせる("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。");
     return;
   }
   /*
@@ -3299,7 +3392,7 @@ $('unhide').onclick = async () => {
 
   // 何を戻すのか見せてから聞く。件数だけでは判断できない
   const 見本 = 外れている.slice(0, 8).map((p) => '  ・' + p.replace(/^.*[\\/]/, '')).join('\n');
-  if (!confirm(
+  if (!await 確かめる(
     `一覧から外した ${外れている.length.toLocaleString('ja-JP')} 曲を、すべて戻します。\n\n`
     + `${見本}${外れている.length > 8 ? `\n  ほか ${外れている.length - 8} 曲` : ''}\n\nよろしいですか？`,
   )) return;
@@ -3389,7 +3482,7 @@ $('unhide').onclick = async () => {
   try {
     const 引 = await window.mp3.引っ越しの結果();
     if (引 && 引.ok === false) {
-      alert(
+      await 知らせる(
         '以前のデータを引き継げませんでした。\n\n'
         + `元の場所: ${引.元}\n理由: ${引.error}\n\n`
         + 'データは消えていません。上の場所に残っています。\n'
@@ -3403,7 +3496,7 @@ $('unhide').onclick = async () => {
   const r = await window.mp3.リストを取る();
   lists = r.lists;
   if (r.落とした) {
-    alert(`再生リストから ${r.落とした} 曲を取り除きました。\n\n元の MP3 ファイルが見つからなくなったためです。`);
+    await 知らせる(`再生リストから ${r.落とした} 曲を取り除きました。\n\n元の MP3 ファイルが見つからなくなったためです。`);
   }
 
   /*

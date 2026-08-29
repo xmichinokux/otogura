@@ -169,6 +169,27 @@
   .link { color: var(--dim); font-size: 11px; cursor: pointer; text-decoration: underline; }
   .link:hover { color: var(--accent); }
 
+  /*
+   * ★画面の中の確認欄（2026-08-29）。
+   * OS のダイアログ（confirm / alert）は、閉じたあと**窓の焦点が戻らない。**
+   * 見た目は打てそうなのにキーが届かない、という分かりにくい壊れ方になる。
+   * Windows は「裏の窓が勝手に前へ出る」のを止めるので、
+   * こちらから焦点を戻すこともできなかった（実測）。
+   * ★だから OS に出さない。画面の中で訊く。prompt() のときと同じ答え。
+   */
+  #ask { position: fixed; inset: 0; display: none; z-index: 50;
+    background: rgba(0, 0, 0, .28); align-items: center; justify-content: center; }
+  #ask.on { display: flex; }
+  #ask .box { background: #fff; border-radius: 10px; border: 1px solid var(--line);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .22); padding: 18px 20px;
+    max-width: min(560px, 86vw); max-height: 76vh; display: flex; flex-direction: column; gap: 14px; }
+  #ask .msg { font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-y: auto; }
+  #ask .row { display: flex; gap: 8px; justify-content: flex-end; }
+  #ask button { font: inherit; font-size: 12px; padding: 6px 16px; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  #ask button.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #ask button:hover { filter: brightness(.97); }
+
   /* 下端: フォルダ設定と状態 */
   #foot {
     flex: 0 0 auto; border-top: 1px solid var(--line); background: var(--sub);
@@ -258,6 +279,7 @@
   </table>
 </div>
 
+<div id="ask"><div class="box"><div class="msg"></div><div class="row"></div></div></div>
 <div id="foot">
   <button class="btn" id="add">フォルダを追加</button>
   <button class="btn" id="rescan">再スキャン</button>
