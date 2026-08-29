@@ -62,7 +62,7 @@ let 音量 = 1;
  * ★空集合は作らない。最後の 1 つを外したら null（すべて）に戻す。
  * 空のまま残すと、下の一覧が 0 件になって「壊れた」ようにしか見えない。
  */
-let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
 
 /*
  * 3 カラムに何を出すか（2026-08-29 本人の希望）。
@@ -97,7 +97,26 @@ const カラムタブの列 = {
     { key: '月', 見出し: '月', 取る: 年月日.月, 新しい順: true },
     { key: '日', 見出し: '日', 取る: 年月日.日, 新しい順: true },
   ],
+  /*
+   * ★響きのタブ（2026-08-29 本人の希望）。
+   *   > 今は選ばれたバンドが入力欄の横に並ぶので、カラムに並べたいです。
+   *
+   * 札を横に並べると 10 個で打ち止めになり、探せない。
+   * カラムに入れれば、いつもの 3 段（絞る・複数選ぶ・打ち込んで探す）が
+   * そのまま使える。**新しい操作を覚えなくていい。**
+   */
+  resonance: [
+    { key: '言葉', 見出し: '辿った言葉', 取る: (t) => 響きの印(t, 'keyword') },
+    { key: '響演者', 見出し: '演者', 取る: (t) => 響きの印(t, 'artist') },
+    { key: '響盤', 見出し: 'アルバム', 取る: (t) => t.album },
+  ],
 };
+
+/** その曲が響きで当たっていれば、その手がかりを返す。当たっていなければ null */
+function 響きの印(t, 欄) {
+  const v = 響きの当たり && 響きの当たり.曲.get(t.path);
+  return v ? v[欄] : null;
+}
 
 /** 小文字にして比べる（列のまとめ方と同じ規則） */
 const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
@@ -115,9 +134,9 @@ const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
 let シャッフル除外 = new Set();
 
 /** Shift の範囲選択で使う、直前に押した位置（列ごと） */
-let 列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+let 列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
 /** いま列に出している並び（Shift の範囲を数えるのに使う） */
-let 列の並び = { genre: [], artist: [], album: [], 年: [], 月: [], 日: [] };
+let 列の並び = { genre: [], artist: [], album: [], 年: [], 月: [], 日: [], 言葉: [], 響演者: [], 響盤: [] };
 /** いま再生している曲の path */
 let nowPath = null;
 /** 再生リスト。{ id, name, tracks: string[] } */
@@ -325,8 +344,20 @@ function タブに合う(t, タブ名, n) {
  * **一覧に出る曲が勝手に増える。**「残す」と言った以上、残らないと嘘になる。
  */
 function 絞る(level) {
-  const 別 = カラムタブ === 'tag' ? 'date' : 'tag';
-  return 見える曲().filter((t) => タブに合う(t, カラムタブ, level) && タブに合う(t, 別, 3));
+  const 響き中 = カラムタブ === 'resonance';
+  return 見える曲().filter((t) => {
+    /*
+     * ★響きのタブを開いている間は、**響きで当たった曲だけ**を対象にする。
+     * このタブは「辿って見つかったもの」を見る場所なので、
+     * 当たっていない曲が混ざると、何を見ているのか分からなくなる。
+     */
+    if (響き中 && !(響きの当たり && 響きの当たり.曲.has(t.path))) return false;
+    // 開いているタブは level まで、隠れているタブはすべての列を効かせる
+    for (const 名 of Object.keys(カラムタブの列)) {
+      if (!タブに合う(t, 名, 名 === カラムタブ ? level : 3)) return false;
+    }
+    return true;
+  });
 }
 
 /**
@@ -520,6 +551,14 @@ let 響きの当たり = null;
 /** 突き合わせ直す（曲が増えた・木を入れ替えた とき） */
 function 響きを合わせ直す() {
   響きの当たり = 響きの木 ? 突き合わせる(響きの木, tracks) : null;
+  /*
+   * ★響きが無くなったら、響きのタブから出る。
+   * 出ないと、空のタブを開いたまま「1 曲も無い」状態になる。
+   */
+  if (カラムタブ === 'resonance' && !(響きの当たり && 響きの当たり.曲.size)) {
+    カラムタブ = 'tag';
+    sel = { ...sel, 言葉: null, 響演者: null, 響盤: null };
+  }
 }
 
 /** 木を生やすときに渡す、手元の演者（曲数の多い順） */
@@ -568,6 +607,70 @@ async function 木を生やして足す(言葉, 言った) {
     + (無かった.length ? `　／ 手元に無い ${無かった.length} 個（発見）: ${無かった.slice(0, 6).map((n) => n.name).join(" / ")}` : "");
 }
 
+/**
+ * 辿った結果を再生リストにする。
+ *
+ * @param 混ぜる true ならシャッフルして並べる
+ *
+ * ★対象は「いま見えているもの」。響きタブで演者を選んでいれば、そのぶんだけ。
+ * 何も選んでいなければ、当たった曲すべて。**画面と一致させる。**
+ * ★AI は呼ばない。通信もお金もかからない。
+ */
+async function 響きを一本にする(混ぜる) {
+  if (!響きの当たり || !響きの当たり.曲.size) return;
+  // ★響きタブの絞り込みを効かせたいので、いったんそのタブの見え方で数える
+  const 元のタブ = カラムタブ;
+  カラムタブ = 'resonance';
+  const 対象 = 絞る(3).filter((t) => t.鳴らせる !== false);
+  カラムタブ = 元のタブ;
+
+  if (!対象.length) { $("status").textContent = "この範囲に、鳴らせる曲がありません"; return; }
+
+  let 並び;
+  if (混ぜる) {
+    /*
+     * ★いつものシャッフルのくじで並べる。
+     * 再生回数の重み（忘れている曲を拾う）と、同じ演者を続けない決まりが
+     * そのまま効く。ここで独自のシャッフルを書くと、2 種類の混ぜ方ができてしまう。
+     */
+    const 表 = new Map(対象.map((t) => [t.path, t]));
+    const 道 = 対象.map((t) => t.path);
+    const 済 = new Set();
+    並び = [];
+    let 前 = null;
+    while (並び.length < 道.length) {
+      const 手 = 前 ? { 直前: { artist: 前.artist, album: 前.album }, 情報: (p) => 表.get(p) ?? null } : null;
+      const p = 次を選ぶ(道, 再生回数, 済, Math.random, 手);
+      if (!p || 済.has(p)) break;
+      済.add(p);
+      前 = 表.get(p);
+      並び.push(p);
+    }
+  } else {
+    並び = [...対象].sort(曲を並べる).map((t) => t.path);
+  }
+  if (!並び.length) return;
+
+  // 名前は、選んでいる言葉から作る（選んでいなければ辿った言葉をまとめて）
+  const 言葉たち = sel.言葉 ? [...sel.言葉] : [...new Set(対象.map((t) => 響きの印(t, "keyword")).filter(Boolean))];
+  const 名 = "🌐 " + (言葉たち.slice(0, 2).join(" / ") || "響き").slice(0, 20) + (混ぜる ? "（混）" : "");
+
+  lists = await window.mp3.リストを作る(名);
+  const 新しいの = lists[lists.length - 1];
+  lists = await window.mp3.リストの中身を入れ替える(新しいの.id, 並び);
+  開いているID = 新しいの.id;
+  // ★並んだ順に流す。ここでシャッフルを入れると、並べた意味が無くなる
+  シャッフル = false;
+  $('shuffle').textContent = '🔀 オフ';
+  $('shuffle').classList.remove('on');
+  描き直す();
+
+  const 一曲目 = tracks.find((t) => t.path === 並び[0]);
+  if (一曲目) 再生する(一曲目);
+  $("status").textContent = `🌐 ${並び.length} 曲の一本を作りました: 「${名}」`
+    + (混ぜる ? "（混ぜました。同じ演者は続きません）" : "（並び順のまま）");
+}
+
 function 響きの欄を描く() {
   const box = $('resbar');
   /*
@@ -583,7 +686,8 @@ function 響きの欄を描く() {
     const 打ちかけ = ($("restree") || {}).value || "";
     const 種 = document.createElement("input");
     種.id = "restree";
-    種.placeholder = "言葉を入れて辿る（例: Unbroken）";
+    // ★具体例は書かない（公開するので、作者の好みが出てしまう）
+    種.placeholder = "言葉を 1 つ入れて辿る";
     種.value = 打ちかけ;
     種.style.flex = "0 1 220px";
     種.style.font = "inherit";
@@ -620,35 +724,42 @@ function 響きの欄を描く() {
 
   box.append(印, 文);
 
-  // 当たった演者を、重い順に並べる。押すとその演者で絞れる
-  for (const a of 当.slice(0, 10)) {
-    const b = document.createElement('button');
-    b.className = 'restag';
-    b.textContent = `${a.artist}（${a.曲数}）`;
-    b.title = `${a.description}\n「${a.keyword}」から深さ ${a.depth}`;
-    b.onclick = () => {
-      /*
-       * ★押したら、その演者だけに絞る。
-       * AI を通さずに「当たったものをすぐ聴く」道も残しておく。
-       */
-      カラムタブ = 'tag';
-      sel = { genre: null, artist: new Set([小文字(a.artist)]), album: null, 年: null, 月: null, 日: null };
-      列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
-      描き直す();
-      $('status').textContent = `${a.artist} で絞りました ―「${a.description}」`;
-    };
-    box.appendChild(b);
-  }
+  /*
+   * ★演者の札は、ここには出さない（2026-08-29 本人の希望）。
+   * カラムの「🌐 響き」タブに移した。横に並べると 10 個で打ち止めになり、
+   * 探すこともできなかった。カラムなら絞り込みも複数選択もそのまま使える。
+   */
 
-  const 外す = document.createElement('button');
-  外す.className = 'restag';
-  外す.textContent = '× 響きを外す';
-  外す.title = '読み込んだ木を忘れます（音楽ファイルには触りません）';
+  /*
+   * ★辿った結果を、そのまま／シャッフルして、再生リストに残す。
+   *   > プレイリストのようにResonaceが選んだリストを保存したい
+   *   > resonanceが選んだのを基準としたシャッフルプレイリストも作りたい
+   *
+   * ★どちらも AI を呼ばない。**通信もお金もかからない。**
+   * 「辿る」で 1 回呼んだ結果を並べ替えるだけ。
+   */
+  const 作る = (名, 説明, シャッフルするか) => {
+    const b = document.createElement("button");
+    b.className = "restag";
+    b.textContent = 名;
+    b.title = 説明;
+    b.onclick = () => 響きを一本にする(シャッフルするか);
+    box.appendChild(b);
+  };
+  作る("📃 このまま一本に", "いま見えている響きの曲を、並び順のまま再生リストにします", false);
+  作る("🔀 混ぜて一本に", "いま見えている響きの曲を、シャッフルして再生リストにします（同じ演者が続きません）", true);
+
+  // 忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
+  const 外す = document.createElement("button");
+  外す.className = "restag";
+  外す.textContent = "× 響きを外す";
+  外す.title = "辿った木を忘れます（音楽ファイルには触りません）";
   外す.onclick = async () => {
     await window.mp3.響きを消す();
     響きの木 = null; 響きの当たり = null;
+    響きを合わせ直す();                        // ★響きタブから抜けるのもここでやる
     描き直す();
-    $('status').textContent = '響きを外しました';
+    $("status").textContent = "響きを外しました";
   };
   box.appendChild(外す);
 }
@@ -728,7 +839,8 @@ function 気分の欄を描く() {
   印.textContent = "🤖";
   const 欄 = document.createElement("input");
   欄.id = "aiword";
-  欄.placeholder = "いまの気分（例: 疲れてるけど、うるさいのが聴きたい）";
+  // ★具体例は書かない（公開するので、作者の好みが出てしまう）
+  欄.placeholder = "いまの気分を書く";
   const 押す = document.createElement("button");
   押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "選んでもらう";
   const 言った = document.createElement("span");
@@ -812,7 +924,13 @@ function カラムタブの選択数(タブ名) {
 function カラムタブを描く() {
   const box = $('coltabs');
   box.innerHTML = '';
-  for (const [名, 表示] of [['tag', 'ジャンル / アーティスト / アルバム'], ['date', '日付（年 / 月 / 日）']]) {
+  const 札 = [
+    ['tag', 'ジャンル / アーティスト / アルバム'],
+    ['date', '日付（年 / 月 / 日）'],
+  ];
+  // ★響きのタブは、辿ったものがあるときだけ出す（無いと空の列を見せるだけになる）
+  if (響きの当たり && 響きの当たり.曲.size) 札.push(['resonance', `🌐 響き（${響きの当たり.当たり.length} 組）`]);
+  for (const [名, 表示] of 札) {
     const b = document.createElement('button');
     b.textContent = 表示;
     b.className = カラムタブ === 名 ? 'on' : '';
@@ -911,7 +1029,7 @@ function 列を描く(ulId, level, 定義) {
  * 一度に描けるのは 300 件までなので、**打ち込んで探せないと大半に手が届かない。**
  * 上限を上げると固まるので、探す手立てのほうを用意する。
  */
-let 列の絞り = { genre: '', artist: '', album: '', 年: '', 月: '', 日: '' };
+let 列の絞り = { genre: '', artist: '', album: '', 年: '', 月: '', 日: '', 言葉: '', 響演者: '', 響盤: '' };
 
 function 列の絞りを作る(ul, key, 件数) {
   const li = document.createElement('li');
@@ -1684,7 +1802,7 @@ function タグ編集を描く(box) {
      * 直したあとは、どこへ行ったか分かるように絞りを外して全部出す。
      */
     // ★日付タブぶんも一緒に外す。片方だけ残ると「絞ったつもりが無いのに出ない」になる
-    sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+    sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
     描き直す();
 
     // 黙って終わらせない。失敗があれば必ず見せる。何件読み直したかも出す
@@ -2541,7 +2659,11 @@ $('add').onclick = async () => {
  * 読み返す手立ても作らない（本体側に「返す」窓口を置いていない）。
  * 画面から読めるようにすると、外から来た文字列で盗める形になりうる。
  */
-$('resload').onclick = async () => {
+/*
+ * ★ボタンは封印してある（index.html）。処理と JSON の形は残す。
+ * Resonance が公開されたら、あちらを戻すだけで繋がる。
+ */
+if ($('resload')) $('resload').onclick = async () => {
   const r = await window.mp3.響きを読み込む();
   if (!r || r.canceled) return;
   if (!r.ok) { alert("読めませんでした: " + r.error); return; }
