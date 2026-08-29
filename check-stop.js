@@ -99,6 +99,67 @@ function 台を作る(曲数, 階層 = 3) {
     確認('★渡さなければ止まらない（既存の呼び出しを壊さない）', r.止めた === false && r.found === 作った, `止めた=${r.止めた} / ${r.found} 件`);
   }
 
+  console.log('\n[5] ★止めても、覚え書きと一覧が減らないか');
+  /*
+   * ■ 実地の不具合（2026-08-29）。本人からの報告:
+   *   > スキャンを止めたらリストが全部消えました。
+   *
+   * 走査は「見つけたものだけを新しい一覧にする」作り。
+   * 最後まで走れば、消えたファイルが落ちるのでそれで正しい。
+   * だが**途中で止めると「まだ見ていないもの」まで消えたことになる。**
+   *
+   * ★もっと危ないのは覚え書きのほう。呼んだ側はこれをそのまま書く。
+   * つまり止めるだけで、**86,044 件の覚え書きが読んだぶんだけに縮む。**
+   * 次に開くと残りを 50 分かけて読み直す。
+   * 「止めても損はしない」と謳っておきながら、いちばん損をさせるところだった。
+   */
+  {
+    const { 根, 作った } = 台を作る(400);
+
+    // 1 回目: 最後まで読んで、覚え書きを作る
+    const 一 = await scanLibrary([根], [], {}, null, null, null, () => false);
+    const 覚え = 一.覚え書き;
+    確認('まず最後まで読める', Object.keys(覚え).length === 作った, `${Object.keys(覚え).length} / ${作った}`);
+
+    // 2 回目: すぐ止める
+    let 止めて = false;
+    const 二 = await scanLibrary(
+      [根], [], 覚え,
+      (pp) => { if (pp.段階 === '読んでいます') 止めて = true; },
+      null, null,
+      () => 止めて,
+    );
+    fs.rmSync(根, { recursive: true, force: true });
+
+    確認('止まっている', 二.止めた === true);
+    確認(
+      '★止めても覚え書きが減らない',
+      Object.keys(二.覚え書き).length === Object.keys(覚え).length,
+      `${Object.keys(覚え).length} 件 → ${Object.keys(二.覚え書き).length} 件（減ると、次に開いたとき全部読み直しになります）`,
+    );
+    確認(
+      '★止めても一覧が減らない',
+      二.tracks.length === 一.tracks.length,
+      `${一.tracks.length} 曲 → ${二.tracks.length} 曲（減ると「リストが全部消えた」に見えます）`,
+    );
+    確認('補ったぶんを黙らない', 二.補った > 0, `補った: ${二.補った} 曲`);
+  }
+
+  console.log('\n[6] 最後まで走ったときは、消えたファイルを落とす（今までどおり）');
+  {
+    const { 根, 作った } = 台を作る(200);
+    const 一 = await scanLibrary([根], [], {}, null, null, null, () => false);
+    // ファイルを半分消してから、最後まで走らせる
+    const 道 = Object.keys(一.覚え書き);
+    for (const d of 道.slice(0, 100)) fs.unlinkSync(d);
+    const 二 = await scanLibrary([根], [], 一.覚え書き, null, null, null, () => false);
+    fs.rmSync(根, { recursive: true, force: true });
+    確認(
+      '★最後まで走れば、消えたファイルは落ちる',
+      Object.keys(二.覚え書き).length === 作った - 100,
+      `${Object.keys(二.覚え書き).length} 件（${作った - 100} 件になるはず。ここが減らないと、消した曲がいつまでも残ります）`,
+    );
+  }
   console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
   process.exit(失敗 ? 1 : 0);
 })();
