@@ -364,6 +364,17 @@ function まとめる(値の並び) {
    ほかの機能は今までどおり動く。 */
 
 let AIが使える = false;
+/*
+ * キーを打っている最中かどうか（2026-08-29 実地）。
+ *
+ * ★prompt() は使えない。**Electron では動かない。**
+ * このファイルの上のほう（再生リスト名のところ）に、その注意書きを
+ * 自分で書いてあったのに、ここで踏んだ。本人からの報告:
+ *   > そのボタンを押すと処理が走ってエラーがでます。
+ * alert と confirm は動くのに prompt だけ使えない、という分かりにくい所。
+ * 再生リスト名と同じく、**画面の中に入力欄を出す**形にする。
+ */
+let キー入力 = null;
 
 /** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */
 function AIに渡すジャンル() {
@@ -384,13 +395,57 @@ function AIに渡す年() {
   return [...年].sort().reverse();
 }
 
+/**
+ * 3 カラムの上の欄。3 通りある。
+ *   キー入力中 … キーを入れる欄（★prompt() が使えないので画面の中に出す）
+ *   キーあり   … 気分を書く欄
+ *   キーなし   … 何も出さない（機能そのものを見せない）
+ */
 function 気分の欄を描く() {
   const box = $("aibar");
-  box.className = AIが使える ? "on" : "";
-  if (!AIが使える) { box.innerHTML = ""; return; }
-  if (box.dataset.できている === "1") return;      // 打っている途中に作り直さない
-  box.dataset.できている = "1";
+  const 形 = キー入力 ? "key" : (AIが使える ? "mood" : "none");
+  box.className = 形 === "none" ? "" : "on";
+  if (形 === "none") { box.innerHTML = ""; box.dataset.形 = "none"; return; }
+  if (box.dataset.形 === 形) return;              // 打っている途中に作り直さない
+  box.dataset.形 = 形;
   box.innerHTML = "";
+
+  if (形 === "key") {
+    const 印 = document.createElement("span");
+    印.textContent = "🔑";
+    const 欄 = document.createElement("input");
+    欄.id = "aikeyinput";
+    欄.type = "password";                          // 肩越しに見えないように
+    欄.placeholder = "Anthropic の API キーを貼り付けて Enter";
+    欄.oninput = () => { キー入力.value = 欄.value; };
+    const しまう = document.createElement("button");
+    しまう.className = "btn"; しまう.id = "aikeysave"; しまう.textContent = "しまう";
+    const やめる = document.createElement("button");
+    やめる.className = "btn"; やめる.textContent = "やめる";
+    const 断り = document.createElement("span");
+    断り.className = "said";
+    断り.textContent = "暗号化してこの PC の中だけに保存します。送るのはジャンル名と気分の文だけです";
+
+    const 保存 = async () => {
+      const v = (キー入力.value || "").trim();
+      if (!v) return;
+      しまう.disabled = true; 欄.disabled = true;
+      const r = await window.mp3.AIのキーを入れる(v);
+      しまう.disabled = false; 欄.disabled = false;
+      if (!r || !r.ok) { 断り.textContent = "しまえませんでした（" + ((r && r.error) || "不明") + "）"; return; }
+      キー入力 = null;                              // ★画面にキーを残さない
+      AIが使える = true;
+      描き直す();
+      $("status").textContent = "APIキーをしまいました。上の欄に気分を書けます";
+    };
+    しまう.onclick = 保存;
+    欄.onkeydown = (e) => { if (e.key === "Enter") 保存(); };
+    やめる.onclick = () => { キー入力 = null; 描き直す(); };
+
+    box.append(印, 欄, しまう, やめる, 断り);
+    欄.focus();
+    return;
+  }
 
   const 印 = document.createElement("span");
   印.textContent = "🤖";
@@ -2185,7 +2240,7 @@ $('aikey').onclick = async () => {
     if (confirm("APIキーを消しますか？\n\n気分で選ぶ機能が使えなくなります（曲は何も変わりません）。")) {
       await window.mp3.AIのキーを消す();
       AIが使える = false;
-      $('aibar').dataset.できている = '';
+      キー入力 = null;
       描き直す();
       $('status').textContent = 'APIキーを消しました';
     }
@@ -2195,20 +2250,13 @@ $('aikey').onclick = async () => {
     alert("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。");
     return;
   }
-  const キー = prompt(
-    "Anthropic の API キーを入れてください。\n\n"
-    + "・console.anthropic.com で作れます\n"
-    + "・暗号化して、この PC の中だけに保存します\n"
-    + "・送るのは「ジャンル名の一覧」と「打ち込んだ気分の文」だけです\n"
-    + "  曲名もファイルのパスも送りません",
-  );
-  if (!キー) return;
-  const r = await window.mp3.AIのキーを入れる(キー);
-  if (!r.ok) { alert("しまえませんでした: " + r.error); return; }
-  AIが使える = true;
-  $('aibar').dataset.できている = '';
+  /*
+   * ★prompt() は使わない。**Electron では動かない。**
+   * ここで一度踏んだ（2026-08-29）。画面の中に欄を出す。
+   */
+  キー入力 = { value: "" };
   描き直す();
-  $('status').textContent = 'APIキーをしまいました。上の欄に気分を書けます';
+  $('status').textContent = '上の欄に API キーを貼り付けてください（console.anthropic.com で作れます）';
 };
 
 $('rescan').onclick = () => 走査する(true);   // ★押されたと伝える（動かないときに黙らないため）
