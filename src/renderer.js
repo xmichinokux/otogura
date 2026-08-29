@@ -768,7 +768,12 @@ async function AIに一本組ませる(気分, 言った) {
       artist: a.artist, description: a.description, keyword: a.keyword, depth: a.depth, 曲数: a.曲数,
     })),
   });
-  if (!r || !r.ok) { 言った.textContent = 'だめでした（' + ((r && r.error) || '不明') + '）'; return false; }
+  if (!r || !r.ok) {
+    const 訳 = (r && r.error) || '不明';
+    言った.textContent = 'だめでした';
+    $('status').textContent = '⚠ 一本を組めませんでした: ' + 訳;
+    return false;
+  }
 
   const 番号表 = new Map(候補.map((c) => [c.番号, c]));
   const 道 = [];
@@ -979,7 +984,17 @@ async function 木を生やして足す(言葉, 言った) {
     蔵書: 蔵書の大きさ(),
     すでにある,
   });
-  if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return false; }
+  if (!r || !r.ok) {
+    /*
+     * ★理由は下の状態にも出す（2026-08-29）。
+     * 上の欄は狭くて「…」で切れるので、**何が起きたか読めない。**
+     * 読めないと、こちらにも伝えられない。
+     */
+    const 訳 = (r && r.error) || "不明";
+    言った.textContent = "だめでした";
+    $("status").textContent = "⚠ 辿れませんでした: " + 訳;
+    return false;
+  }
 
   響きの木 = r.木;
   響きを合わせ直す();

@@ -253,7 +253,8 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
     const client = new Anthropic({ apiKey: キー });
     const 返り = await client.messages.parse({
       model: 使うモデル,
-      max_tokens: 2000,
+      // ★短い返事だが、考えたぶんも含まれるので余裕を取る
+      max_tokens: 8000,
       system: 頼み文(ジャンル一覧, 年一覧, 幅を読む(幅目盛).ジャンル),
       messages: [{ role: 'user', content: 気分.trim() }],
       /*
@@ -398,13 +399,14 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
        * 8000 のままだと、多めにしたときだけ「返事が長すぎて切れました」に
        * なる。1 曲あたり 30 ﾄｰｸﾝ見当のところを 220 取って、余裕を持たせる。
        */
-      max_tokens: Math.max(4000, 頼む曲数 * 220 + 2000),
+      // ★考えたぶんも含まれるので、余裕を取る（上限は使った分だけの請求）
+      max_tokens: Math.max(16000, 頼む曲数 * 220 + 8000),
       system: プレイリストの頼み文(気分.trim(), 頼む曲数, 響き, 演者の数),
       messages: [{ role: 'user', content: '■ 候補（番号／アーティスト／曲名／アルバム）\n' + 表 }],
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
     });
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
-    if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました' };
+    if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました。「選出の量」を 1 つ減らして、もう一度お試しください' };
     const 出 = 返り.parsed_output;
     if (!出) return { ok: false, error: 'AI の返事を読み取れませんでした' };
     return { ok: true, 結果: { ...並びを確かめる(出, 候補), 頼んだ曲数: 頼む曲数, 演者の数 } };
@@ -679,8 +681,25 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
     const client = new Anthropic({ apiKey: キー });
     const 返り = await client.messages.parse({
       model: 使うモデル,
-      // ★名前の数に合わせて伸ばす。1 個 70 ﾄｰｸﾝ見当（名前＋20 字の理由）
-      max_tokens: Math.max(4000, 幅を読む(幅目盛).名前 * 70 + 1500),
+      /*
+       * ★返事の上限。**考えたぶんも、ここに含まれる。**
+       *
+       * ■ 実地の不具合（2026-08-29）。本人からの報告:
+       *   > carcassを対象幅最大、選出量最大で試したらエラーが出ました。
+       *
+       * 0.17.0 で effort を low → medium に上げたとき、**上限を上げ忘れた。**
+       * そこへ 0.18.0 で名前を 60 → 90 個に増やしたので、
+       * いちばん広いところで足りなくなった。実測:
+       *
+       *   幅5（名前 90 個）  返事に要る ≈ 5,400 ﾄｰｸﾝ / 前の上限 7,800
+       *   → 残り 2,400 しか考えるぶんが無い。medium だと軽く超える
+       *   → stop_reason が max_tokens になり「返事が長すぎて切れました」
+       *
+       * ★上限は**使った分だけ請求される**ので、大きめに取って損はしない。
+       * 足りないと丸ごと無駄になる。ここはけちるところではない。
+       * 名前 1 個 150 ﾄｰｸﾝ（余裕込み）＋ 考えるぶん 12,000。
+       */
+      max_tokens: Math.max(16000, 幅を読む(幅目盛).名前 * 150 + 12000),
       system: 木の頼み文(手元の演者, 幅を読む(幅目盛), 蔵書, すでにある),
       messages: [{ role: 'user', content: 言葉.trim() }],
       /*
@@ -697,7 +716,13 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
       output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
     });
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
-    if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました' };
+    /*
+     * ★何をすればいいかまで言う。「切れました」だけだと、
+     * つまみを動かせばいいと分からない。
+     */
+    if (返り.stop_reason === 'max_tokens') {
+      return { ok: false, error: '返事が長すぎて切れました。「対象の幅」を 1 つ狭めて、もう一度お試しください' };
+    }
     const 出 = 返り.parsed_output;
     if (!出 || !Array.isArray(出.nodes)) return { ok: false, error: 'AI の返事を読み取れませんでした' };
 
