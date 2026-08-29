@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('mp3', {
   // ★アプリ名を変えたときの引き継ぎ結果。黙って済ませない
   引っ越しの結果: () => ipcRenderer.invoke('migration:get'),
   走査する: () => ipcRenderer.invoke('scan'),
+  // ★走査を途中で止める。押しても、そこまで読んだぶんは残る
+  走査を止める: () => ipcRenderer.invoke('scan:stop'),
   // ★走査の進み具合。170,000 曲だと数えるだけで 5 分かかるので、無言にしない
   走査の進みを受ける: (fn) => ipcRenderer.on('scan:progress', (_e, p) => fn(p)),
   走査の途中経過を受ける: (fn) => ipcRenderer.on('scan:partial', (_e, a) => fn(a)),

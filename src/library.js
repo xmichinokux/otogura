@@ -126,8 +126,20 @@ function 鳴らせるか(codec) {
  * ★見つけるたびに知らせる。170,000 曲だと数えるだけで 5 分かかるので、
  * 「全部数え終わってから動く」作りにすると、その間ずっと画面が空になる。
  */
-async function collectTracks(dir, out, depth = 0, 知らせる = null) {
+/**
+ * @param 止めるか 「もう止めてよいか」を返す関数。true なら、そこで切り上げる
+ */
+async function collectTracks(dir, out, depth = 0, 知らせる = null, 止めるか = null) {
   if (depth > 8) return out;                 // 深すぎるところで止まらないように
+  /*
+   * ★数えている最中でも止まれるようにする（2026-08-29 本人の希望）。
+   * 本人からの報告:
+   *   > デカいライブラリをスキャンしたらパソコンが重くなったんですが
+   *
+   * 大きなライブラリでは**数えるだけで 297 秒**かかる（実測）。
+   * 読み始めてからしか止まらない作りだと、そのあいだ止められない。
+   */
+  if (止めるか && 止めるか()) return out;
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
@@ -136,7 +148,8 @@ async function collectTracks(dir, out, depth = 0, 知らせる = null) {
   }
   for (const e of entries) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) await collectTracks(p, out, depth + 1, 知らせる);
+    if (止めるか && 止めるか()) return out;
+    if (e.isDirectory()) await collectTracks(p, out, depth + 1, 知らせる, 止めるか);
     else if (e.isFile() && 拾う拡張子.includes(path.extname(e.name).toLowerCase())) {
       /*
        * ★「._」で始まるものは曲ではない（2026-08-25 実測で判明）。
@@ -384,11 +397,22 @@ async function 目印(file) {
  * 起動のたびに全曲を読み直していた。171,085 曲では完走まで数分かかるので、
  * その前に閉じれば、次もまた最初から。**永久に追いつかない。**
  */
-async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = null, 途中経過 = null, 覚え途中 = null) {
+/**
+ * @param 止めるか 「もう止めてよいか」を返す関数。true になったら、そこまでの結果を返す
+ *
+ * ★止めても、そこまで読んだぶんは捨てない。
+ * 覚え書きも返すので、次に開いたときは続きから進む。
+ * 途中でやめたら全部やり直し、では止めるボタンを押せない。
+ */
+async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = null, 途中経過 = null, 覚え途中 = null, 止めるか = null) {
+  const 止まった = () => !!(止めるか && 止めるか());
   const 知らせる = (n) => 進み && 進み({ 段階: '数えています', 済み: n, 全体: null });
 
   const files = [];
-  for (const dir of folders) await collectTracks(dir, files, 0, 知らせる);
+  for (const dir of folders) {
+    if (止まった()) break;
+    await collectTracks(dir, files, 0, 知らせる, 止まった);
+  }
   if (進み) 進み({ 段階: '数えました', 済み: files.length, 全体: files.length });
 
   const skip = new Set(hidden);
@@ -489,6 +513,8 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
   let 次 = 0;
   const 走者 = Array.from({ length: Math.min(同時に読む数, 対象.length) }, async () => {
     while (次 < 対象.length) {
+      // ★1 曲ごとに見る。押してから止まるまでを短くするため
+      if (止まった()) return;
       const i = 次; 次 += 1;
       await 一本(対象[i]);
     }
@@ -497,9 +523,12 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
 
   if (途中経過 && 溜め.length) 途中経過(溜め);
   if (覚え途中 && 覚え溜め数) 覚え途中(覚え溜め);
-  if (進み) 進み({ 段階: '読み終えました', 済み: 対象.length, 全体: 対象.length });
+  const 止めた = 止まった();
+  if (進み) 進み({ 段階: 止めた ? '止めました' : '読み終えました', 済み, 全体: 対象.length });
 
   return {
+    // ★途中で止めたことを、呼んだ側に伝える。黙って「読み終えた」と言わない
+    止めた,
     tracks,
     found: files.length,
     unreadable,

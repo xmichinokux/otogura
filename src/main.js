@@ -567,7 +567,23 @@ ipcMain.handle('library:cached', async () => {
  *   ・見つかったそばから送る（全部そろうまで待たせない）
  *   ・前回と変わっていないファイルは、タグを読み直さない
  */
+/*
+ * ★走査を途中で止められるようにする（2026-08-29 本人の希望）。
+ *
+ * 大きなライブラリでは、読み終わるまで数十分ディスクを占め続ける
+ * （作者の 86,000 曲で約 50 分）。CPU ではなくディスクが詰まるので、
+ * ほかのアプリの読み書きまで遅くなる。
+ * それまでは**窓を閉じるしか止める方法が無かった。**
+ *
+ * ★止めても損はしない。30 秒ごとに覚え書きを保存しているので、
+ * 次に開いたときは続きから進む。
+ */
+let 止めてほしい = false;
+
+ipcMain.handle('scan:stop', async () => { 止めてほしい = true; return { ok: true }; });
+
 ipcMain.handle('scan', async (e) => {
+  止めてほしい = false;                        // 押し直したら、また最初から
   const s = await 設定を読む();
   const 覚え = await 覚え書きを読む();
   const 送る = (種, 値) => { try { e.sender.send(種, 値); } catch { /* 窓が閉じた */ } };
@@ -621,6 +637,7 @@ ipcMain.handle('scan', async (e) => {
       Object.assign(統合, 増分);
       if (Date.now() - 最後の保存 >= 30000) 途中保存();
     },
+    () => 止めてほしい,                          // ★押されたら、そこで切り上げる
   );
 
   const 保存 = await 覚え書きを書く(r.覚え書き);
@@ -632,6 +649,8 @@ ipcMain.handle('scan', async (e) => {
   if (掃除.落とした) { s.lists = 掃除.lists; await 設定を書く(s); }
 
   return {
+    // ★途中で止めたことを画面に伝える。黙って「読み終えた」と言わない
+    止めた: !!r.止めた,
     tracks: r.tracks, 見つかった: r.found, 読めなかった: r.unreadable, hidden: r.hidden,
     使い回し: r.使い回し,
     lists: 掃除.lists, リストから落とした: 掃除.落とした,
