@@ -608,6 +608,9 @@ function つまみの行() {
   return 行;
 }
 
+/** 再生リストの絞り込み。数が増えたので探せるようにした（2026-08-29） */
+let 再生リストの絞り = "";
+
 /** 打ちかけの言葉。描き直しで消えないように覚えておく */
 let 打ちかけの言葉 = "";
 let 打ちかけの辿る言葉 = "";
@@ -765,6 +768,24 @@ function AIに渡す候補(何曲) {
  * 気に入らなければ並べ替えられるし、消せるし、m3u に書き出せる。
  * その仕組みはもうあるので、そこに乗せる。
  */
+/**
+ * 3 カラムで、自分で何か絞っているか。
+ *
+ * ■ 本人の希望（2026-08-29）
+ *   > 適当なジャンル名を付けてるとAIには認識できないので
+ *   > 下のカラムの表示エリアを検索対象にするといいのかも。
+ *   > ジャンルが「すべて」を選択していたらAIはAIの知識でジャンルを選択するけど、
+ *   > ジャンルを指定してら（一つでも複数でも）カラム下の表示エリアが
+ *   > 作られていたらその中から選ぶようにしたいです。
+ *
+ * ★自分でつけたジャンル名は、AI の知らない言葉のことがある。
+ * そこへ「一覧から選べ」と頼むと、意味の分からない名前から選ばせることになる。
+ * **自分で絞ってあるなら、そのまま使うのが正しい。** AI に選び直させない。
+ */
+function 自分で絞っているか() {
+  return Object.values(sel).some((v) => v !== null);
+}
+
 async function AIに一本組ませる(気分, 言った) {
   const 大きさ = await window.mp3.AIの大きさ();
   const 候補 = AIに渡す候補(大きさ.候補の数);
@@ -1289,6 +1310,38 @@ function 響きの欄を描く() {
     box.appendChild(開閉);
   }
 
+  /*
+   * ★響きで選ばれたバンドから、一本を組む（2026-08-29 本人の希望）。
+   *   > やはりResonanceで選出されたバンドを元にプレイリストを作りたい
+   *   > シャッフルで流せばいいと思ったんですが、それだと曲数が多すぎる問題が
+   *   > あるので、resonanceが選んだバンドから更に厳選して曲を選んで
+   *
+   * ★前に「響きのところに一本を作るボタンは置かない」と決めた（0.13.0）。
+   * あのときは**押すつもりのないボタンが 2 つ**あって、事故が起きたから。
+   * いまは 1 つだけ、何が起きるかを名前に書いて置く。
+   * 勝手には作らない ―― 押したときだけ。
+   */
+  const 組む = document.createElement("button");
+  組む.className = "restag";
+  組む.textContent = "🔀 この響きで一本を組む";
+  組む.title = "いま響きで選ばれている曲から、AI が厳選して並べます（勝手には流れません）";
+  組む.onclick = async () => {
+    const 言葉 = (響きの木 && Array.isArray(響きの木.木))
+      ? 響きの木.木.map((e) => e.keyword).join("・") : "響き";
+    const 言った = $("aisaid");
+    if (!言った) { $("status").textContent = "⚠ 先に APIキーを入れてください"; return; }
+    組む.disabled = true;
+    try {
+      言った.textContent = "響きから組んでいます…";
+      await AIに一本組ませる(言葉, $("aisaid") || 言った);
+    } finally {
+      const b = [...document.querySelectorAll("#resbar button")]
+        .find((x) => (x.textContent || "").includes("一本を組む"));
+      if (b) b.disabled = false;
+    }
+  };
+  box.appendChild(組む);
+
   const 外す = document.createElement("button");
   外す.className = "restag";
   外す.textContent = "× 全部外す";
@@ -1442,11 +1495,26 @@ function 気分の欄を描く() {
     止める(true);
     言った.textContent = "聞いています…";
     try {
-      const r = await window.mp3.気分でおすすめ({
-        気分: v, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
-      });
-      if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
-      当てはめる(r.結果);
+      /*
+       * ★自分で絞ってあるなら、AI にジャンルを選ばせない（2026-08-29 本人の希望）。
+       * いま画面に出ている範囲から、そのまま組ませる。
+       * 自分でつけたジャンル名は AI の知らない言葉のことがあるので、
+       * **選び直させるほうが外れる。**
+       */
+      if (自分で絞っているか()) {
+        言った.textContent = "いま絞っている範囲から組みます…";
+      } else {
+        const r = await window.mp3.気分でおすすめ({
+          気分: v, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
+        });
+        if (!r || !r.ok) {
+          const 訳 = (r && r.error) || "不明";
+          言った.textContent = "だめでした";
+          $("status").textContent = "⚠ 絞り込めませんでした: " + 訳;
+          return;
+        }
+        当てはめる(r.結果);
+      }
       const できた = await AIに一本組ませる(v, $("aisaid") || 言った);
       /*
        * ★組めたら記入欄を空にする（2026-08-29 本人の希望）。
@@ -1790,18 +1858,22 @@ function 選ぶ(level, 値, e = null) {
  * ★合計は、縦棒（縦スクロール）が出たぶんも見込んで決める。
  * 最初 act を広げただけにしたら、**横棒が出た**（検査が捕まえた）。
  * 曲が並ぶと縦棒が出て、そのぶん（15px ほど）横が狭くなるため。
+ *
+ * ★左に再生リストの一覧を置いたので（0.21.0）、表に使える幅が 200px ほど減った。
+ * そのぶんを曲名・演者・盤から回している。どれも「…」で切れるだけで、
+ * 見えなくなる操作は無い。どれも取っ手で広げられる。
  */
 const 既定の列幅 = {
-  pick: 34, grip: 30, num: 40,
-  title: 288, artist: 186, album: 190,
-  dur: 60, date: 88, plays: 52, move: 68,
+  pick: 34, grip: 30, num: 38,
+  title: 230, artist: 150, album: 150,
+  dur: 58, date: 84, plays: 50, move: 68,
   /*
    * ★act は、開いているものによって要る幅が違う。
-   *   ライブラリ … 「シャッフルに入れない　一覧から外す」 187px 要る
+   *   ライブラリ … 「くじに入れない　一覧から外す」（0.21.0 で短くした）
    *   再生リスト … 「この曲を外す」だけ            59px で足りる
    * 同じ幅にすると、再生リスト側で 150px 遊んで、横棒が出る（並べ替えの列も増えるので）。
    */
-  act: 210, actlist: 110,
+  act: 152, actlist: 96,
 };
 
 /** 変えた幅を覚えておく。{ 列id: 画素 } */
@@ -1854,6 +1926,31 @@ function 高さを決める(px) {
   $('cols').style.flexBasis = `${h}px`;
   return h;
 }
+
+/*
+ * ★左の一覧の幅も掴んで変えられるようにする。
+ * 再生リストの名前は長さがまちまちなので、固定だと切れる。
+ * 3 カラムの高さと同じ置き場（列幅）に覚えておく。
+ */
+$('sidesizer').onmousedown = (e) => {
+  e.preventDefault();
+  const 始点 = e.clientX;
+  const 元 = $('tabs').getBoundingClientRect().width;
+  document.body.style.cursor = 'col-resize';
+  const 動く = (ev) => {
+    const 幅 = Math.max(120, Math.min(420, 元 + (ev.clientX - 始点)));
+    $('tabs').style.width = `${幅}px`;
+    列幅.__sideWidth = 幅;
+  };
+  const 離す = async () => {
+    document.removeEventListener('mousemove', 動く);
+    document.removeEventListener('mouseup', 離す);
+    document.body.style.cursor = '';
+    await window.mp3.列幅を覚える(列幅);
+  };
+  document.addEventListener('mousemove', 動く);
+  document.addEventListener('mouseup', 離す);
+};
 
 $('colsizer').onmousedown = (e) => {
   e.preventDefault();
@@ -2199,7 +2296,7 @@ function 一覧を描く() {
       const 外れている = シャッフル除外.has(t.path);
       const sk = document.createElement('span');
       sk.className = 'link';
-      sk.textContent = 外れている ? 'シャッフルに戻す' : 'シャッフルに入れない';
+      sk.textContent = 外れている ? 'くじに戻す' : 'くじに入れない';
       sk.title = 外れている
         ? 'くじで選ばれるように戻します'
         : '一覧には残り、押せば鳴ります。くじで選ばれなくなるだけです';
@@ -2260,10 +2357,54 @@ function タブを描く() {
   };
 
   タブ('ライブラリ', null);
-  for (const l of lists) タブ(`${l.name}（${l.tracks.length}）`, l.id);
+
+  /*
+   * ★数が増えたので、探せるようにする（2026-08-29 本人の希望）。
+   *   > プレイリストを作るのが楽しくなって大量生産してしまい、
+   *   > 今の表示部分だと無理があることがわかりました。
+   * ★少ないうちは出さない。3 本のために探す欄が出ても邪魔なだけ。
+   * 3 カラムの探す欄と同じ考え方（件数が多い列にだけ出す）。
+   */
+  const 語 = (再生リストの絞り || "").trim().toLocaleLowerCase("ja");
+  if (lists.length > 8 || 語) {
+    const inp = document.createElement('input');
+    inp.className = 'sidefind';
+    inp.id = "listfind";
+    inp.placeholder = `${lists.length} 本から探す`;
+    inp.value = 再生リストの絞り;
+    inp.autocomplete = 'off';
+    inp.oninput = () => {
+      再生リストの絞り = inp.value;
+      描き直す();
+      // ★打つたびに描き直すので、焦点を戻さないと 1 文字しか打てない
+      const 次 = $("listfind");
+      if (次) { 次.focus(); 次.setSelectionRange(次.value.length, 次.value.length); }
+    };
+    box.appendChild(inp);
+  }
+
+  const 出す = 語
+    ? lists.filter((l) => l.name.toLocaleLowerCase("ja").includes(語))
+    : lists;
+
+  const 見出し = document.createElement('div');
+  見出し.className = 'sidehead';
+  見出し.textContent = 語
+    ? `合う再生リスト（${出す.length} / ${lists.length}）`
+    : `再生リスト（${lists.length}）`;
+  box.appendChild(見出し);
+
+  for (const l of 出す) タブ(`${l.name}（${l.tracks.length}）`, l.id, l.name);
+  // ★絞って 0 本でも、黙って空にしない
+  if (語 && !出す.length) {
+    const 無 = document.createElement('div');
+    無.className = 'sidehead';
+    無.textContent = '合うものがありません';
+    box.appendChild(無);
+  }
 
   const 新規 = document.createElement('button');
-  新規.className = 'tab';
+  新規.className = 'tab sideadd';
   新規.textContent = '＋ 新しい再生リスト';
   // ★prompt() は使わない。Electron では動かない（alert / confirm は動くのに prompt だけ使えない）。
   // 実地で「押しても反応がない」となった原因。画面内の入力欄に置き換えた。
@@ -2271,7 +2412,7 @@ function タブを描く() {
   box.appendChild(新規);
 
   const 読込 = document.createElement('button');
-  読込.className = 'tab';
+  読込.className = 'tab sideadd';
   読込.textContent = 'm3u を読み込む';
   読込.onclick = async () => {
     const r = await window.mp3.m3uを読み込む();
@@ -3564,6 +3705,7 @@ $('unhide').onclick = async () => {
   列幅 = await window.mp3.列幅を取る();
   // ★覚えた 3 カラムの高さを戻す
   高さを決める(typeof 列幅.__colsHeight === 'number' ? 列幅.__colsHeight : 既定の高さ);
+  if (typeof 列幅.__sideWidth === 'number') $('tabs').style.width = `${列幅.__sideWidth}px`;
 
   // ★覚えた音量を戻す。戻さないと、開くたびに大音量から始まる
   音量 = await window.mp3.音量を取る();

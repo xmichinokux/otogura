@@ -212,9 +212,37 @@
    * 大事な文が出るので、「…」で消えるほうが困る。
    */
   #status { flex-basis: 100%; min-width: 0; color: var(--dim); font-size: 11px; line-height: 1.6; }
-  #tabs { flex: 0 0 auto; display: flex; gap: 4px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); overflow-x: auto; }
-  .tab { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  /*
+   * ★再生リストは左に縦（2026-08-29 本人の希望）。
+   *   > プレイリストを作るのが楽しくなって大量生産してしまい、
+   *   > 今の表示部分だと無理があることがわかりました。
+   * 横一列だと、増えたぶんが右へ流れて見えなくなる。縦なら何本でも並ぶ。
+   */
+  #lower { display: flex; flex: 1; min-height: 0; }
+  #tabs {
+    flex: 0 0 auto; width: 170px; min-width: 120px; max-width: 420px;
+    display: flex; flex-direction: column; gap: 2px; align-items: stretch;
+    padding: 6px; border-right: 1px solid var(--line);
+    overflow-y: auto; background: var(--sub);
+  }
+  #sidesizer { flex: 0 0 5px; cursor: col-resize; background: var(--line); }
+  #sidesizer:hover { background: var(--accent); }
+  #listwrap { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+  .tab {
+    border: 1px solid transparent; background: none; border-radius: 6px;
+    padding: 5px 9px; font-size: 12px; cursor: pointer; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text);
+  }
+  .tab:hover { background: #fff; border-color: var(--line); }
   .tab.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  /* 見出しと、作る・読み込むのところ */
+  #tabs .sidehead { font-size: 10px; color: var(--dim); padding: 6px 9px 2px; letter-spacing: .08em; }
+  #tabs .sidefind {
+    font: inherit; font-size: 11px; padding: 4px 8px; margin: 2px 0 4px;
+    border: 1px solid var(--line); border-radius: 6px; background: #fff; width: 100%;
+  }
+  #tabs .sideadd { color: var(--dim); }
+  #tabs .sideadd:hover { color: var(--accent); }
   #listtools { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--sub); flex-wrap: wrap; }
   #listtools:empty { display: none; }
   td.pick { width: 34px; text-align: center; }
@@ -267,7 +295,14 @@
      列の幅は横に掴んで変えられるのに、高さだけ 240px で固定だった。 -->
 <div id="colsizer" title="上下にドラッグして、3カラムの高さを変える"></div>
 
-<div id="tabs"></div>
+<!-- ★再生リストは左に縦に並べる（2026-08-29 本人の希望）。
+     > プレイリストを作るのが楽しくなって大量生産してしまい、
+     > 今の表示部分だと無理があることがわかりました。
+     横に並べる作りだと、増えたぶん右へ流れて見えなくなっていた。 -->
+<div id="lower">
+  <div id="tabs"></div>
+  <div id="sidesizer" title="左右にドラッグして、一覧の幅を変える"></div>
+  <div id="listwrap">
 <div id="listtools"></div>
 <div id="list">
   <div class="empty" id="empty">
@@ -277,6 +312,8 @@
     <thead><tr><th class="num"></th><th>曲名</th><th>アーティスト</th><th>アルバム</th><th class="dur">長さ</th><th class="plays">再生</th><th class="act"></th></tr></thead>
     <tbody id="tbody"></tbody>
   </table>
+</div>
+  </div>
 </div>
 
 <div id="ask"><div class="box"><div class="msg"></div><div class="row"></div></div></div>
