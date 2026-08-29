@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('mp3', {
   AIのキーを消す: () => ipcRenderer.invoke('ai:clearKey'),
   気分でおすすめ: (手がかり) => ipcRenderer.invoke('ai:suggest', 手がかり),
   AIの大きさ: () => ipcRenderer.invoke('ai:sizes'),
+  // ★つまみ（対象の幅・選出の量）。AI DJ と Resonance の両方に効く
+  AIのつまみを変える: (目盛) => ipcRenderer.invoke('ai:setScale', 目盛),
   AIにプレイリストを作らせる: (手がかり) => ipcRenderer.invoke('ai:playlist', 手がかり),
 
   // Resonance（Kokoro OS のカルチャーツリー）。★読むだけ

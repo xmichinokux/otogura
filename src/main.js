@@ -26,7 +26,8 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
-const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数 } = require('./ai');
+const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
+  目盛の数, 既定の目盛, 幅の段, 量の段, 幅を読む, 量を読む } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
@@ -50,7 +51,18 @@ app.setName('Otogura');
 /** 設定（スキャン対象フォルダ・一覧から外した曲）の置き場 */
 const 設定ファイル = () => path.join(app.getPath('userData'), 'settings.json');
 
-const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [] };
+const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛 } };
+
+/** 1〜5 に丸める。数でないものは真ん中に */
+function 目盛ひとつ(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 既定の目盛;
+  return Math.max(1, Math.min(目盛の数, Math.round(n)));
+}
+function 目盛を整える(v) {
+  const o = (v && typeof v === 'object') ? v : {};
+  return { 幅: 目盛ひとつ(o.幅), 量: 目盛ひとつ(o.量) };
+}
 
 async function 設定を読む() {
   try {
@@ -86,6 +98,11 @@ async function 設定を読む() {
        * くじを引くときだけ候補から外す。
        */
       シャッフル除外: Array.isArray(v.シャッフル除外) ? v.シャッフル除外.filter((x) => typeof x === 'string') : [],
+      /*
+       * ★AI の 2 つのつまみ（対象の幅・選出の量）。1〜5。
+       * 範囲の外は黙って真ん中に寄せる。人が手で書き換えても壊れないように。
+       */
+      AIの目盛: 目盛を整える(v.AIの目盛),
     };
   } catch {
     return { ...既定の設定 };
@@ -268,25 +285,59 @@ ipcMain.handle('ai:clearKey', async () => {
 ipcMain.handle('ai:suggest', async (_e, 手がかり) => {
   const キー = await キーを読む();
   if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  /*
+   * ★つまみは画面から受け取らず、**ここで設定から読む。**
+   * 画面の言い値を信じると、直せば何曲でも頼めてしまう。
+   * 置き場を 1 つにしておけば、画面と食い違いようがない。
+   */
+  const 目盛 = (await 設定を読む()).AIの目盛;
   return おすすめを聞く({
     キー,
     気分: 手がかり && 手がかり.気分,
     ジャンル一覧: 手がかり && 手がかり.ジャンル一覧,
     年一覧: (手がかり && 手がかり.年一覧) || [],
+    幅目盛: 目盛.幅,
   });
 });
 
-/** 何曲渡して何曲作らせるか。画面が候補を選ぶのに使う */
-ipcMain.handle('ai:sizes', async () => ({ 候補の数, 作る曲数 }));
+/**
+ * 何曲渡して何曲作らせるか。画面が候補を選ぶのに使う。
+ * ★つまみの段そのものも返す。画面が数を持たないようにするため
+ * （持たせると、段を足したとき片方だけ直す事故になる）。
+ */
+ipcMain.handle('ai:sizes', async () => {
+  const 目盛 = (await 設定を読む()).AIの目盛;
+  return {
+    候補の数: 幅を読む(目盛.幅).候補,
+    作る曲数: 量を読む(目盛.量).曲数,
+    目盛,
+    目盛の数,
+    幅の段,
+    量の段,
+    // ★つまみを触っていないときの値。README と食い違わないように出しておく
+    もとの候補の数: 候補の数,
+    もとの作る曲数: 作る曲数,
+  };
+});
+
+/** つまみを動かした。★1〜5 に丸めてから書く */
+ipcMain.handle('ai:setScale', async (_e, 目盛) => {
+  const s = await 設定を読む();
+  s.AIの目盛 = 目盛を整える(目盛);
+  await 設定を書く(s);
+  return s.AIの目盛;
+});
 
 /** @param 手がかり { 気分, 候補 } ―― 候補は画面が 200 曲だけ選んで渡す */
 ipcMain.handle('ai:playlist', async (_e, 手がかり) => {
   const キー = await キーを読む();
   if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  const 目盛 = (await 設定を読む()).AIの目盛;
   return プレイリストを作らせる({
     キー,
     気分: 手がかり && 手がかり.気分,
     候補: 手がかり && 手がかり.候補,
+    曲数: 量を読む(目盛.量).曲数,
     // ★画面が突き合わせた結果を、そのまま頼み文に差し込む
     響き: 響きの一節((手がかり && 手がかり.響き) || []),
   });
@@ -349,6 +400,7 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
     キー,
     言葉: 手がかり && 手がかり.言葉,
     手元の演者: (手がかり && 手がかり.手元の演者) || [],
+    幅目盛: (await 設定を読む()).AIの目盛.幅,
   });
   if (!r.ok) return r;
 

@@ -76,6 +76,13 @@
   #aibar.on { display: flex; }
   #aibar input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
   #aibar .said { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
+  /* ★つまみ（対象の幅・選出の量）は 2 段目。1 行に並べると記入欄が押しつぶされる */
+  #aibar.on { flex-wrap: wrap; }
+  #aibar .knobs { flex-basis: 100%; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); }
+  /* 上の #aibar input が flex:1 なので、つまみだけ幅を決め直す */
+  #aibar .knobs input[type=range] { flex: 0 0 96px; min-width: 96px; padding: 0; border: 0; }
+  #aibar .knobs .val { min-width: 4.5em; color: var(--text); }
+  #aibar .knobs .said { max-width: none; flex: 1; }
   /* Resonance（Kokoro OS の木）。読み込んだときだけ出す */
   #resbar { display: none; gap: 6px; align-items: center; flex-wrap: wrap; padding: 5px 8px; background: var(--sub); border-bottom: 1px solid var(--line); }
   #resbar.on { display: flex; }

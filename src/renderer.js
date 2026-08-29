@@ -406,6 +406,108 @@ let AIが使える = false;
  * 再生リスト名と同じく、**画面の中に入力欄を出す**形にする。
  */
 let キー入力 = null;
+
+/* ── ★つまみ（対象の幅・選出の量）────────────────────────
+   本人の希望（2026-08-29）:
+     > AI DJとResonaceですが、対象の幅と選出の量の幅をスライダーで
+     > 最小から最大まで選べるようにってできますか？
+     > この２つのスライダーを一組として、AI DJとResonace両方に適用
+
+   ★一組で足りる。2 つの道（気分から／言葉から辿って）は、最後に同じ
+   プレイリストを作らせる() に入るので、幅と量の意味が共通になる。
+
+   ★段の数も値も、ここには書かない。すべて ai.js の表から受け取る。
+   画面にも数を書くと、段を足したとき片方だけ直す事故になる。
+   ────────────────────────────────────────────────── */
+
+/** ai:sizes から取った { 目盛, 目盛の数, 幅の段, 量の段 }。取れなければ null（つまみが出ないだけ） */
+let AIのつまみ = null;
+
+async function AIのつまみを取り直す() {
+  try {
+    const v = await window.mp3.AIの大きさ();
+    AIのつまみ = (v && v.目盛 && Array.isArray(v.幅の段) && Array.isArray(v.量の段)) ? v : null;
+  } catch {
+    // ★取れなくても壊さない。つまみが出ないだけで、既定の大きさで動く
+    AIのつまみ = null;
+  }
+}
+
+/**
+ * 1 本組むのにかかる、おおよその金額（円）。
+ *
+ * ★実測（2026-08-29、本人の 86,044 曲）。候補 1 曲は 51 文字 ≒ 23 ﾄｰｸﾝ。
+ * 頼み文が 700 ﾄｰｸﾝ、返事は 1 曲 30 ﾄｰｸﾝ見当。
+ * Opus 5 の 100万ﾄｰｸﾝあたり $5 / $25 を、150 円/ドルで換算した。
+ *
+ * ★あくまで目安。値段も為替も変わる。だから画面にも「目安」と書く。
+ * それでも出すのは、**つまみを動かす前に見当がつかないと動かせない**から。
+ */
+function つまみの目安円(幅, 量) {
+  const 入り = 幅.候補 * 23 + 700;
+  const 出 = 量.曲数 * 30;
+  return Math.round((入り * 5 + 出 * 25) / 1000000 * 150 * 10) / 10;
+}
+
+/**
+ * つまみの行を作る。読み込めていなければ null（呼んだ側は足さない）。
+ */
+function つまみの行() {
+  if (!AIのつまみ) return null;
+  const 段数 = AIのつまみ.目盛の数 || AIのつまみ.幅の段.length;
+
+  const 棒を作る = (id, いま) => {
+    const b = document.createElement("input");
+    b.type = "range"; b.id = id; b.min = "1"; b.max = String(段数); b.step = "1";
+    b.value = String(いま);
+    return b;
+  };
+  const 字 = (文, 組) => { const e = document.createElement("span"); e.textContent = 文; if (組) e.className = 組; return e; };
+
+  const 行 = document.createElement("div");
+  行.className = "knobs";
+
+  const 幅棒 = 棒を作る("aiwide", AIのつまみ.目盛.幅);
+  幅棒.title = "何を見渡すか。AI に渡す候補の曲数・辿る名前の数・選ばせるジャンル数が、いっしょに変わります";
+  const 幅札 = 字("", "val"); 幅札.id = "aiwidelabel";
+
+  const 量棒 = 棒を作る("aimany", AIのつまみ.目盛.量);
+  量棒.title = "一本を何曲にするか";
+  const 量札 = 字("", "val"); 量札.id = "aimanylabel";
+
+  const 説き = 字("", "said"); 説き.id = "aiknobsaid";
+
+  const 札を直す = () => {
+    const 幅 = AIのつまみ.幅の段[Number(幅棒.value) - 1];
+    const 量 = AIのつまみ.量の段[Number(量棒.value) - 1];
+    if (!幅 || !量) return;
+    幅札.textContent = 幅.札;
+    量札.textContent = 量.曲数 + " 曲";
+    /*
+     * ★何が変わるのかを、そのまま出す。
+     * 「狭い〜広い」だけだと、押すまで何が起きるか分からない。
+     */
+    説き.textContent = `候補 ${幅.候補} 曲 ／ 辿る名前 ${幅.名前} 個 ／ ジャンル ${幅.ジャンル} まで`
+      + `　→ ${量.曲数} 曲の一本（目安 ${つまみの目安円(幅, 量)} 円）`;
+  };
+
+  /*
+   * ★動かしている間は書かない（oninput）。離したときに 1 回だけ書く（onchange）。
+   * 動かすたびに設定ファイルを書くと、端から端まで動かすだけで 5 回書くことになる。
+   */
+  const 覚える = async () => {
+    札を直す();
+    const r = await window.mp3.AIのつまみを変える({ 幅: Number(幅棒.value), 量: Number(量棒.value) });
+    if (r && Number.isFinite(r.幅) && Number.isFinite(r.量)) AIのつまみ = { ...AIのつまみ, 目盛: r };
+  };
+  幅棒.oninput = 札を直す; 量棒.oninput = 札を直す;
+  幅棒.onchange = 覚える; 量棒.onchange = 覚える;
+  札を直す();
+
+  行.append(字("対象の幅"), 幅棒, 幅札, 字("選出の量"), 量棒, 量札, 説き);
+  return 行;
+}
+
 /** 打ちかけの言葉。描き直しで消えないように覚えておく */
 let 打ちかけの言葉 = "";
 let 打ちかけの辿る言葉 = "";
@@ -537,7 +639,14 @@ async function AIに一本組ませる(気分, 言った) {
    * 先に出すと 再生する() の中の 一覧を描く() に上書きされて、消える（実測）。
    */
   const 落ち = r.結果.落とした ? `（${r.結果.落とした} 件は候補に無くて落としました）` : '';
-  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}　▶ で頭から流れます`;
+  /*
+   * ★頼んだ曲数が減らされていたら、そう言う。
+   * つまみが 2 本あるので「幅は最小・量は最大」（候補 50 で 80 曲）は必ず起きる。
+   * 黙って 50 曲にすると、つまみが効いていないように見える。
+   */
+  const 減り = (r.結果.頼んだ曲数 && r.結果.頼んだ曲数 < 大きさ.作る曲数)
+    ? `（候補が ${候補.length} 曲しかないので ${r.結果.頼んだ曲数} 曲にしました。対象の幅を広げると増やせます）` : '';
+  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${落ち}${減り}　▶ で頭から流れます`;
 }
 
 /* ── Resonance（Kokoro OS のカルチャーツリー）───────────────
@@ -784,6 +893,8 @@ function 気分の欄を描く() {
       if (!r || !r.ok) { 断り.textContent = "しまえませんでした（" + ((r && r.error) || "不明") + "）"; return; }
       キー入力 = null;                              // ★画面にキーを残さない
       AIが使える = true;
+      // ★キーを入れて初めて欄が出る。つまみもここで取る（起動時は取れていない）
+      await AIのつまみを取り直す();
       描き直す();
       $("status").textContent = "APIキーをしまいました。上の欄に気分を書けます";
     };
@@ -839,6 +950,9 @@ function 気分の欄を描く() {
 
   const 止める = (と) => {
     for (const e of [押す, 欄, 辿る, 欄2]) e.disabled = と;
+    // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
+    // 動かせるままだと「効かなかった」と見えるので、いっしょに止める
+    for (const id of ["aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = と; }
   };
 
   const 気分で = async () => {
@@ -854,7 +968,7 @@ function 気分の欄を描く() {
       当てはめる(r.結果);
       await AIに一本組ませる(v, $("aisaid") || 言った);
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree"]) { const e = $(id); if (e) e.disabled = false; }
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
 
@@ -870,7 +984,7 @@ function 気分の欄を描く() {
       描き直す();
       await AIに一本組ませる(v, $("aisaid") || 言った);
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree"]) { const e = $(id); if (e) e.disabled = false; }
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
 
@@ -880,6 +994,9 @@ function 気分の欄を描く() {
   欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
 
   box.append(印, 欄, 押す, 印2, 欄2, 辿る, 言った);
+  // ★つまみは 2 段目に置く。1 行に並べると、記入欄が押しつぶされる
+  const つまみ = つまみの行();
+  if (つまみ) box.append(つまみ);
 }
 
 /**
@@ -2860,6 +2977,8 @@ $('unhide').onclick = async () => {
     const 状態 = await window.mp3.AIが使えるか();
     AIが使える = !!(状態 && 状態.使える);
   } catch { AIが使える = false; }
+  // ★つまみの段を取る。取れなくても、つまみが出ないだけで動く
+  await AIのつまみを取り直す();
   /*
    * ★響きも読む。**無くても壊れない。**
    * 無ければ欄が出ないだけで、ほかは今までどおり。
