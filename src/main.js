@@ -27,7 +27,7 @@ const { scanLibrary, アートワークを読む, readTags, 目印 } = require('
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
 const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
-  目盛の数, 既定の目盛, 幅の段, 量の段, 幅を読む, 量を読む } = require('./ai');
+  目盛の数, 既定の目盛, 幅の段, 量の段, 幅を読む, 量を読む, 木を混ぜる } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
@@ -402,10 +402,21 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
     手元の演者: (手がかり && 手がかり.手元の演者) || [],
     幅目盛: (await 設定を読む()).AIの目盛.幅,
     蔵書: (手がかり && 手がかり.蔵書) || null,
+    // ★同じ言葉なら、すでに挙げた名前を渡して「別のものを」と頼む
+    すでにある: (手がかり && Array.isArray(手がかり.すでにある)) ? 手がかり.すでにある : [],
   });
   if (!r.ok) return r;
 
-  // 控えに足す。同じ言葉で生やし直したら、古いほうを差し替える
+  /*
+   * ★同じ言葉で辿り直したら、**入れ替えずに足す**（2026-08-29 本人の報告）。
+   *   > 一度resonance生成したものと同じ名前で生成しても元の結果と同じままだった
+   *
+   * 前は入れ替えていたので、AI が似た答えを返すと**何も変わらなかった。**
+   * 足していく形にすれば、押すたびに広がる ―― 「もっと辿る」になる。
+   *
+   * ★曲がたくさん当たるジャンルで演者が足りない、という不便もこれで直せる:
+   *   > resonanceで選出した曲が結果的に多いと選出するバンドが少なくなるのが不便
+   */
   let 前 = { version: 1, entries: [] };
   try {
     const 文 = await fs.readFile(響きファイル(), 'utf8');
@@ -414,7 +425,9 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
   } catch { /* まだ無い */ }
   前.version = 1;
   前.exportedAt = new Date().toISOString();
-  前.entries = [r.結果, ...前.entries.filter((e) => e && e.keyword !== r.結果.keyword)];
+  const 前の同じ = 前.entries.find((e) => e && e.keyword === r.結果.keyword);
+  const 混ぜた = 木を混ぜる(前の同じ, r.結果);
+  前.entries = [混ぜた, ...前.entries.filter((e) => e && e.keyword !== r.結果.keyword)];
 
   const 確かめ = 響きを読み込む(JSON.stringify(前));
   if (!確かめ.ok) return { ok: false, error: '生やした木を保存できませんでした（' + 確かめ.error + '）' };
@@ -424,7 +437,14 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
   } catch (e) {
     return { ok: false, error: '保存できませんでした（' + ((e && e.message) || '不明') + '）' };
   }
-  return { ok: true, 生やした: r.結果, 木: 確かめ.木 };
+  return {
+    ok: true,
+    生やした: r.結果,
+    木: 確かめ.木,
+    // ★何個増えたか。同じ言葉で押し直したときに「増えた」と言えるように
+    増えた: r.結果.nodes.length,
+    全部で: 混ぜた.nodes.length,
+  };
 });
 
 ipcMain.handle('ai:treeSizes', async () => ({ 見せる演者の数 }));
