@@ -14,7 +14,7 @@
  * 指示書に無い判断が要るときは、実装で埋めずに相談する。
  */
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 /*
@@ -26,6 +26,7 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む } = require('./playlists');
 const { タグを書く } = require('./tags');
+const { おすすめを聞く } = require('./ai');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
  * ★アプリ名を、ここで決め打ちする（2026-08-25 実地）。
@@ -209,6 +210,70 @@ if (!一つだけ) {
     });
   });
 }
+
+/* ── 気分でおすすめ（本人の希望 2026-08-29）─────────────────
+   ★このアプリで唯一、外に通信するところ。
+     送るのは「ジャンル名の一覧」と「打ち込んだ気分の文」だけ。
+     曲名もファイルのパスも送らない。押したときだけ通信する。
+
+   ★キーが無くても壊れないこと（本人の指示）。
+     無ければ機能が画面に出ないだけで、ほかは今までどおり動く。 */
+
+/** キーの置き場。settings.json とは別にする（あちらは人が開いて読むファイル） */
+const キーファイル = () => path.join(app.getPath('userData'), 'ai-key.bin');
+
+/**
+ * ★平文で置かない。
+ * Windows なら safeStorage が DPAPI で暗号化してくれる。
+ * 使えない環境では**保存を断る**。平文で書くくらいなら、保存しないほうがいい。
+ */
+async function キーを読む() {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    const 中身 = await fs.readFile(キーファイル());
+    const v = safeStorage.decryptString(中身);
+    return (typeof v === 'string' && v.trim()) ? v.trim() : null;
+  } catch {
+    return null;                                  // 無い・読めない → 使えないだけ
+  }
+}
+
+ipcMain.handle('ai:status', async () => ({
+  使える: !!(await キーを読む()),
+  しまえる: safeStorage.isEncryptionAvailable(),
+}));
+
+ipcMain.handle('ai:setKey', async (_e, キー) => {
+  if (typeof キー !== 'string' || !キー.trim()) return { ok: false, error: 'キーが空です' };
+  if (!safeStorage.isEncryptionAvailable()) {
+    return { ok: false, error: 'この環境では暗号化して保存できません。平文では保存しません' };
+  }
+  try {
+    await fs.mkdir(path.dirname(キーファイル()), { recursive: true });
+    await fs.writeFile(キーファイル(), safeStorage.encryptString(キー.trim()));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : '保存に失敗しました' };
+  }
+});
+
+ipcMain.handle('ai:clearKey', async () => {
+  // ★消すのはキーのファイルだけ。音楽ファイルは一切触らない
+  try { await fs.unlink(キーファイル()); } catch { /* もともと無い */ }
+  return { ok: true };
+});
+
+/** @param 手がかり { 気分, ジャンル一覧, 年一覧 } ―― 画面が作って渡す */
+ipcMain.handle('ai:suggest', async (_e, 手がかり) => {
+  const キー = await キーを読む();
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  return おすすめを聞く({
+    キー,
+    気分: 手がかり && 手がかり.気分,
+    ジャンル一覧: 手がかり && 手がかり.ジャンル一覧,
+    年一覧: (手がかり && 手がかり.年一覧) || [],
+  });
+});
 
 ipcMain.handle('migration:get', async () => 引っ越しの結果);
 

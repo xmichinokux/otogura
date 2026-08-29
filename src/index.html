@@ -71,6 +71,11 @@
   #coltabs button.on { background: #fff; color: var(--accent); font-weight: 600; }
   /* ★隠れているタブに絞り込みが残っていることを出す（出さないと理由が分からない） */
   #coltabs button .mark { color: var(--accent); font-weight: 700; margin-left: 4px; }
+  /* 気分の欄。キーがあるときだけ出す */
+  #aibar { display: none; gap: 6px; align-items: center; padding: 6px 8px; background: var(--sub); border-bottom: 1px solid var(--line); }
+  #aibar.on { display: flex; }
+  #aibar input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; }
+  #aibar .said { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
   /* 3カラムの高さを掴んで変える取っ手。細いと掴めないので、少し余裕をとる */
   #colsizer { flex: 0 0 6px; cursor: row-resize; background: var(--line); }
   #colsizer:hover { background: var(--accent); }
@@ -178,6 +183,7 @@
      切り替えても、前のタブの絞り込みは残す。だから隠れている側に
      絞り込みがあることを、タブ自身に出す。 -->
 <div id="coltabs"></div>
+<div id="aibar"></div>
 
 <div id="cols">
   <div class="col"><h2>ジャンル</h2><ul id="c-genre"></ul></div>
@@ -203,6 +209,12 @@
 <div id="foot">
   <button class="btn" id="add">フォルダを追加</button>
   <button class="btn" id="rescan">再スキャン</button>
+  <!-- ★気分でおすすめ（本人の希望 2026-08-29）。
+       このアプリで唯一、外に通信する機能。既定は切で、キーを入れるまで
+       上の気分の欄は出ない。ここだけは、入れる道として常に出しておく。 -->
+  <button class="btn" id="aikey" title="気分を言うと、聴く範囲を選んでくれます（Anthropic の API キーが要ります）">
+    🤖 気分で選ぶ
+  </button>
   <!-- ★タグの無い曲を隠す（本人の希望 2026-08-25）。
        理由: バンドで作った試作品が混ざっていて、再生したくない。
        以前は問答無用で消していたが、消えた理由が分からないほうが困るので選べるようにした。 -->

@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('mp3', {
   // ★まとめて外す。1曲ずつだと設定ファイルを曲数ぶん書き直すことになる
   まとめて一覧から外す: (paths) => ipcRenderer.invoke('tracks:hideMany', paths),
   外したものを戻す: () => ipcRenderer.invoke('tracks:unhideAll'),
+
+  // 気分でおすすめ。★キーが無ければ 使える:false が返るだけで、壊れない
+  AIが使えるか: () => ipcRenderer.invoke('ai:status'),
+  AIのキーを入れる: (キー) => ipcRenderer.invoke('ai:setKey', キー),
+  AIのキーを消す: () => ipcRenderer.invoke('ai:clearKey'),
+  気分でおすすめ: (手がかり) => ipcRenderer.invoke('ai:suggest', 手がかり),
   // ★シャッフルに入れない曲。「一覧から外す」とは別（一覧には残り、押せば鳴る）
   シャッフル除外を取る: () => ipcRenderer.invoke('shuffleskip:get'),
   シャッフル除外を変える: (paths, 除外する) => ipcRenderer.invoke('shuffleskip:set', paths, 除外する),

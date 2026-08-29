@@ -351,6 +351,105 @@ function まとめる(値の並び) {
 }
 
 
+/* ── 気分でおすすめ ─────────────────────────────────────
+   本人の希望（2026-08-29）:
+     > その時の気分を言うと AI がおすすめして曲を選んでくれる
+
+   ★AI に曲は選ばせない。**3 カラムに入れる値**を選ばせる。
+   そうすると、AI が何をしたかが画面に見えるし（カラムが選ばれた状態になる）、
+   納得できなければ手で直せる。無い曲を作られる心配も無い。
+   選んだあとは、いまのシャッフルがそのまま働く。
+
+   ★キーが無ければ、この欄は出ない（本人の指示）。出さないだけで、
+   ほかの機能は今までどおり動く。 */
+
+let AIが使える = false;
+
+/** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */
+function AIに渡すジャンル() {
+  const 数 = new Map();
+  // ★「見える曲」から作る。タグ無しを隠しているなら、その曲は候補に入れない
+  for (const t of 見える曲()) {
+    const g = (t.genre || "").trim();
+    if (!g) continue;
+    数.set(g, (数.get(g) ?? 0) + 1);
+  }
+  return [...数.entries()].sort((a, b) => b[1] - a[1]).map(([名前, 件数]) => ({ 名前, 件数 }));
+}
+
+/** 手に入れた年の一覧（新しい順） */
+function AIに渡す年() {
+  const 年 = new Set();
+  for (const t of 見える曲()) if (t.更新日時 > 0) 年.add(String(new Date(t.更新日時).getFullYear()));
+  return [...年].sort().reverse();
+}
+
+function 気分の欄を描く() {
+  const box = $("aibar");
+  box.className = AIが使える ? "on" : "";
+  if (!AIが使える) { box.innerHTML = ""; return; }
+  if (box.dataset.できている === "1") return;      // 打っている途中に作り直さない
+  box.dataset.できている = "1";
+  box.innerHTML = "";
+
+  const 印 = document.createElement("span");
+  印.textContent = "🤖";
+  const 欄 = document.createElement("input");
+  欄.id = "aiword";
+  欄.placeholder = "いまの気分（例: 疲れてるけど、うるさいのが聴きたい）";
+  const 押す = document.createElement("button");
+  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "選んでもらう";
+  const 言った = document.createElement("span");
+  言った.className = "said"; 言った.id = "aisaid";
+
+  const 走る = async () => {
+    const 気分 = 欄.value.trim();
+    if (!気分) return;
+    押す.disabled = true; 欄.disabled = true;
+    言った.textContent = "聞いています…";
+    const r = await window.mp3.気分でおすすめ({
+      気分, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
+    });
+    押す.disabled = false; 欄.disabled = false;
+    if (!r || !r.ok) { 言った.textContent = "だめでした（" + ((r && r.error) || "不明") + "）"; return; }
+    当てはめる(r.結果);
+  };
+  押す.onclick = 走る;
+  欄.onkeydown = (e) => { if (e.key === "Enter") 走る(); };
+
+  box.append(印, 欄, 押す, 言った);
+}
+
+/**
+ * AI の答えを 3 カラムに当てはめる。
+ *
+ * ★絞り込みを置き換える（足さない）。前の絞り込みが残ったままだと、
+ * 掛け合わせで 0 件になりやすく、「AI が変なものを選んだ」ようにしか見えない。
+ * ★手で直せる状態にして返す。カラムが選ばれた状態になるだけなので、
+ * 気に入らなければ、そのまま押して外せる。
+ */
+function 当てはめる(結果) {
+  const 小 = (v) => String(v).toLocaleLowerCase("ja");
+  sel = {
+    genre: 結果.ジャンル.length ? new Set(結果.ジャンル.map(小)) : null,
+    artist: null, album: null,
+    年: 結果.年.length ? new Set(結果.年.map(小)) : null,
+    月: null, 日: null,
+  };
+  列の起点 = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };
+  列の絞り = { genre: "", artist: "", album: "", 年: "", 月: "", 日: "" };
+  カラムタブ = 結果.ジャンル.length ? "tag" : "date";
+  描き直す();
+
+  const 何曲 = 絞る(3).length;
+  const 選んだ = [...結果.ジャンル, ...結果.年].join(" / ") || "（絞り込みなし）";
+  // ★実在しなかったものは黙らない。AI がそう言ったことは事実なので、出す
+  const 無し = 結果.無かったもの.length ? "／手元に無かったもの: " + 結果.無かったもの.join(", ") : "";
+  const 言った = $("aisaid");
+  if (言った) 言った.textContent = 結果.ひとこと || 選んだ;
+  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}`;
+}
+
 /** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
 function カラムタブの選択数(タブ名) {
   return カラムタブの列[タブ名].reduce((n, 列) => n + (sel[列.key] ? sel[列.key].size : 0), 0);
@@ -1399,6 +1498,7 @@ function 描き直す() {
     列を描く(id, i, 列たち[i]);
   });
   カラムタブを描く();
+  気分の欄を描く();
   タブを描く();
   道具を描く();
   一覧を描く();
@@ -2072,6 +2172,45 @@ $('add').onclick = async () => {
   フォルダを描く(s);
   await 走査する();
 };
+/*
+ * ★キーの出し入れ。ここだけはキーが無くても出しておく（入れる道が要るので）。
+ *
+ * ★入れたキーは画面に持たない。本体へ渡してすぐ捨てる。
+ * 読み返す手立ても作らない（本体側に「返す」窓口を置いていない）。
+ * 画面から読めるようにすると、外から来た文字列で盗める形になりうる。
+ */
+$('aikey').onclick = async () => {
+  const 状態 = await window.mp3.AIが使えるか();
+  if (状態.使える) {
+    if (confirm("APIキーを消しますか？\n\n気分で選ぶ機能が使えなくなります（曲は何も変わりません）。")) {
+      await window.mp3.AIのキーを消す();
+      AIが使える = false;
+      $('aibar').dataset.できている = '';
+      描き直す();
+      $('status').textContent = 'APIキーを消しました';
+    }
+    return;
+  }
+  if (!状態.しまえる) {
+    alert("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。");
+    return;
+  }
+  const キー = prompt(
+    "Anthropic の API キーを入れてください。\n\n"
+    + "・console.anthropic.com で作れます\n"
+    + "・暗号化して、この PC の中だけに保存します\n"
+    + "・送るのは「ジャンル名の一覧」と「打ち込んだ気分の文」だけです\n"
+    + "  曲名もファイルのパスも送りません",
+  );
+  if (!キー) return;
+  const r = await window.mp3.AIのキーを入れる(キー);
+  if (!r.ok) { alert("しまえませんでした: " + r.error); return; }
+  AIが使える = true;
+  $('aibar').dataset.できている = '';
+  描き直す();
+  $('status').textContent = 'APIキーをしまいました。上の欄に気分を書けます';
+};
+
 $('rescan').onclick = () => 走査する(true);   // ★押されたと伝える（動かないときに黙らないため）
 
 /**
@@ -2155,6 +2294,15 @@ $('unhide').onclick = async () => {
 
   // ★覚えた「タグ無しを隠す」を戻す
   タグ無しを隠す = await window.mp3.タグ無しを隠すか();
+  /*
+   * ★AI が使えるかを聞く。**キーが無くても落ちないこと。**
+   * 落ちると、この行より後の起動処理が全部止まる。
+   * 使えないときは、気分の欄が出ないだけにする。
+   */
+  try {
+    const 状態 = await window.mp3.AIが使えるか();
+    AIが使える = !!(状態 && 状態.使える);
+  } catch { AIが使える = false; }
   $('untagged').classList.toggle('on', タグ無しを隠す);
   $('untagged').textContent = タグ無しを隠す ? '🏷 タグ無しを隠す' : '🏷 タグ無しも出す';
 
