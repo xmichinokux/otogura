@@ -525,7 +525,16 @@ console.log('\n[5] AI に渡す一節');
 
 /* ── 6. 実物のファイルがあれば、それでも通す ─────────── */
 const fs = require('node:fs');
-const 実物 = 'C:/Users/（自分）/Downloads/resonance-trees-2026-08-29.json';
+const os = require('node:os');
+const path = require('node:path');
+/*
+ * ★人の家の道を書かない（2026-08-31、公開前の棚卸しで見つけた）。
+ * もとは作者の Downloads を直に書いていた。
+ * 他人の PC では意味が無いうえ、Windows の利用者名まで載ってしまう。
+ * 置き場は環境変数で差せるようにして、既定は自分の Downloads を見る。
+ */
+const 実物 = process.env.OTOGURA_RESONANCE_JSON
+  || path.join(os.homedir(), 'Downloads', 'resonance-trees-2026-08-29.json');
 if (fs.existsSync(実物)) {
   console.log('\n[6] 実物の書き出しで通す');
   const r = 読み込む(fs.readFileSync(実物, 'utf8'));
