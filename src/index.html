@@ -82,6 +82,9 @@
   /* 上の #aibar input が flex:1 なので、つまみだけ幅を決め直す */
   #aibar .knobs input[type=range] { flex: 0 0 96px; min-width: 96px; padding: 0; border: 0; }
   #aibar .knobs .val { min-width: 4.5em; color: var(--text); }
+  /* ★拡大解釈の入／切（2026-08-30）。強度とは別の軸 */
+  #aiwide2 { flex: 0 0 auto; }
+  #aiwide2.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   #aibar .knobs .said { max-width: none; flex: 1; }
   /* ★いま何から組むのか。押す前に見えるところに置く */
   /*
