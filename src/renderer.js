@@ -148,7 +148,15 @@ let 音量 = 1;
  * ★空集合は作らない。最後の 1 つを外したら null（すべて）に戻す。
  * 空のまま残すと、下の一覧が 0 件になって「壊れた」ようにしか見えない。
  */
-let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
+/*
+ * ★「まとめ」は、ジャンル名をまとめた親で絞るための欄（2026-08-30 本人の希望）。
+ *   > ジャンル名が適当に付けられたデータがたくさんあって困ってる
+ *
+ * ★genre とは別の鍵にしてある。同じ鍵にすると、
+ * 隠れているタブの絞り込みも効く作りなので、生の名前と親の名前が
+ * ひとつの欄で衝突して、どちらのタブでも何も出なくなる。
+ */
+let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null, まとめ: null };
 
 /*
  * 3 カラムに何を出すか（2026-08-29 本人の希望）。
@@ -191,6 +199,19 @@ const カラムタブの列 = {
    * カラムに入れれば、いつもの 3 段（絞る・複数選ぶ・打ち込んで探す）が
    * そのまま使える。**新しい操作を覚えなくていい。**
    */
+  /*
+   * ★ジャンルをまとめて見るタブ（2026-08-30 本人の希望）。
+   *
+   * ★作りとしては、tag タブの genre を「親の名前」に差し替えただけ。
+   * 絞り込み・複数選び・打ち込んで探すは、いつもの仕掛けがそのまま効く。
+   * **新しい操作を覚えなくていい**し、AI DJ も響きも、
+   * 組む範囲() が 絞る() を通るので、黙って付いてくる。
+   */
+  まとめ: [
+    { key: 'まとめ', 見出し: 'ジャンル（まとめ）', 取る: (t) => まとめた名(まとめ索引, t.genre) },
+    { key: 'artist', 見出し: 'アーティスト', 取る: (t) => t.artist },
+    { key: 'album', 見出し: 'アルバム', 取る: (t) => t.album },
+  ],
   resonance: [
     { key: '言葉', 見出し: '辿った言葉', 取る: (t) => 響きの印(t, 'keyword') },
     { key: '響演者', 見出し: '演者', 取る: (t) => 響きの印(t, 'artist') },
@@ -217,6 +238,195 @@ const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
  * 「聴きたくない曲」ではなく「不意に流れてほしくない曲」のための仕組み。
  * 消すのではないので、設定に覚えておく（アプリを閉じても残る）。
  */
+/*
+ * ★ジャンル名のまとめ（2026-08-30 本人の希望）。
+ *
+ * ★これは**別の層**。元のジャンル名にも mp3 のタグにも触らない。
+ * 見るときに重ねるだけなので、捨てれば元通りになる。
+ * 実測では 86,044 曲に 98 種類のジャンル名が付いていて、
+ * 荒れ方は打ち間違いではなく**粒の大きさのばらつき**だった。
+ */
+let ジャンルのまとめ = { 組: [], 作った日: '' };
+let まとめ索引 = new Map();
+
+/**
+ * AI のまとめを見てもらう。**押す前に、何がどう変わるかを全部見せる。**
+ *
+ * ★勝手に当てない。ジャンルの区別はこの人が聴くのに使っているもので、
+ * こちらが良かれと思って潰していいものではない。
+ * 親ごとに外せるようにして、外したぶんは元の名前のまま残す。
+ *
+ * @returns 採る組の並び。やめたら null
+ */
+function まとめを見せて訊く(結果) {
+  const box = document.getElementById('ask');
+  if (!box) return Promise.resolve(null);
+  if (訊いている) 訊く欄を閉じる(false);
+
+  const 箱 = box.querySelector('.box');
+  箱.className = 'box wide';
+  const 文 = box.querySelector('.msg');
+  文.innerHTML = '';
+
+  const 見出し = document.createElement('div');
+  const 曲の合計 = 結果.組.reduce((a, c) => a + c.曲数, 0);
+  見出し.textContent = `AI が ${結果.組.length} 組にまとめました（${曲の合計.toLocaleString('ja-JP')} 曲ぶん）。`
+    + String.fromCharCode(10) + '要らない組はチェックを外してください。外したものは元の名前のまま残ります。';
+  文.appendChild(見出し);
+
+  const 並び = document.createElement('div');
+  並び.className = 'groups';
+  const 印たち = [];
+  for (const c of 結果.組) {
+    const l = document.createElement('label');
+    const 印 = document.createElement('input');
+    印.type = 'checkbox';
+    印.checked = true;
+    印たち.push([印, c]);
+    const 親 = document.createElement('span');
+    親.className = 'oya';
+    親.textContent = ' ' + c.親 + ' ';
+    const 数 = document.createElement('span');
+    数.className = 'kazu';
+    数.textContent = `（${c.子.length} 個 / ${c.曲数.toLocaleString('ja-JP')} 曲）`;
+    const 子 = document.createElement('span');
+    子.className = 'ko';
+    子.textContent = c.子.join('、');
+    l.append(印, 親, 数, 子);
+    if (c.訳) {
+      const 訳 = document.createElement('span');
+      訳.className = 'wake';
+      訳.textContent = c.訳;
+      l.appendChild(訳);
+    }
+    並び.appendChild(l);
+  }
+  文.appendChild(並び);
+
+  /*
+   * ★まとめなかったものと、落としたものを必ず出す。
+   * 黙って減っていると、どこへ行ったのか分からなくなる。
+   */
+  const 添え = document.createElement('div');
+  添え.className = 'said';
+  const 言い分 = [];
+  if (結果.残り.length) 言い分.push(`まとめなかった名前 ${結果.残り.length} 個は、そのまま残ります`);
+  const 落 = 結果.落とした || {};
+  if (落.手元に無い && 落.手元に無い.length) {
+    言い分.push(`AI が挙げた ${落.手元に無い.length} 個は手元に無い名前だったので外しました`);
+  }
+  if (落.二重 && 落.二重.length) 言い分.push(`${落.二重.length} 個は二重だったので先の組に入れました`);
+  添え.textContent = 言い分.join('。');
+  if (言い分.length) 文.appendChild(添え);
+
+  const 行 = box.querySelector('.row');
+  行.innerHTML = '';
+  const 作る = (札, 答, 主) => {
+    const b = document.createElement('button');
+    b.textContent = 札;
+    if (主) b.className = 'main';
+    b.onclick = () => {
+      箱.className = 'box';
+      訊く欄を閉じる(答);
+    };
+    行.appendChild(b);
+    return b;
+  };
+  作る('やめる', false, false);
+  const はい = 作る('これでまとめる', true, true);
+  setTimeout(() => はい.focus(), 0);
+
+  const 出来 = new Promise((決着) => { 訊いている = 決着; });
+  box.className = 'on';
+  return 出来.then((答) => {
+    箱.className = 'box';
+    if (!答) return null;
+    return 印たち.filter(([印]) => 印.checked).map(([, c]) => c);
+  });
+}
+
+/**
+ * ジャンル名を AI にまとめさせる（2026-08-30 本人の希望）。
+ *   > ジャンル名が適当に付けられたデータがたくさんあって困ってるんですが、
+ *   > AI がいい感じにまとめてくれる機能って作れますか？
+ *
+ * ★送るのは**ジャンル名と曲数だけ**。曲は 1 曲も送らない。
+ * ★元のジャンル名にも mp3 のタグにも触らない。まとめは別の層。
+ */
+async function ジャンルをまとめる(言った) {
+  /*
+   * ★数えるのは「いま見えている曲」全部から。
+   * カラムで絞っていると、その中のジャンルしか出てこない。
+   * まとめるのは蔵書ぜんぶの話なので、絞りを通さない。
+   */
+  const 一覧 = ジャンルを数える(見える曲());
+  if (!一覧.length) {
+    知らせる('まとめられるジャンル名がありません。先にフォルダを走査してください。');
+    return;
+  }
+
+  言った.textContent = `${一覧.length} 種類のジャンル名をまとめています…`;
+  const r = await window.mp3.ジャンルをまとめさせる(
+    一覧.map((g) => ({ 名: g.名, 鍵: g.鍵, 曲数: g.曲数 })),
+  );
+  if (!r || !r.ok) {
+    言った.textContent = 'だめでした';
+    $('status').textContent = '⚠ まとめられませんでした: ' + ((r && r.error) || '不明');
+    return;
+  }
+  if (!r.組.length) {
+    言った.textContent = '';
+    知らせる('まとめられる組が見つかりませんでした。いまのままで十分ばらけていないようです。');
+    return;
+  }
+
+  言った.textContent = '';
+  const 採る = await まとめを見せて訊く(r);
+  if (!採る || !採る.length) {
+    $('status').textContent = 'ジャンルのまとめはやめました（何も変わっていません）';
+    return;
+  }
+
+  const 覚え = {
+    組: 採る.map((c) => ({ 親: c.親, 子: c.子, 訳: c.訳 })),
+    作った日: new Date().toISOString().slice(0, 10),
+  };
+  const 返り = await window.mp3.ジャンルのまとめを覚える(覚え);
+  if (!返り || !返り.ok) {
+    $('status').textContent = '⚠ まとめを覚えられませんでした';
+    return;
+  }
+  まとめを入れる(返り.ジャンルのまとめ);
+  /* ★まとめたら、そのタブを開いて見せる。押した結果がその場で見えないと分からない */
+  カラムタブ = 'まとめ';
+  sel = { ...sel, まとめ: null };
+  描き直す();
+  const 曲 = 採る.reduce((a, c) => a + c.曲数, 0);
+  $('status').textContent = `ジャンルを ${採る.length} 組にまとめました`
+    + `（${曲.toLocaleString('ja-JP')} 曲ぶん）。元のジャンル名はそのまま残っています`;
+}
+
+/**
+ * まとめの有無に合わせて、2 つのボタンを直す。
+ *
+ * ★AI の欄は「形（none/mood/key）が変わったときだけ」作り直す作りなので、
+ * まとめただけでは札が古いままになる。描き直すたびにここで直す。
+ */
+function まとめのボタンを直す() {
+  const 組む = $('aigenre');
+  if (組む) {
+    組む.textContent = ジャンルのまとめ.組.length ? 'ジャンル名をまとめ直す' : 'ジャンル名をまとめる';
+  }
+  const やめ = $('aigenreoff');
+  if (やめ) やめ.style.display = ジャンルのまとめ.組.length ? '' : 'none';
+}
+
+/** まとめを入れ替えて、索引を作り直す */
+function まとめを入れる(v) {
+  ジャンルのまとめ = ジャンルのまとめを整える(v);
+  まとめ索引 = ジャンルの索引を作る(ジャンルのまとめ);
+}
+
 let シャッフル除外 = new Set();
 
 /** Shift の範囲選択で使う、直前に押した位置（列ごと） */
@@ -745,7 +955,7 @@ function 組む範囲を書く() {
     }
   }
   const 見せる = (k, v) => (字面[k] && 字面[k].get(v)) || v;
-  const 名 = { genre: "ジャンル", artist: "アーティスト", album: "アルバム", 年: "年", 月: "月", 日: "日", 言葉: "言葉", 響演者: "演者", 響盤: "盤" };
+  const 名 = { genre: "ジャンル", artist: "アーティスト", album: "アルバム", 年: "年", 月: "月", 日: "日", 言葉: "言葉", 響演者: "演者", 響盤: "盤", まとめ: "ジャンル（まとめ）" };
   const 絞り = Object.entries(sel)
     .filter(([, v]) => v)
     .map(([k, v]) => `${名[k] || k}: ${[...v].slice(0, 3).map((x) => 見せる(k, x)).join("・")}${v.size > 3 ? `ほか${v.size - 3}` : ""}`);
@@ -1576,11 +1786,30 @@ function 気分の欄を描く() {
   辿る.className = "btn"; 辿る.id = "restreego"; 辿る.textContent = "辿る";
   辿る.title = "その言葉から辿れる音楽を探し、手元にあったものを響きタブに集めます（一本は組みません）";
 
+  /* ── ジャンル名をまとめる（2026-08-30 本人の希望） ── */
+  const 印3 = document.createElement("span");
+  印3.textContent = "🏷";
+  const まとめる押す = document.createElement("button");
+  まとめる押す.className = "btn"; まとめる押す.id = "aigenre";
+  まとめる押す.textContent = ジャンルのまとめ.組.length ? "ジャンル名をまとめ直す" : "ジャンル名をまとめる";
+  まとめる押す.title = "散らかったジャンル名を、見て回りやすい大きさにまとめます（元の名前も mp3 のタグも変えません）";
+
+  /*
+   * ★捨てるボタン。まとめてあるときだけ出す。
+   * 元のジャンル名は無傷なので、これを押せば**完全に元通り**になる。
+   * 捨てられない仕掛けは「別の層」とは言えない。ここは必ず要る。
+   */
+  const やめる押す = document.createElement("button");
+  やめる押す.className = "btn"; やめる押す.id = "aigenreoff";
+  やめる押す.textContent = "まとめをやめる";
+  やめる押す.title = "まとめを捨てて、元のジャンル名だけに戻します";
+  やめる押す.style.display = ジャンルのまとめ.組.length ? "" : "none";
+
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
   const 止める = (と) => {
-    for (const e of [押す, 欄, 辿る, 欄2]) e.disabled = と;
+    for (const e of [押す, 欄, 辿る, 欄2, まとめる押す, やめる押す]) e.disabled = と;
     // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
     // 動かせるままだと「効かなかった」と見えるので、いっしょに止める
     for (const id of ["aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = と; }
@@ -1625,7 +1854,7 @@ function 気分の欄を描く() {
         if (欄い) 欄い.value = "";
       }
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = false; }
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre"]) { const e = $(id); if (e) e.disabled = false; }
     }
   };
 
@@ -1684,12 +1913,38 @@ function 気分の欄を描く() {
     }
   };
 
+  /* ★まとめている間も、ほかの 2 つと同じように止める（二重に走らせない） */
+  const まとめて = async () => {
+    止める(true);
+    try {
+      await ジャンルをまとめる($("aisaid") || 言った);
+    } finally {
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre"]) {
+        const e = $(id); if (e) e.disabled = false;
+      }
+    }
+  };
+
   押す.onclick = 気分で;
   辿る.onclick = 辿って;
+  まとめる押す.onclick = まとめて;
+  やめる押す.onclick = async () => {
+    if (!(await 訊く(
+      `ジャンルのまとめ（${ジャンルのまとめ.組.length} 組）を捨てます。` + String.fromCharCode(10)
+      + '元のジャンル名はそのまま残っているので、完全に元通りになります。',
+      true,
+    ))) return;
+    await window.mp3.ジャンルのまとめを捨てる();
+    まとめを入れる({ 組: [] });
+    if (カラムタブ === 'まとめ') カラムタブ = 'tag';
+    sel = { ...sel, まとめ: null };
+    描き直す();
+    $('status').textContent = 'ジャンルのまとめを捨てました（元のジャンル名に戻っています）';
+  };
   欄.onkeydown = (e) => { if (e.key === "Enter") 気分で(); };
   欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
 
-  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 言った);
+  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 印3, まとめる押す, やめる押す, 言った);
   // ★つまみは 2 段目に置く。1 行に並べると、記入欄が押しつぶされる
   const つまみ = つまみの行();
   if (つまみ) box.append(つまみ);
@@ -1744,6 +1999,11 @@ function カラムタブを描く() {
     ['tag', 'ジャンル / アーティスト / アルバム'],
     ['date', '日付（年 / 月 / 日）'],
   ];
+  /*
+   * ★まとめのタブは、まとめてあるときだけ出す。
+   * 何もまとめていないと、ジャンルの列と同じものが並ぶだけになる。
+   */
+  if (ジャンルのまとめ.組.length) 札.push(['まとめ', `🏷 ジャンル（まとめ ${ジャンルのまとめ.組.length} 組）`]);
   // ★響きのタブは、辿ったものがあるときだけ出す（無いと空の列を見せるだけになる）
   if (響きの当たり && 響きの当たり.曲.size) 札.push(['resonance', `🌐 響き（${響きの当たり.当たり.length} 組）`]);
   for (const [名, 表示] of 札) {
@@ -2945,6 +3205,7 @@ function 描き直す() {
   キーのボタンを直す();
   気分の欄を描く();
   組む範囲を書く();          // ★カラムを変えるたびに書き換える
+  まとめのボタンを直す();    // ★まとめの有無で、札と出し隠しが変わる
   響きの欄を描く();
   タブを描く();
   道具を描く();
@@ -3867,6 +4128,8 @@ $('unhide').onclick = async () => {
 
   // ★覚えた「タグ無しを隠す」を戻す
   タグ無しを隠す = await window.mp3.タグ無しを隠すか();
+  // ★覚えたジャンルのまとめを戻す（無ければ空のまま。タブも出ない）
+  まとめを入れる(s.ジャンルのまとめ);
   /*
    * ★AI が使えるかを聞く。**キーが無くても落ちないこと。**
    * 落ちると、この行より後の起動処理が全部止まる。

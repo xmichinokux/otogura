@@ -193,6 +193,18 @@
     border: 1px solid var(--line); background: #fff; cursor: pointer; }
   #ask button.main { background: var(--accent); border-color: var(--accent); color: #fff; }
   #ask button:hover { filter: brightness(.97); }
+  /* ★ジャンルのまとめを見てもらうところ（2026-08-30） */
+  #ask .box.wide { max-width: 780px; width: 92vw; }
+  #ask .groups { text-align: left; font-size: 12px; overflow-y: auto; max-height: 52vh;
+    border: 1px solid var(--line); border-radius: 6px; }
+  #ask .groups label { display: block; padding: 7px 10px; border-bottom: 1px solid var(--line);
+    cursor: pointer; line-height: 1.6; }
+  #ask .groups label:last-child { border-bottom: 0; }
+  #ask .groups label:hover { background: var(--accent-bg); }
+  #ask .groups .oya { font-weight: 600; }
+  #ask .groups .kazu { color: var(--dim); }
+  #ask .groups .ko { color: var(--dim); display: block; padding-left: 22px; }
+  #ask .groups .wake { color: var(--dim); display: block; padding-left: 22px; font-style: italic; }
 
   /* 下端: フォルダ設定と状態 */
   #foot {
@@ -377,6 +389,7 @@
 
 <audio id="audio"></audio>
 <script src="shuffle.js"></script>
+<script src="genre.js"></script>
 <script src="resonance.js"></script>
 <script src="loudness.js"></script>
 <script src="renderer.js"></script>

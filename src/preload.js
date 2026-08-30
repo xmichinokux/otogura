@@ -48,6 +48,15 @@ contextBridge.exposeInMainWorld('mp3', {
   // ★音蔵の中で木を生やす（Resonance が無くても使える）
   木を生やす: (手がかり) => ipcRenderer.invoke('ai:tree', 手がかり),
   木の大きさ: () => ipcRenderer.invoke('ai:treeSizes'),
+
+  /*
+   * ★ジャンル名のまとめ（2026-08-30 本人の希望）。
+   * 渡すのは**ジャンル名と曲数だけ**。曲は 1 曲も渡らない。
+   * 覚えるのは別の層で、元のジャンル名にも mp3 のタグにも触らない。
+   */
+  ジャンルをまとめさせる: (一覧) => ipcRenderer.invoke('genre:group', 一覧),
+  ジャンルのまとめを覚える: (まとめ) => ipcRenderer.invoke('genre:save', まとめ),
+  ジャンルのまとめを捨てる: () => ipcRenderer.invoke('genre:forget'),
   // 辿った言葉ごとに、名前を変える／消す
   響きの名前を変える: (旧, 新) => ipcRenderer.invoke('resonance:rename', 旧, 新),
   響きをひとつ消す: (言葉) => ipcRenderer.invoke('resonance:remove', 言葉),

@@ -1,5 +1,7 @@
 'use strict';
 
+const genre = require('./genre');
+
 /**
  * 気分を言うと、聴くものを絞り込んでくれるところ。
  *
@@ -899,4 +901,75 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
   }
 }
 
-module.exports = { 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };
+/**
+ * ジャンル名をまとめさせる（2026-08-30 本人の希望）。
+ *   > ジャンル名が適当に付けられたデータがたくさんあって困ってるんですが、
+ *   > AI がいい感じにまとめてくれる機能って作れますか？
+ *
+ * ★これは「一覧から選ぶ」仕事ではなく「見て判断する」仕事なので effort を medium にした。
+ * 気分やプレイリストは決まった中から選ぶだけなので low でよい。
+ * こちらは、名前を見てどの系統かを当てる仕事で、浅く考えると
+ * 字面の似たものだけを寄せて、意味の近いものを取りこぼす。
+ *
+ * ★送るのは**ジャンル名と曲数だけ**。曲は 1 曲も送らない。
+ * 実測（86,044 曲・98 種類）で 1,448 文字 ≒ 414 トークン。一度に渡しきれる。
+ */
+async function ジャンルをまとめさせる({ キー, 一覧 }) {
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  if (!Array.isArray(一覧) || !一覧.length) {
+    return { ok: false, error: 'まとめるジャンルがありません' };
+  }
+
+  let Anthropic; let z; let zodOutputFormat;
+  try {
+    Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+    ({ z } = require('zod'));
+    ({ zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod'));
+  } catch {
+    return { ok: false, error: 'AI の部品が読み込めません' };
+  }
+
+  const かたち = z.object({
+    組: z.array(z.object({
+      親: z.string(),
+      子: z.array(z.string()),
+      訳: z.string(),
+    })),
+  });
+
+  try {
+    const client = new Anthropic({ apiKey: キー });
+    /*
+     * ★返事の上限。考えたぶんもここに含まれる。
+     * 名前 1 つにつき、親の名前・訳・並びで 80 トークンほど見ておく。
+     * 98 種類で 7,840 ＋ 考えるぶん 16,000 ＝ 23,840。
+     * ★21,333 を超えるので、流し込みで受けないと SDK に断られる。
+     */
+    const 返り = await client.messages.stream({
+      model: 使うモデル,
+      max_tokens: Math.max(16000, 一覧.length * 80 + 16000),
+      system: genre.ジャンルの頼み文(一覧),
+      messages: [{ role: 'user', content: 'まとめてください。' }],
+      output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
+    }).finalMessage();
+
+    if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
+    if (返り.stop_reason === 'max_tokens') {
+      return { ok: false, error: '返事が長すぎて切れました。もう一度お試しください' };
+    }
+    const 出 = 返り.parsed_output;
+    if (!出 || !Array.isArray(出.組)) {
+      return { ok: false, error: 'AI の返事を読み取れませんでした' };
+    }
+
+    /*
+     * ★手元に無い名前を返してくることがある。ここで必ず濾す。
+     * 落としたものは黙って捨てず、画面に出せるよう一緒に返す。
+     */
+    const 整えた = genre.ジャンルの返事を整える(出, 一覧);
+    return { ok: true, ...整えた };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+module.exports = { ジャンルをまとめさせる, 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };

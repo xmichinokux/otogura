@@ -26,8 +26,9 @@ const fs = require('node:fs/promises');
 const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む, 名前を安全に, 持ち出すm3u } = require('./playlists');
 const { タグを書く } = require('./tags');
+const genre = require('./genre');
 const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
-  目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる } = require('./ai');
+  目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる, ジャンルをまとめさせる } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
@@ -51,7 +52,7 @@ app.setName('Otogura');
 /** 設定（スキャン対象フォルダ・一覧から外した曲）の置き場 */
 const 設定ファイル = () => path.join(app.getPath('userData'), 'settings.json');
 
-const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 } };
+const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 }, ジャンルのまとめ: { 組: [], 作った日: '' } };
 
 /** 1〜5 に丸める。数でないものは真ん中に */
 function 目盛ひとつ(v) {
@@ -103,6 +104,15 @@ async function 設定を読む() {
        * 範囲の外は黙って真ん中に寄せる。人が手で書き換えても壊れないように。
        */
       AIの目盛: 目盛を整える(v.AIの目盛),
+      /*
+       * ★ジャンル名のまとめ（2026-08-30 本人の希望）。
+       *   > ジャンル名が適当に付けられたデータがたくさんあって困ってる
+       *
+       * ★これは**別の層**。元のジャンル名にも mp3 のタグにも触らない。
+       * 見るときに重ねるだけなので、捨てれば元通りになる。
+       * 人の手でも直せる場所なので、読むたびに整える。
+       */
+      ジャンルのまとめ: genre.ジャンルのまとめを整える(v.ジャンルのまとめ),
     };
   } catch {
     return { ...既定の設定 };
@@ -396,6 +406,44 @@ ipcMain.handle('resonance:get', async () => {
  * 形をそろえてあるので（ai.js の 木を生やす を参照）、
  * この先はまったく同じ道を通る。分けると片方だけ直す事故になる。
  */
+/* ── ジャンル名のまとめ ─────────────────────────────────
+   ★元のジャンル名にも mp3 のタグにも触らない。覚え書きに別の層として置くだけ。
+   気に入らなければ genre:forget で捨てれば、元通りになる。 */
+
+ipcMain.handle('genre:group', async (_e, 一覧) => {
+  const キー = await キーを読む();
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  /*
+   * ★渡ってくるのは**ジャンル名と曲数だけ**。曲は 1 曲も送らない。
+   * 画面が数えたものをそのまま使う（本体でもう一度 86,044 曲を回さない）。
+   */
+  const 綺麗 = (Array.isArray(一覧) ? 一覧 : [])
+    .filter((g) => g && typeof g.名 === 'string' && g.名.trim())
+    .map((g) => ({
+      名: String(g.名).trim(),
+      鍵: String(g.鍵 || g.名).toLocaleLowerCase('ja').trim(),
+      曲数: Number.isFinite(g.曲数) ? g.曲数 : 0,
+    }));
+  if (!綺麗.length) return { ok: false, error: 'まとめるジャンルがありません' };
+  return ジャンルをまとめさせる({ キー, 一覧: 綺麗 });
+});
+
+/** まとめを覚える（本人が見て、要らない親を外したあとのもの） */
+ipcMain.handle('genre:save', async (_e, まとめ) => {
+  const s = await 設定を読む();
+  s.ジャンルのまとめ = genre.ジャンルのまとめを整える(まとめ);
+  await 設定を書く(s);
+  return { ok: true, ジャンルのまとめ: s.ジャンルのまとめ };
+});
+
+/** まとめを捨てる（★元のジャンル名は無傷なので、これで完全に元通りになる） */
+ipcMain.handle('genre:forget', async () => {
+  const s = await 設定を読む();
+  s.ジャンルのまとめ = { 組: [], 作った日: '' };
+  await 設定を書く(s);
+  return { ok: true };
+});
+
 ipcMain.handle('ai:tree', async (_e, 手がかり) => {
   const キー = await キーを読む();
   if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
