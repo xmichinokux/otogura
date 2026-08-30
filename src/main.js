@@ -28,6 +28,7 @@ const { 掃除する, m3uにする, m3uを読む, 名前を安全に, 持ち出�
 const { タグを書く } = require('./tags');
 const genre = require('./genre');
 const naoshi = require('./naoshi');
+const lang = require('./lang');
 const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
   目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる, ジャンルをまとめさせる, ジャンルを埋めさせる, 中断する } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
@@ -53,7 +54,7 @@ app.setName('Otogura');
 /** 設定（スキャン対象フォルダ・一覧から外した曲）の置き場 */
 const 設定ファイル = () => path.join(app.getPath('userData'), 'settings.json');
 
-const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 }, ジャンルのまとめ: { 組: [], 作った日: '' }, 自分の音源: [] };
+const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 }, ジャンルのまとめ: { 組: [], 作った日: '' }, 自分の音源: [], 言語: 'auto' };
 
 /** 1〜5 に丸める。数でないものは真ん中に */
 function 目盛ひとつ(v) {
@@ -125,6 +126,13 @@ async function 設定を読む() {
        * 人の手でも直せる場所なので、読むたびに整える。
        */
       ジャンルのまとめ: genre.ジャンルのまとめを整える(v.ジャンルのまとめ),
+      /*
+       * ★画面の言葉（2026-08-30 本人の希望）。
+       *   'auto' … OS の言葉を見て決める（既定）
+       *   'ja' / 'en' … 手で選んだとき
+       * ★自動と手動の両方が要る、というのが本人の指定。
+       */
+      言語: (v.言語 === 'ja' || v.言語 === 'en') ? v.言語 : 'auto',
       /*
        * ★自分の音源の演者名（2026-08-30 本人の話）。
        *   > 自分のバンド1 は僕のバンドで作曲途中のデータがたくさんあって
@@ -277,6 +285,11 @@ if (!一つだけ) {
   });
 
   app.whenReady().then(async () => {
+  /* ★本体側の言葉も決めておく。AI への頼み文がこれを見る */
+  try {
+    const s = await 設定を読む();
+    lang.言葉を入れる(lang.言葉を決める(s.言語, app.getLocale()));
+  } catch { /* 読めなくても既定（日本語）で動く */ }
     引っ越しの結果 = await 引っ越す();
     ウィンドウを作る();
     app.on('activate', () => {
@@ -473,6 +486,27 @@ ipcMain.handle('resonance:get', async () => {
  * ★止めても、それまでに使ったぶんは請求される。
  * だから「止めた＝ただになる」とは言わない。**途中で切るだけ。**
  */
+/*
+ * ★画面の言葉（2026-08-30 本人の希望）。
+ * OS の言葉を見て自動で切り替えたうえで、手動でも切り替えられる。
+ */
+ipcMain.handle('lang:get', async () => {
+  const s = await 設定を読む();
+  const 決めた = lang.言葉を決める(s.言語, app.getLocale());
+  lang.言葉を入れる(決めた);
+  return { 設定: s.言語, いま: 決めた, OS: app.getLocale() };
+});
+
+ipcMain.handle('lang:set', async (_e, v) => {
+  const 次 = (v === 'ja' || v === 'en' || v === 'auto') ? v : 'auto';
+  const s = await 設定を読む();
+  s.言語 = 次;
+  await 設定を書く(s);
+  const 決めた = lang.言葉を決める(次, app.getLocale());
+  lang.言葉を入れる(決めた);
+  return { 設定: 次, いま: 決めた, OS: app.getLocale() };
+});
+
 ipcMain.handle('ai:cancel', async () => ({ ok: true, 止めた: 中断する() }));
 
 ipcMain.handle('hist:get', async () => 履歴を読む());

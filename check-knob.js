@@ -285,6 +285,10 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
       作られたもの.push(e);
       return e;
     };
+    /* ★言葉（2026-08-30）。ここでは日本語のまま返す */
+    const 言 = (文, 差し込み) => { let t = String(文 ?? ""); if (差し込み) for (const [k, v] of Object.entries(差し込み)) t = t.split("{"+k+"}").join(String(v)); return t; };
+    const いまの = () => "ja";
+    void 言; void いまの;
     const document = { createElement: () => 要素() };
     const $ = () => null;
     let 覚えた = null;

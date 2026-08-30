@@ -381,7 +381,7 @@ async function ジャンルをまとめる(言った) {
   );
   if (!r || !r.ok) {
     if (止めたか(r, 言った)) return;
-    言った.textContent = 'だめでした';
+    言った.textContent = 言("だめでした");
     $('status').textContent = '⚠ まとめられませんでした: ' + ((r && r.error) || '不明');
     return;
   }
@@ -431,13 +431,41 @@ function まとめのボタンを直す() {
     if (e) e.style.display = 件 ? '' : 'none';
   }
   const 捨 = $('naoshioff');
-  if (捨 && 件) 捨.textContent = `手直しを捨てる（${件.toLocaleString('ja-JP')} 曲）`;
+  if (捨 && 件) 捨.textContent = 言('手直しを捨てる（{n} 曲）', { n: 件.toLocaleString('ja-JP') });
   const 組む = $('aigenre');
   if (組む) {
-    組む.textContent = ジャンルのまとめ.組.length ? 'ジャンル名をまとめ直す' : 'ジャンル名をまとめる';
+    組む.textContent = 言(ジャンルのまとめ.組.length ? 'ジャンル名をまとめ直す' : 'ジャンル名をまとめる');
   }
   const やめ = $('aigenreoff');
   if (やめ) やめ.style.display = ジャンルのまとめ.組.length ? '' : 'none';
+}
+
+/*
+ * ★画面の言葉（2026-08-30 本人の希望）。
+ *   > OS言語を見て自動で切り替えたうえで手動でも切り替えたいです
+ *
+ * 設定は 'auto' / 'ja' / 'en'。いまの言葉は 'ja' か 'en'。
+ * ★訳が無いものは日本語のまま出る（lang.js を参照）。少しずつ進められる。
+ */
+let 言葉の設定 = 'auto';
+
+/** 🌐 の札を、いまの言葉に合わせる */
+function 言葉のボタンを直す() {
+  const b = $('langbtn');
+  if (!b) return;
+  /*
+   * ★札には**設定そのもの**を出す。
+   * 「自動」から「日本語」へ移ったとき、日本語の OS では見た目が変わらないので、
+   * 中身だけ変えると「押しても何も起きない」ように見える。
+   */
+  const 札 = {
+    auto: いまの() === 'ja' ? '🌐 自動（日本語）' : '🌐 Auto (English)',
+    ja: '🌐 日本語', en: '🌐 English',
+  };
+  b.textContent = 札[言葉の設定] || 札.auto;
+  b.title = 言葉の設定 === 'auto'
+    ? '画面と AI の言葉。いまは OS に合わせています（押すと 自動→日本語→English）'
+    : '画面と AI の言葉（押すと 自動→日本語→English）';
 }
 
 /** 手直しの控え（★消せる別ファイル『手直し.json』に残してある） */
@@ -475,7 +503,7 @@ async function ジャンルを埋める(言った) {
     );
     if (!r || !r.ok) {
       if (止めたか(r, 言った)) return;
-      言った.textContent = 'だめでした';
+      言った.textContent = 言("だめでした");
       $('status').textContent = '⚠ 振り分けられませんでした: ' + ((r && r.error) || '不明');
       /* ★AI がだめでも、手元で決まったぶんは活かす */
       if (!決まった.length) return;
@@ -1211,7 +1239,7 @@ function つまみの行() {
   広げる.className = "btn"; 広げる.id = "aiwide2";
   const 広げる札 = () => {
     const 入 = AIのつまみ.目盛.拡大解釈 === true;
-    広げる.textContent = 入 ? "🌀 拡大解釈 入" : "🌀 拡大解釈 切";
+    広げる.textContent = 言(入 ? "🌀 拡大解釈 入" : "🌀 拡大解釈 切");
     広げる.classList.toggle("on", 入);
     広げる.title = 入
       ? "後半は遠くの文脈まで飛びます。飛んだ先で何を選ぶかは、文脈の強度が決めます"
@@ -1242,18 +1270,18 @@ function つまみの行() {
    *
    * ★名前は title に残す。つまみに触れば出る。
    */
-  幅棒.title = "対象の幅 ― どれだけ広い範囲から選ぶか";
-  量棒.title = "選出の量 ― 何曲の一本にするか";
-  強棒.title = "文脈の強度 ― 王道を守るか、外すか";
+  幅棒.title = 言("対象の幅 ― どれだけ広い範囲から選ぶか");
+  量棒.title = 言("選出の量 ― 何曲の一本にするか");
+  強棒.title = 言("文脈の強度 ― 王道を守るか、外すか");
 
-  const 端 = (文) => 字(文, "edge");
+  const 端 = (文) => 字(言(文), "edge");   // ★訳済みの文はそのまま通る（鍵が無ければ素通し）
   const 段 = AIのつまみ;
   /* ★量だけは札（少なめ）ではなく曲数。そのほうが具体的で、本人もそう挙げていた */
   const 尾 = (段たち) => 段たち[段たち.length - 1];
   const 幅の左 = 段.幅の段[0].札;
   const 幅の右 = 尾(段.幅の段).札;
-  const 量の左 = `${段.量の段[0].曲数} 曲`;
-  const 量の右 = `${尾(段.量の段).曲数} 曲`;
+  const 量の左 = 言('{n} 曲', { n: 段.量の段[0].曲数 });
+  const 量の右 = 言('{n} 曲', { n: 尾(段.量の段).曲数 });
   const 強の左 = 段.強度の段[0].札;
   const 強の右 = 尾(段.強度の段).札;
 
@@ -1618,7 +1646,7 @@ async function AIに一本組ませる(気分, 言った) {
   if (!r || !r.ok) {
     const 訳 = (r && r.error) || '不明';
     if (止めたか(r, 言った)) return false;
-    言った.textContent = 'だめでした';
+    言った.textContent = 言("だめでした");
     $('status').textContent = '⚠ 一本を組めませんでした: ' + 訳;
     return false;
   }
@@ -1864,7 +1892,7 @@ async function 木を生やして足す(言葉, 言った) {
      */
     const 訳 = (r && r.error) || "不明";
     if (止めたか(r, 言った)) return false;
-    言った.textContent = "だめでした";
+    言った.textContent = 言("だめでした");
     $("status").textContent = "⚠ 辿れませんでした: " + 訳;
     return false;
   }
@@ -2286,11 +2314,11 @@ function 気分の欄を描く() {
   const 欄 = document.createElement("input");
   欄.id = "aiword";
   // ★具体例は書かない（公開するので、作者の好みが出てしまう）
-  欄.placeholder = "いまの気分を書く";
+  欄.placeholder = 言("いまの気分を書く");
   欄.value = 打ちかけの言葉;
   欄.oninput = () => { 打ちかけの言葉 = 欄.value; };
   const 押す = document.createElement("button");
-  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = "一本を組む";
+  押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = 言("一本を組む");
   押す.title = "書いた気分に合うジャンルに絞って、そこから 30 曲の一本を組みます";
 
   /* ── 言葉から辿る ── */
@@ -2298,11 +2326,11 @@ function 気分の欄を描く() {
   印2.textContent = "🌱";
   const 欄2 = document.createElement("input");
   欄2.id = "restree";
-  欄2.placeholder = "言葉を 1 つ入れて辿る";
+  欄2.placeholder = 言("言葉を 1 つ入れて辿る");
   欄2.value = 打ちかけの辿る言葉;
   欄2.oninput = () => { 打ちかけの辿る言葉 = 欄2.value; };
   const 辿る = document.createElement("button");
-  辿る.className = "btn"; 辿る.id = "restreego"; 辿る.textContent = "辿る";
+  辿る.className = "btn"; 辿る.id = "restreego"; 辿る.textContent = 言("辿る");
   辿る.title = "その言葉から辿れる音楽を探し、手元にあったものを響きタブに集めます（一本は組みません）";
 
   /* ── ジャンル名をまとめる（2026-08-30 本人の希望） ── */
@@ -2310,7 +2338,7 @@ function 気分の欄を描く() {
   印3.textContent = "🏷";
   const まとめる押す = document.createElement("button");
   まとめる押す.className = "btn"; まとめる押す.id = "aigenre";
-  まとめる押す.textContent = ジャンルのまとめ.組.length ? "ジャンル名をまとめ直す" : "ジャンル名をまとめる";
+  まとめる押す.textContent = 言(ジャンルのまとめ.組.length ? "ジャンル名をまとめ直す" : "ジャンル名をまとめる");
   まとめる押す.title = "散らかったジャンル名を、見て回りやすい大きさにまとめます（元の名前も mp3 のタグも変えません）";
 
   /*
@@ -2320,7 +2348,7 @@ function 気分の欄を描く() {
    */
   const やめる押す = document.createElement("button");
   やめる押す.className = "btn"; やめる押す.id = "aigenreoff";
-  やめる押す.textContent = "まとめをやめる";
+  やめる押す.textContent = 言("まとめをやめる");
   やめる押す.title = "まとめを捨てて、元のジャンル名だけに戻します";
   やめる押す.style.display = ジャンルのまとめ.組.length ? "" : "none";
 
@@ -2334,20 +2362,20 @@ function 気分の欄を描く() {
    */
   const 手直し見る = document.createElement("button");
   手直し見る.className = "btn"; 手直し見る.id = "naoshishow";
-  手直し見る.textContent = "手直しを見る";
+  手直し見る.textContent = 言("手直しを見る");
   手直し見る.title = "手直し.json のある場所を開きます（中を見て、直したり消したりできます）";
   手直し見る.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
 
   const 手直し捨てる = document.createElement("button");
   手直し捨てる.className = "btn"; 手直し捨てる.id = "naoshioff";
-  手直し捨てる.textContent = "手直しを捨てる";
+  手直し捨てる.textContent = 言("手直しを捨てる");
   手直し捨てる.title = "手直しを丸ごと消して、元のジャンルに戻します";
   手直し捨てる.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
 
   /* ── ジャンルの付いていない曲を埋める（2026-08-30 本人の希望） ── */
   const 埋める押す = document.createElement("button");
   埋める押す.className = "btn"; 埋める押す.id = "aifill";
-  埋める押す.textContent = "ジャンル名無しを埋める";
+  埋める押す.textContent = 言("ジャンル名無しを埋める");
   埋める押す.title = "ジャンルの付いていない曲に、ジャンルを入れます（まず手元で決め、決まらないぶんだけ AI に訊きます。手直し.json に残るので消せば元通り）";
 
   /*
@@ -2364,12 +2392,12 @@ function 気分の欄を描く() {
 
   const 道具ボタン = document.createElement("button");
   道具ボタン.className = "btn toolsbtn"; 道具ボタン.id = "aitoolsbtn";
-  道具ボタン.textContent = 道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼";
+  道具ボタン.textContent = 言(道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼");
   道具ボタン.title = "ジャンル名をまとめる・ジャンル名無しを埋める・手直しの出し入れ";
   道具ボタン.onclick = () => {
     道具箱を開いている = !道具箱を開いている;
     道具箱.classList.toggle("on", 道具箱を開いている);
-    道具ボタン.textContent = 道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼";
+    道具ボタン.textContent = 言(道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼");
   };
 
   /*
@@ -2382,13 +2410,13 @@ function 気分の欄を描く() {
    */
   const 中断押す = document.createElement("button");
   中断押す.className = "btn"; 中断押す.id = "aistop";
-  中断押す.textContent = "⏹ 止める";
+  中断押す.textContent = 言("⏹ 止める");
   中断押す.title = "走っている生成を途中で切ります（そこまでに使ったぶんは請求されます）";
   中断押す.onclick = async () => {
     中断押す.disabled = true;
     await window.mp3.AIを止める();
-    const 言 = $("aisaid");
-    if (言) 言.textContent = "止めています…";
+    const 言い欄 = $("aisaid");
+    if (言い欄) 言い欄.textContent = 言("止めています…");
   };
 
   const 言った = document.createElement("span");
@@ -2428,7 +2456,7 @@ function 気分の欄を描く() {
     const v = 欄.value.trim();
     if (!v) return;
     止める(true);
-    言った.textContent = "聞いています…";
+    言った.textContent = 言("聞いています…");
     try {
       /*
        * ★自分で絞ってあるなら、AI にジャンルを選ばせない（2026-08-29 本人の希望）。
@@ -2445,7 +2473,7 @@ function 気分の欄を描く() {
         if (!r || !r.ok) {
           const 訳 = (r && r.error) || "不明";
           if (止めたか(r, 言った)) return;
-        言った.textContent = "だめでした";
+        言った.textContent = 言("だめでした");
           $("status").textContent = "⚠ 絞り込めませんでした: " + 訳;
           return;
         }
@@ -3956,6 +3984,7 @@ function 描き直す() {
     列を描く(id, i, 列たち[i]);
   });
   カラムタブを描く();
+  言葉のボタンを直す();      // ★言葉を変えたら札も変わる
   絞りを外すボタンを直す();   // ★何か絞っているときだけ出す
   キーのボタンを直す();
   気分の欄を描く();
@@ -4844,8 +4873,28 @@ $('unhide').onclick = async () => {
   描き直す();
 
   const 読めなかった = 返り.tracks.filter((t) => !t).length;
-  $('status').textContent = `${戻した.toLocaleString('ja-JP')} 曲を一覧に戻しました`
+
+$('status').textContent = `${戻した.toLocaleString('ja-JP')} 曲を一覧に戻しました`
     + (読めなかった ? `（${読めなかった} 曲は読めませんでした）` : '');
+};
+
+/*
+ * ★言葉を切り替える（2026-08-30 本人の希望）。
+ * 日本語 → English → 自動（OS に合わせる）→ 日本語 … と回る。
+ * ★自動も選べるようにしてある。本人の指定が「自動のうえで手動でも」なので。
+ */
+$('langbtn').onclick = async () => {
+  const 次 = { auto: 'ja', ja: 'en', en: 'auto' }[言葉の設定] || 'auto';
+  const 返り = await window.mp3.言葉を変える(次);
+  言葉の設定 = 返り.設定;
+  言葉を入れる(返り.いま);
+  /* ★AI の欄は形が変わったときしか作り直さないので、作り直させる */
+  const box = $('aibar');
+  if (box) box.dataset.形 = '';
+  描き直す();
+  $('status').textContent = 言葉の設定 === 'auto'
+    ? `言葉を OS に合わせます（いまは ${いまの() === 'ja' ? '日本語' : 'English'}）`
+    : `言葉を ${いまの() === 'ja' ? '日本語' : 'English'} にしました`;
 };
 
 (async () => {
@@ -4891,6 +4940,11 @@ $('unhide').onclick = async () => {
   {
     const 手 = await window.mp3.手直しを取る();
     if (手) { 手直し = 手.手直し; 手直しの置き場 = 手.置き場; }
+  }
+  /* ★画面の言葉。OS を見て自動、手でも切り替えられる */
+  {
+    const 返り = await window.mp3.言葉を取る();
+    if (返り) { 言葉の設定 = 返り.設定; 言葉を入れる(返り.いま); }
   }
   // ★打った文の履歴（設定とは別のファイル）
   打った履歴 = await window.mp3.履歴を取る();

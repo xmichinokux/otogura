@@ -67,6 +67,10 @@ contextBridge.exposeInMainWorld('mp3', {
    * 消したくなるものなので、消しても他を巻き込まない。
    */
   /** ★走っている AI を止める（2026-08-30） */
+  /** ★画面の言葉（2026-08-30）。OS を見て自動、手でも切り替えられる */
+  言葉を取る: () => ipcRenderer.invoke('lang:get'),
+  言葉を変える: (v) => ipcRenderer.invoke('lang:set', v),
+
   AIを止める: () => ipcRenderer.invoke('ai:cancel'),
 
   履歴を取る: () => ipcRenderer.invoke('hist:get'),

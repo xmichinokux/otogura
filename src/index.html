@@ -404,6 +404,10 @@
 <div id="foot">
   <button class="btn" id="add">フォルダを追加</button>
   <button class="btn" id="rescan">再スキャン</button>
+  <!-- ★言葉の切り替え（2026-08-30 本人の希望）。
+       OS の言葉を見て自動で決めたうえで、手でも切り替えられる。
+       たまにしか触らないので、下の欄に置く。 -->
+  <button class="btn" id="langbtn" title="画面と AI の言葉を切り替えます">🌐 日本語</button>
   <!-- ★気分でおすすめ（本人の希望 2026-08-29）。
        このアプリで唯一、外に通信する機能。既定は切で、キーを入れるまで
        上の気分の欄は出ない。ここだけは、入れる道として常に出しておく。 -->
@@ -442,6 +446,7 @@
 
 <audio id="audio"></audio>
 <script src="shuffle.js"></script>
+<script src="lang.js"></script>
 <script src="genre.js"></script>
 <script src="naoshi.js"></script>
 <script src="resonance.js"></script>
