@@ -1741,7 +1741,8 @@ console.log('\n[核] ★候補の作り方が、シャッフルと分かれて�
   const 素画面 = fs.readFileSync(path.join(__dirname, "src/renderer.js"), "utf8")
     .split(String.fromCharCode(13) + "\n").join("\n");
   const 頭 = 素画面.indexOf("function AIに渡す候補(");
-  const 尾 = 素画面.indexOf("\n}", 素画面.indexOf("  return 出;", 頭)) + 2;
+  /* ★関数の終わりは、桁 0 の閉じ括弧で探す。中の return の名前で探すと、名前を変えたとき黙って途中で切れる（実際に切れた） */
+  const 尾 = 素画面.indexOf(String.fromCharCode(10) + String.fromCharCode(125), 頭) + 2;
   const 本体 = 素画面.slice(頭, 尾);
 
   /* 演者 40 組 × 盤 2 枚 × 10 曲 */
@@ -1824,7 +1825,7 @@ console.log('\n[核] ★候補の作り方が、シャッフルと分かれて�
   const 素AI = fs.readFileSync(path.join(__dirname, "src/ai.js"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, " ");
   確認("★頼み文が「その演者の核となる曲を選べ」と言っている",
-    /核となる曲/.test(素AI) && /同じ演者の曲が何曲か/.test(素AI));
+    /核となる曲/.test(素AI) && /演者ごとにまとまっています/.test(素AI));
   確認("★スパイスのことも言っている", /ときどき味付けに/.test(素AI));
 }
 

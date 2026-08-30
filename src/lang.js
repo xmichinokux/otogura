@@ -149,6 +149,11 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '（同じ演者・同じ盤が {n} 曲重なっていたので落としました）': "({n} repeated the same artist or album, so they were dropped)",
+    '・★候補は**演者ごとにまとまっています**（同じ演者の曲が続けて並んでいます）':
+      "- ★The list is **grouped by artist** — an artist's songs run together",
+    '　★**1 組から選ぶのは 1 曲だけ。** どの曲にするかを選んでください':
+      "  ★**Take only one song from each group.** Your job is to choose which one",
     '・★候補には**同じ演者の曲が何曲か**並んでいます。その中から 1 曲選んでください':
       "- ★The list holds **several songs by the same artist.** Pick one of them",
     '　★**その演者の核となる曲**を選んでください。よく知られた曲、代表曲です': "  ★Choose **that artist's core song** — the one they are known for",

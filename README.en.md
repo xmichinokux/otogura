@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.34.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.34.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.34.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.34.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.34.0.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.34.1.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.34.0.exe` | `594c89fe16b08a49fbd67c1ac289ec42b091d94e83c548b552426abae0426608` |
-| `Otogura-Portable-0.34.0.exe` | `891c1205fadb1a6d9b69e61280b5e4b1ef25988aaacfa83a95c2505a3e83e1ff` |
+| `Otogura-Setup-0.34.1.exe` | `189f00a542be4c28787ad28cfa9f872181c304095fe5e4ec556701c0425c15c9` |
+| `Otogura-Portable-0.34.1.exe` | `83693c5cbcf2fdf6212a4e5b8bdd1667c90f1595bf7ecf87bf0cf52bffa44241` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
@@ -298,6 +298,13 @@ A song also gains weight if the same title appears on two or more of that artist
 (your own library voting for it) or if it sits on a best-of or discography release.
 
 **The last pick from each artist drops the weighting entirely — that one is the spice.**
+
+The candidate list is **grouped by artist**, so an artist's songs run together rather than
+sitting 67 rows apart — scattered, they read as three separate good songs rather than one
+group to choose from. And because the reply is never taken on trust, a returned set that
+repeats an artist or an album has the repeats dropped here, with the count shown on screen.
+When there are fewer artists than songs asked for, repeats are left alone — the same
+"when it cannot be avoided, it is not avoided" rule as shuffle.
 
 Once a set is built, **the number of repeated artists is shown on screen.** Passing over it in silence
 just looks like the problem was never fixed.
