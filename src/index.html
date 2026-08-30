@@ -81,7 +81,15 @@
   #aibar .knobs { flex-basis: 100%; display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--dim); }
   /* 上の #aibar input が flex:1 なので、つまみだけ幅を決め直す */
   #aibar .knobs input[type=range] { flex: 0 0 96px; min-width: 96px; padding: 0; border: 0; }
-  #aibar .knobs .val { min-width: 4.5em; color: var(--text); }
+  /*
+   * ★つまみの左端と現在値（2026-08-30 本人の希望）。
+   * 前は名前（「対象の幅」など）を置いていて、幅が足りず 2 行に折り返していた。
+   * 短い言葉に替えたうえで、念のため折り返しも止める。
+   */
+  #aibar .knobs .val { min-width: 4.5em; color: var(--text); white-space: nowrap; }
+  #aibar .knobs .edge { white-space: nowrap; color: var(--dim); }
+  /* つまみの左右に少しだけ間を空ける（隣の組とくっつかないように） */
+  #aibar .knobs .val + .edge { margin-left: 10px; }
   /* ★拡大解釈の入／切（2026-08-30）。強度とは別の軸 */
   #aiwide2 { flex: 0 0 auto; }
   #aiwide2.on { background: var(--accent); border-color: var(--accent); color: #fff; }

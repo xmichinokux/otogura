@@ -322,7 +322,28 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
     確認('★選出の量のつまみがある', !!量棒 && 量棒.type === 'range');
     const 強棒 = 中身.find((e) => e.id === 'aistrict');
     確認('★文脈の強度のつまみがある', !!強棒 && 強棒.type === 'range', '王道を守るか外すかを決めるところです');
-    確認('★強度の札が出ている', !!引く('aistrictlabel') && 引く('aistrictlabel').textContent === 'ふつう', 引く('aistrictlabel') ? 引く('aistrictlabel').textContent : '');
+    /*
+     * ★0.30.1 から、つまみの左右は**両端**になった（本人の希望）。
+     *   > 狭い↔広い、10曲↔80曲、王道↔外す、みたいな表現
+     * 今の値は説きが数で出すので、そちらで見る。
+     */
+    確認('★強度の札は控えとして残っている',
+      !!引く('aistrictlabel') && 引く('aistrictlabel').textContent === 'ふつう',
+      引く('aistrictlabel') ? 引く('aistrictlabel').textContent : '');
+    確認('★つまみの左右に、両端が出ている',
+      中身.some((e) => e.className === 'edge' && e.textContent === '狭い')
+        && 中身.some((e) => e.className === 'edge' && e.textContent === '広い')
+        && 中身.some((e) => e.className === 'edge' && e.textContent === '10 曲')
+        && 中身.some((e) => e.className === 'edge' && e.textContent === '80 曲')
+        && 中身.some((e) => e.className === 'edge' && e.textContent === '王道')
+        && 中身.some((e) => e.className === 'edge' && e.textContent === '外す'),
+      中身.filter((e) => e.className === 'edge').map((e) => e.textContent).join('／'));
+    確認('★名前は出さない（写真で 2 行に折り返していたので）',
+      !中身.some((e) => e.textContent === '対象の幅' || e.textContent === '文脈の強度'),
+      '幅が足りず折り返します。名前は title に入れてあります');
+    確認('★名前は title で分かる',
+      幅棒.title.includes('対象の幅') && 量棒.title.includes('選出の量')
+        && 強棒.title.includes('文脈の強度'));
     確認(
       '端から端まで動かせる',
       幅棒 && 幅棒.min === '1' && 幅棒.max === String(ai.目盛の数)
@@ -331,7 +352,9 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
     );
 
     確認('いまの段が入っている', 幅棒.value === '3' && 量棒.value === '3');
-    確認('★いま何曲になるかが出ている', 引く('aimanylabel').textContent === '30 曲', 引く('aimanylabel').textContent);
+    確認('★いま何曲になるかが、説きに出ている',
+      /→ 30 曲の一本/.test(引く('aiknobsaid').textContent),
+      引く('aiknobsaid').textContent);
     確認('★何が変わるかが書いてある', /候補 200 曲/.test(引く('aiknobsaid').textContent) && /辿る名前 35 個/.test(引く('aiknobsaid').textContent), 引く('aiknobsaid').textContent);
 
     /* 動かしてみる。★札と説明が、ちゃんと追いかけるか */
@@ -339,7 +362,7 @@ console.log('\n[7] つまみの行が、実際に組み上がるか');
     幅棒.oninput();
     確認(
       '★動かすと説明が変わる',
-      /候補 800 曲/.test(引く('aiknobsaid').textContent) && 引く('aimanylabel').textContent === '80 曲',
+      /候補 800 曲/.test(引く('aiknobsaid').textContent) && /→ 80 曲の一本/.test(引く('aiknobsaid').textContent),
       引く('aiknobsaid').textContent,
     );
 
@@ -1038,7 +1061,7 @@ console.log('\n[7-e] ★拡大解釈は、強度とは別の軸になってい�
   );
   確認('★入／切のボタンを作っている', /広げる\.id = "aiwide2"/.test(素));
   {
-    const 並文 = (素.match(/行\.append\([^;]*対象の幅[^;]*\);/) || [''])[0];
+    const 並文 = (素.match(/行\.append\([^;]*幅棒[^;]*\);/) || [''])[0];
     確認('つまみの行の並べ方を取り出せる', !!並文);
     確認('★つまみの行に並べている',
       並文.replace(/^行\.append\(|\);$/g, '').split(',').map((x) => x.trim()).includes('広げる'),
