@@ -2092,6 +2092,23 @@ function 気分の欄を描く() {
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
+  /*
+   * 走っている間は、触れるところを止める。**戻すのも同じ一覧を使う。**
+   *
+   * ■ 実地の不具合（2026-08-30）。本人からの報告:
+   *   > ジャンル名をまとめるをやったあと、ジャンル名無しを埋めると
+   *   > まとめをやめるのボタンがグレーになって使えなくなりました。
+   *   > 立ち上げ直したらボタンが白に戻りました。
+   *
+   * ★原因は、戻す側が **id を直書きした一覧**で、しかも 4 か所にあったこと。
+   * ボタンを足すたびに 4 か所を直す必要があり、0.26.0 で足した 4 つが
+   * どこにも入っていなかった。
+   *
+   * ★AI の欄は「形が変わったときだけ」作り直すので、描き直しても戻らない。
+   * だから立ち上げ直すまで直らなかった。
+   *
+   * ★一覧はここだけ。足すときはここに足せば、止めるのも戻るのも揃う。
+   */
   const 止める = (と) => {
     for (const e of [押す, 欄, 辿る, 欄2, まとめる押す, やめる押す, 埋める押す, 手直し見る, 手直し捨てる]) e.disabled = と;
     // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
@@ -2138,7 +2155,7 @@ function 気分の欄を描く() {
         if (欄い) 欄い.value = "";
       }
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre"]) { const e = $(id); if (e) e.disabled = false; }
+      止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
   };
 
@@ -2193,7 +2210,7 @@ function 気分の欄を描く() {
       $("status").textContent = `🌐「${v}」で絞りました（${曲数.toLocaleString("ja-JP")} 曲）`
         + '　▶ で流せます。🔀 を押すとこの範囲でシャッフルします';
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = false; }
+      止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
   };
 
@@ -2203,9 +2220,7 @@ function 気分の欄を描く() {
     try {
       await ジャンルをまとめる($("aisaid") || 言った);
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre"]) {
-        const e = $(id); if (e) e.disabled = false;
-      }
+      止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
   };
 
@@ -2245,9 +2260,7 @@ function 気分の欄を描く() {
     try {
       await ジャンルを埋める($("aisaid") || 言った);
     } finally {
-      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre", "aifill"]) {
-        const e = $(id); if (e) e.disabled = false;
-      }
+      止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
   };
   やめる押す.onclick = async () => {
