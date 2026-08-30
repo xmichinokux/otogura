@@ -299,6 +299,46 @@ console.log('\n[7] ★画面に並べて読み込む台本が、名前をぶつ�
     ぶつかり.join('／') || '同じ名前を 2 本が作ると、2 本目が丸ごと読み込まれません');
 }
 
+
+console.log('\n[8] ★2 つの README が、ずれていないか');
+/*
+ * ★2026-08-31、英語版を作ったときに足した。
+ * README が 2 つになると、片方だけ古くなる。
+ * 実際、日本語版の検査一覧は「12 本」のまま 18 本に増えていた。
+ * 版・ハッシュ・検査の一覧は、機械が見れば必ず気づける。
+ */
+{
+  const 版 = require(path.join(__dirname, 'package.json')).version;
+  const 検査 = require(path.join(__dirname, 'package.json')).scripts.check
+    .split('&&').map((v) => (v.trim().match(/check-[a-z]+\.js/) || [''])[0]).filter(Boolean);
+
+  const 英あり = fs.existsSync(path.join(__dirname, 'README.en.md'));
+  確認('★英語版の README がある', 英あり);
+
+  if (英あり) {
+    const 日 = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8');
+    const 英 = fs.readFileSync(path.join(__dirname, 'README.en.md'), 'utf8');
+
+    確認('★互いに行き来できる', 日.includes('README.en.md') && 英.includes('](README.md)'));
+
+    for (const [名, 文] of [['日本語', 日], ['英語', 英]]) {
+      確認(`★${名}版が、いまの版を指している（${版}）`,
+        文.includes(`Otogura-Setup-${版}.exe`) && 文.includes(`Otogura-Portable-${版}.exe`),
+        '版を上げたら、両方の README を直してください');
+      const 抜け = 検査.filter((v) => !文.includes(v));
+      確認(`★${名}版が、検査 ${検査.length} 本を全部並べている`, 抜け.length === 0,
+        抜け.join('／'));
+    }
+
+    /* ★ハッシュは、両方に同じものが載っていること */
+    const 拾う = (文) => [...文.matchAll(/`([0-9a-f]{64})`/g)].map((m) => m[1]).sort();
+    const 日ハ = 拾う(日); const 英ハ = 拾う(英);
+    確認('★どちらの README も、同じ SHA256 を載せている',
+      日ハ.length === 2 && 日ハ.join(',') === 英ハ.join(','),
+      `日本語 ${日ハ.length} 個 ／ 英語 ${英ハ.length} 個`);
+  }
+}
+
 console.log('');
 if (落ちた) { console.log(`★${落ちた} 個 落ちました`); process.exit(1); }
 console.log('すべて通りました');
