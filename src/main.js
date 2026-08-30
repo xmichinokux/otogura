@@ -52,7 +52,7 @@ app.setName('Otogura');
 /** 設定（スキャン対象フォルダ・一覧から外した曲）の置き場 */
 const 設定ファイル = () => path.join(app.getPath('userData'), 'settings.json');
 
-const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 }, ジャンルのまとめ: { 組: [], 作った日: '' } };
+const 既定の設定 = { folders: [], hidden: [], lists: [], plays: {}, gains: {}, widths: {}, volume: 1, タグ無しを隠す: true, シャッフル除外: [], AIの目盛: { 幅: 既定の目盛, 量: 既定の目盛, 強度: 既定の目盛 }, ジャンルのまとめ: { 組: [], 作った日: '' }, 自分の音源: [] };
 
 /** 1〜5 に丸める。数でないものは真ん中に */
 function 目盛ひとつ(v) {
@@ -113,6 +113,19 @@ async function 設定を読む() {
        * 人の手でも直せる場所なので、読むたびに整える。
        */
       ジャンルのまとめ: genre.ジャンルのまとめを整える(v.ジャンルのまとめ),
+      /*
+       * ★自分の音源の演者名（2026-08-30 本人の話）。
+       *   > 自分のバンド1 は僕のバンドで作曲途中のデータがたくさんあって
+       *   > それが読み込まれてる。これはシャッフルの対象にされたくない
+       *
+       * ★覚えるのは**演者名**。曲のパスではない。
+       * パスだと、走査し直したり新しく録ったぶんがまた混ざる。
+       * ★曲は消さない。一覧にも残る。くじと AI の候補に入らないだけ。
+       */
+      自分の音源: Array.isArray(v.自分の音源)
+        ? [...new Set(v.自分の音源.filter((x) => typeof x === 'string')
+            .map((x) => x.toLocaleLowerCase('ja').trim()).filter(Boolean))]
+        : [],
     };
   } catch {
     return { ...既定の設定 };
@@ -409,6 +422,27 @@ ipcMain.handle('resonance:get', async () => {
 /* ── ジャンル名のまとめ ─────────────────────────────────
    ★元のジャンル名にも mp3 のタグにも触らない。覚え書きに別の層として置くだけ。
    気に入らなければ genre:forget で捨てれば、元通りになる。 */
+
+/* ── 自分の音源 ─────────────────────────────────────────
+   ★曲は消さない。一覧にも残る。押せば鳴る。
+   くじ（シャッフル）と AI の候補に入らないだけ。 */
+
+ipcMain.handle('own:set', async (_e, 演者たち, 入れるか) => {
+  const s = await 設定を読む();
+  const 今 = new Set(s.自分の音源);
+  const 綺麗 = (Array.isArray(演者たち) ? 演者たち : [])
+    .filter((x) => typeof x === 'string')
+    .map((x) => x.toLocaleLowerCase('ja').trim())
+    .filter(Boolean);
+  for (const 名 of 綺麗) {
+    if (入れるか) 今.add(名); else 今.delete(名);
+  }
+  s.自分の音源 = [...今];
+  await 設定を書く(s);
+  return s.自分の音源;
+});
+
+ipcMain.handle('own:get', async () => (await 設定を読む()).自分の音源);
 
 ipcMain.handle('genre:group', async (_e, 一覧) => {
   const キー = await キーを読む();

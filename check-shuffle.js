@@ -138,6 +138,13 @@ function 走らせる(仕込み) {
     let 繰り返し = 仕込み.繰り返し ?? 'none';
     let 再生回数 = 仕込み.再生回数 ?? {};
     let シャッフル除外 = new Set(仕込み.シャッフル除外 ?? []);
+    /*
+     * ★自分の音源（2026-08-30）。くじの引き方が これも見るようになった。
+     * 仕込みで演者名を渡せば、ここでも試せる。
+     */
+    const 自分の音源 = new Set(仕込み.自分の音源 ?? []);
+    const 自分のか = (t) => 自分の音源.has(String((t && t.artist) || '').toLocaleLowerCase('ja').trim());
+    void 自分のか;
   `;
   // eslint-disable-next-line no-new-func
   const 動かす = new Function('環境', '仕込み', '次を選ぶ', '巡が終わったか',

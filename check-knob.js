@@ -781,6 +781,8 @@ console.log('\n[8-g] ★文脈の強度の足場は、曲数ではなく作品�
   const 絞る = () => tracks;
   const 開いているリスト = () => null;
   const シャッフル除外 = new Set();
+  const 自分のか = () => false;   // ★自分の音源（2026-08-30）。ここでは誰も自分のではない
+  void 自分のか;
   const 響きの重み表 = () => null;
   const 再生回数 = {};
   const 小文字 = (x) => String(x ?? '').toLocaleLowerCase('ja');
@@ -892,6 +894,8 @@ console.log('\n[8-f] ★組む元は、開いている再生リストではな�
   const 曲を並べる = (a, b) => a.path.localeCompare(b.path);
   const 絞る = () => tracks.filter((t) => !sel.genre || sel.genre.has(t.genre));
   const シャッフル除外 = new Set();
+  const 自分のか = () => false;   // ★自分の音源（2026-08-30）。ここでは誰も自分のではない
+  void 自分のか;
   const 響きの重み表 = () => null;
   const 再生回数 = {};
   const 小文字 = (x) => String(x ?? '').toLocaleLowerCase('ja');
@@ -967,6 +971,8 @@ console.log('\n[9] ★候補が、同じバンドに偏らないか');
     const 絞る = () => 台;
     const 曲を並べる = () => 0;
     const シャッフル除外 = new Set();
+    const 自分のか = () => false;   // ★自分の音源（2026-08-30）
+    void 自分のか;
     const 響きの重み表 = () => null;
     const 再生回数 = {};
     void 次を選ぶ; void 小文字; void いまの列; void シャッフル除外; void 響きの重み表; void 再生回数;

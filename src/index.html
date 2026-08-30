@@ -166,6 +166,12 @@
   /* シャッフルから外してある曲。一覧には残り、押せば鳴る（薄く見せるだけ） */
   tr.skip td { opacity: .5; }
   tr.skip td.title::before { content: '🚫 '; opacity: .8; }
+  /*
+   * ★自分の音源（2026-08-30）。**一覧には残す。押せば鳴る。**
+   * くじと AI の候補に入らないだけなので、消えたようには見せない。
+   */
+  tr.mine td { opacity: .72; }
+  tr.mine td.title::before { content: '✎ '; opacity: .85; }
   td.play-cell { color: var(--accent); text-align: center; cursor: pointer; }
   td.num { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 48px; }
   td.dur { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 64px; }

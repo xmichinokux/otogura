@@ -54,6 +54,13 @@ contextBridge.exposeInMainWorld('mp3', {
    * 渡すのは**ジャンル名と曲数だけ**。曲は 1 曲も渡らない。
    * 覚えるのは別の層で、元のジャンル名にも mp3 のタグにも触らない。
    */
+  /*
+   * ★自分の音源（2026-08-30）。演者名で覚える。
+   * 曲は消さない。一覧にも残る。くじと AI の候補に入らないだけ。
+   */
+  自分の音源を取る: () => ipcRenderer.invoke('own:get'),
+  自分の音源を変える: (演者たち, 入れるか) => ipcRenderer.invoke('own:set', 演者たち, 入れるか),
+
   ジャンルをまとめさせる: (一覧) => ipcRenderer.invoke('genre:group', 一覧),
   ジャンルのまとめを覚える: (まとめ) => ipcRenderer.invoke('genre:save', まとめ),
   ジャンルのまとめを捨てる: () => ipcRenderer.invoke('genre:forget'),
