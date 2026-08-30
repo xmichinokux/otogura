@@ -66,6 +66,9 @@ contextBridge.exposeInMainWorld('mp3', {
    * ★打った文の履歴（2026-08-30）。設定とは別のファイルに置いてある。
    * 消したくなるものなので、消しても他を巻き込まない。
    */
+  /** ★走っている AI を止める（2026-08-30） */
+  AIを止める: () => ipcRenderer.invoke('ai:cancel'),
+
   履歴を取る: () => ipcRenderer.invoke('hist:get'),
   履歴に足す: (種, 文) => ipcRenderer.invoke('hist:add', 種, 文),
   履歴から消す: (種, 文) => ipcRenderer.invoke('hist:remove', 種, 文),

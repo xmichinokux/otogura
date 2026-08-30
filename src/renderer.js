@@ -380,6 +380,7 @@ async function ジャンルをまとめる(言った) {
     一覧.map((g) => ({ 名: g.名, 鍵: g.鍵, 曲数: g.曲数 })),
   );
   if (!r || !r.ok) {
+    if (止めたか(r, 言った)) return;
     言った.textContent = 'だめでした';
     $('status').textContent = '⚠ まとめられませんでした: ' + ((r && r.error) || '不明');
     return;
@@ -473,6 +474,7 @@ async function ジャンルを埋める(言った) {
       一覧,
     );
     if (!r || !r.ok) {
+      if (止めたか(r, 言った)) return;
       言った.textContent = 'だめでした';
       $('status').textContent = '⚠ 振り分けられませんでした: ' + ((r && r.error) || '不明');
       /* ★AI がだめでも、手元で決まったぶんは活かす */
@@ -731,6 +733,22 @@ function 履歴をつける(欄, 種) {
     setTimeout(() => { if (出てた) 履歴を閉じる(); else 履歴を出す(欄, 種, 決める); }, 0);
   });
   欄.addEventListener("input", 履歴を閉じる);
+}
+
+/**
+ * ★自分で止めたのか（2026-08-30 本人の希望）。
+ *   > AIに指示を出した後、生成を途中で止めることってできますか？
+ *
+ * 自分で押したのに「だめでした」と出ると、壊れたのかと思う。
+ * ★見分けはここ 1 か所。増やすと、また入れ忘れが起きる。
+ *
+ * @returns 止めたなら true（呼んだ側は、そこで静かに引き返す）
+ */
+function 止めたか(r, 言った) {
+  if (!r || !r.止めた) return false;
+  if (言った) 言った.textContent = '';
+  $('status').textContent = '止めました（何も作っていません）';
+  return true;
 }
 
 /** まとめを入れ替えて、索引を作り直す */
@@ -1526,6 +1544,7 @@ async function AIに一本組ませる(気分, 言った) {
   });
   if (!r || !r.ok) {
     const 訳 = (r && r.error) || '不明';
+    if (止めたか(r, 言った)) return false;
     言った.textContent = 'だめでした';
     $('status').textContent = '⚠ 一本を組めませんでした: ' + 訳;
     return false;
@@ -1771,6 +1790,7 @@ async function 木を生やして足す(言葉, 言った) {
      * 読めないと、こちらにも伝えられない。
      */
     const 訳 = (r && r.error) || "不明";
+    if (止めたか(r, 言った)) return false;
     言った.textContent = "だめでした";
     $("status").textContent = "⚠ 辿れませんでした: " + 訳;
     return false;
@@ -2279,6 +2299,25 @@ function 気分の欄を描く() {
     道具ボタン.textContent = 道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼";
   };
 
+  /*
+   * ★走っている間だけ出る「止める」（2026-08-30 本人の希望）。
+   *   > AIに指示を出した後、生成を途中で止めることってできますか？
+   *   > 結構これができないのが地味に不便なので。
+   *
+   * ★これだけは 止める(true) で止めない。**止めるためのボタンなので。**
+   * 代わりに、走っているときだけ出す。
+   */
+  const 中断押す = document.createElement("button");
+  中断押す.className = "btn"; 中断押す.id = "aistop";
+  中断押す.textContent = "⏹ 止める";
+  中断押す.title = "走っている生成を途中で切ります（そこまでに使ったぶんは請求されます）";
+  中断押す.onclick = async () => {
+    中断押す.disabled = true;
+    await window.mp3.AIを止める();
+    const 言 = $("aisaid");
+    if (言) 言.textContent = "止めています…";
+  };
+
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
@@ -2301,6 +2340,12 @@ function 気分の欄を描く() {
    */
   const 止める = (と) => {
     for (const e of [押す, 欄, 辿る, 欄2, まとめる押す, やめる押す, 埋める押す, 手直し見る, 手直し捨てる, 道具ボタン]) e.disabled = と;
+    /*
+     * ★「止める」だけは逆。走っている間に出し、押せるようにする。
+     * ここを 止める(true) に入れてしまうと、止めるものが押せなくなる。
+     */
+    中断押す.classList.toggle("on", と);
+    中断押す.disabled = false;
     // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
     // 動かせるままだと「効かなかった」と見えるので、いっしょに止める
     for (const id of ["aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = と; }
@@ -2326,7 +2371,8 @@ function 気分の欄を描く() {
         });
         if (!r || !r.ok) {
           const 訳 = (r && r.error) || "不明";
-          言った.textContent = "だめでした";
+          if (止めたか(r, 言った)) return;
+        言った.textContent = "だめでした";
           $("status").textContent = "⚠ 絞り込めませんでした: " + 訳;
           return;
         }
@@ -2477,7 +2523,7 @@ function 気分の欄を描く() {
   欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
 
   /* ★毎日使う 2 つだけを表に出す。あとは道具箱の中へ */
-  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 言った, 道具ボタン);
+  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 中断押す, 言った, 道具ボタン);
   道具箱.append(印3, まとめる押す, 埋める押す, やめる押す, 手直し見る, 手直し捨てる);
   box.append(道具箱);
   // ★つまみは 2 段目に置く。1 行に並べると、記入欄が押しつぶされる

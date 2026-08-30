@@ -3,6 +3,48 @@
 const genre = require('./genre');
 const naoshi = require('./naoshi');
 
+/*
+ * ★いま走っている AI の呼び出しを止めるための札（2026-08-30 本人の希望）。
+ *   > AIに指示を出した後、生成を途中で止めることってできますか？
+ *   > 結構これができないのが地味に不便なので。
+ *
+ * ★AI の欄は走っている間ほかのボタンを止めるので、**同時に走るのは 1 本**。
+ * だから札も 1 つでよい。
+ *
+ * ★止めたときは「だめでした」ではなく「止めました」と分かるようにする。
+ * 自分で押したのに壊れたように見えるのが、いちばん困る。
+ */
+let いまの中断札 = null;
+
+/** 新しい呼び出しの札を用意する（前のが残っていれば止めてから） */
+function 中断札を用意する() {
+  中断する();
+  いまの中断札 = new AbortController();
+  return いまの中断札;
+}
+
+/** いま走っているものを止める。走っていなければ false */
+function 中断する() {
+  if (!いまの中断札) return false;
+  try { いまの中断札.abort(); } catch { /* もう終わっている */ }
+  いまの中断札 = null;
+  return true;
+}
+
+/** その札で終わったら片づける */
+function 中断札を片づける(札) {
+  if (いまの中断札 === 札) いまの中断札 = null;
+}
+
+/** 止められたことによる失敗か（人が押したのか、本当の不具合か） */
+function 止められたか(e) {
+  if (!e) return false;
+  const 名 = String(e.name || '');
+  const 文 = String(e.message || '');
+  return 名 === 'AbortError' || /abort/i.test(名) || /abort/i.test(文);
+}
+
+
 /**
  * 気分を言うと、聴くものを絞り込んでくれるところ。
  *
@@ -391,9 +433,12 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
     ひとこと: z.string(),
   });
 
+  /* ★finally から見えるよう、try の外で宣言する */
+  let 札 = null;
   try {
     const client = new Anthropic({ apiKey: キー });
     // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    札 = 中断札を用意する();
     const 返り = await client.messages.stream({
       model: 使うモデル,
       // ★短い返事だが、考えたぶんも含まれるので余裕を取る
@@ -406,7 +451,7 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
        * 高くすると待ち時間と費用が増えるだけ。
        */
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
-    }).finalMessage();
+    }, { signal: 札.signal }).finalMessage();
 
     if (返り.stop_reason === 'refusal') {
       return { ok: false, error: 'AI が答えを断りました（' + (返り.stop_details && 返り.stop_details.category ? 返り.stop_details.category : '理由不明') + '）' };
@@ -416,6 +461,8 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
     const 実在ジャンル = ジャンル一覧.map((g) => g.名前);
     return { ok: true, 結果: 照らし合わせる(返り.parsed_output, 実在ジャンル, 年一覧) };
   } catch (e) {
+    /* ★自分で止めたときは、壊れたように見せない（2026-08-30 本人の希望） */
+    if (止められたか(e)) return { ok: false, 止めた: true, error: '止めました' };
     /*
      * ★理由をそのまま返す。黙って「使えません」にしない。
      * キーが違うのか、繋がらないのか、上限に当たったのかで、直し方が全然違う。
@@ -425,6 +472,8 @@ async function おすすめを聞く({ キー, 気分, ジャンル一覧, 年�
     if (名 === 'RateLimitError') return { ok: false, error: '短い間に呼びすぎました。少し待ってからもう一度' };
     if (名 === 'APIConnectionError') return { ok: false, error: 'つながりませんでした（ネットワークを確認してください）' };
     return { ok: false, error: (e && e.message) ? e.message : '不明な失敗' };
+  } finally {
+    中断札を片づける(札);
   }
 }
 
@@ -605,9 +654,12 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
     並び: z.array(z.object({ 番号: z.number(), ひとこと: z.string() })),
   });
 
+  /* ★finally から見えるよう、try の外で宣言する */
+  let 札 = null;
   try {
     const client = new Anthropic({ apiKey: キー });
     // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    札 = 中断札を用意する();
     const 返り = await client.messages.stream({
       model: 使うモデル,
       /*
@@ -623,18 +675,22 @@ async function プレイリストを作らせる({ キー, 気分, 候補, 曲�
       system: プレイリストの頼み文(気分.trim(), 頼む曲数, 響き, 演者の数, 強度を読む(強度目盛)),
       messages: [{ role: 'user', content: '■ 候補（番号／アーティスト(この範囲で持っている盤の数/曲数)／曲名／アルバム）\n' + 表 }],
       output_config: { effort: 'low', format: zodOutputFormat(かたち) },
-    }).finalMessage();
+    }, { signal: 札.signal }).finalMessage();
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     if (返り.stop_reason === 'max_tokens') return { ok: false, error: '返事が長すぎて切れました。「選出の量」を 1 つ減らして、もう一度お試しください' };
     const 出 = 返り.parsed_output;
     if (!出) return { ok: false, error: 'AI の返事を読み取れませんでした' };
     return { ok: true, 結果: { ...並びを確かめる(出, 候補), 頼んだ曲数: 頼む曲数, 演者の数 } };
   } catch (e) {
+    /* ★自分で止めたときは、壊れたように見せない（2026-08-30 本人の希望） */
+    if (止められたか(e)) return { ok: false, 止めた: true, error: '止めました' };
     const 名 = e && e.constructor ? e.constructor.name : '';
     if (名 === 'AuthenticationError') return { ok: false, error: 'APIキーが正しくないようです' };
     if (名 === 'RateLimitError') return { ok: false, error: '短い間に呼びすぎました。少し待ってからもう一度' };
     if (名 === 'APIConnectionError') return { ok: false, error: 'つながりませんでした（ネットワークを確認してください）' };
     return { ok: false, error: (e && e.message) ? e.message : '不明な失敗' };
+  } finally {
+    中断札を片づける(札);
   }
 }
 
@@ -894,9 +950,12 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
     })),
   });
 
+  /* ★finally から見えるよう、try の外で宣言する */
+  let 札 = null;
   try {
     const client = new Anthropic({ apiKey: キー });
     // ★流し込みで受ける（max_tokens 21,333 の壁を避ける。上の説明を参照）
+    札 = 中断札を用意する();
     const 返り = await client.messages.stream({
       model: 使うモデル,
       /*
@@ -933,7 +992,7 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
        */
       // ★深さも強度で決まる。遠いものを引き出すほど、深く考えさせる
       output_config: { effort: 強度を読む(強度目盛).effort, format: zodOutputFormat(かたち) },
-    }).finalMessage();
+    }, { signal: 札.signal }).finalMessage();
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     /*
      * ★何をすればいいかまで言う。「切れました」だけだと、
@@ -969,11 +1028,15 @@ async function 木を生やす({ キー, 言葉, 手元の演者 = [], 幅目盛
     if (!nodes.length) return { ok: false, error: 'AI が名前を挙げませんでした' };
     return { ok: true, 結果: { keyword: 言葉.trim(), savedAt: new Date().toISOString(), nodes } };
   } catch (e) {
+    /* ★自分で止めたときは、壊れたように見せない（2026-08-30 本人の希望） */
+    if (止められたか(e)) return { ok: false, 止めた: true, error: '止めました' };
     const 名 = e && e.constructor ? e.constructor.name : '';
     if (名 === 'AuthenticationError') return { ok: false, error: 'APIキーが正しくないようです' };
     if (名 === 'RateLimitError') return { ok: false, error: '短い間に呼びすぎました' };
     if (名 === 'APIConnectionError') return { ok: false, error: 'つながりませんでした' };
     return { ok: false, error: (e && e.message) ? e.message : '不明な失敗' };
+  } finally {
+    中断札を片づける(札);
   }
 }
 
@@ -1013,6 +1076,8 @@ async function ジャンルをまとめさせる({ キー, 一覧 }) {
     })),
   });
 
+  /* ★finally から見えるよう、try の外で宣言する */
+  let 札 = null;
   try {
     const client = new Anthropic({ apiKey: キー });
     /*
@@ -1021,13 +1086,14 @@ async function ジャンルをまとめさせる({ キー, 一覧 }) {
      * 98 種類で 7,840 ＋ 考えるぶん 16,000 ＝ 23,840。
      * ★21,333 を超えるので、流し込みで受けないと SDK に断られる。
      */
+    札 = 中断札を用意する();
     const 返り = await client.messages.stream({
       model: 使うモデル,
       max_tokens: Math.max(16000, 一覧.length * 80 + 16000),
       system: genre.ジャンルの頼み文(一覧),
       messages: [{ role: 'user', content: 'まとめてください。' }],
       output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
-    }).finalMessage();
+    }, { signal: 札.signal }).finalMessage();
 
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     if (返り.stop_reason === 'max_tokens') {
@@ -1045,7 +1111,11 @@ async function ジャンルをまとめさせる({ キー, 一覧 }) {
     const 整えた = genre.ジャンルの返事を整える(出, 一覧);
     return { ok: true, ...整えた };
   } catch (e) {
+    /* ★自分で止めたときは、壊れたように見せない（2026-08-30 本人の希望） */
+    if (止められたか(e)) return { ok: false, 止めた: true, error: '止めました' };
     return { ok: false, error: String((e && e.message) || e) };
+  } finally {
+    中断札を片づける(札);
   }
 }
 /**
@@ -1091,19 +1161,22 @@ async function ジャンルを埋めさせる({ キー, 残り, ジャンル一�
     })),
   });
 
+  /* ★finally から見えるよう、try の外で宣言する */
+  let 札 = null;
   try {
     const client = new Anthropic({ apiKey: キー });
     /*
      * ★1 組につき 60 トークンほど（番号・ジャンル名・訳）。
      * 考えるぶんを 16,000 見て、流し込みで受ける（21,333 の壁）。
      */
+    札 = 中断札を用意する();
     const 返り = await client.messages.stream({
       model: 使うモデル,
       max_tokens: Math.max(16000, 残り.length * 60 + 16000),
       system: naoshi.埋める頼み文(残り, ジャンル一覧),
       messages: [{ role: 'user', content: '振り分けてください。' }],
       output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
-    }).finalMessage();
+    }, { signal: 札.signal }).finalMessage();
 
     if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
     if (返り.stop_reason === 'max_tokens') {
@@ -1117,7 +1190,11 @@ async function ジャンルを埋めさせる({ キー, 残り, ジャンル一�
     /* ★手元にあるジャンル名だけを通す。作られた名前は落とす */
     return { ok: true, ...naoshi.埋める返事を整える(出, 残り, ジャンル一覧) };
   } catch (e) {
+    /* ★自分で止めたときは、壊れたように見せない（2026-08-30 本人の希望） */
+    if (止められたか(e)) return { ok: false, 止めた: true, error: '止めました' };
     return { ok: false, error: String((e && e.message) || e) };
+  } finally {
+    中断札を片づける(札);
   }
 }
-module.exports = { ジャンルを埋めさせる, ジャンルをまとめさせる, 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };
+module.exports = { 中断する, 止められたか, ジャンルを埋めさせる, ジャンルをまとめさせる, 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };

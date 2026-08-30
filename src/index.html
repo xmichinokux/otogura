@@ -110,6 +110,10 @@
     align-items: center; padding: 6px 2px 0; border-top: 1px dashed var(--line); }
   #aibar .tools.on { display: flex; }
   #aibar .toolsbtn { margin-left: auto; }
+  /* ★走っている間だけ出る「止める」（2026-08-30） */
+  #aistop { display: none; border-color: #b45309; color: #b45309; }
+  #aistop.on { display: inline-block; }
+  #aistop:hover { background: #fef3c7; }
   #aibar .scope { flex-basis: 100%; font-size: 12px; color: var(--dim); padding: 2px 2px 0; }
   #aibar .scope .b { color: var(--accent); font-weight: 600; }
   #aibar .scope .warn { color: #b45309; }
