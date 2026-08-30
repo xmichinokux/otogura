@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.33.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.33.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.34.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.34.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.33.1.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.34.0.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.33.1.exe` | `f0ed786b3bd44432c4fc1e2b9035deec445461268d4cd31d141313a542494d08` |
-| `Otogura-Portable-0.33.1.exe` | `3d82381292e3f22a82e00d5a32d94fe591a308fa296505a6610722084089f3a4` |
+| `Otogura-Setup-0.34.0.exe` | `594c89fe16b08a49fbd67c1ac289ec42b091d94e83c548b552426abae0426608` |
+| `Otogura-Portable-0.34.0.exe` | `891c1205fadb1a6d9b69e61280b5e4b1ef25988aaacfa83a95c2505a3e83e1ff` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
@@ -259,7 +259,7 @@ There are three reasons for this. **You can see what it did** — and if you dis
 **It cannot invent songs you do not have** — every name that comes back is checked against your library.
 And **from there on, the ordinary shuffle still works.**
 
-#### Candidates are drawn one per artist
+#### Candidates: fewer artists, several songs each
 
 The AI is handed 200 candidate songs. **How those 200 are chosen matters.**
 
@@ -267,9 +267,14 @@ Draw song by song and bands you own more of get picked repeatedly.
 The AI then chooses from a lopsided 200, and even with "do not repeat an artist" in the prompt,
 **the same band lands every other slot while technically obeying the rule.**
 
-So it goes once round the artists taking one song each, and starts a second lap only if it needs more.
-**The number of laps is exactly the "at most N songs per artist" limit.**
-When several songs do come from one artist, it walks their albums one at a time.
+So it goes round the artists taking one song each, and starts another lap when it needs more.
+When several songs come from one artist, it walks their albums one at a time.
+
+**Since 0.34.0 it deliberately narrows the artists and hands over several songs each**
+(2–4 depending on the slider — at the usual notch, 67 artists × 3 songs rather than 200 × 1).
+With one song per artist, **the AI cannot choose which song to play** — it only gets a random
+track from each discography. Which song is a band's signature is exactly what the AI knows,
+so that choice is handed to it. There are still at least twice as many artists as songs in the set.
 
 | Situation | Most songs from one artist (before → now) |
 |---|---|
@@ -281,8 +286,18 @@ When several songs do come from one artist, it walks their albums one at a time.
 **In narrow ranges it is already at the floor.** With only five artists, 200 songs must repeat.
 **When it cannot be avoided, it is not avoided** — the same principle as shuffle.
 
-**The draw itself is unchanged** (the fewer plays, the heavier the weight). Only the pool it draws from
-became per-artist, so "forgotten songs make it into the candidates" still holds.
+**Since 0.34.0 this draw is separate from shuffle.** Shuffle weights songs you have played least,
+to dig up what you have forgotten. Building a set wants the opposite — a band's core songs —
+so play counts are not consulted here at all.
+
+Within an artist, the draw favours where hit songs tend to sit on an album. Measured across
+6,743 albums with complete track numbering, the share of intro/outro/interlude titles is
+6.78% at track 1 (10.5× the baseline), **0.31% at track 2** (the cleanest spot on the record),
+0.89% mid-album, and 2.04% on the closer (3.1×) — which matches how records are actually made.
+A song also gains weight if the same title appears on two or more of that artist's albums
+(your own library voting for it) or if it sits on a best-of or discography release.
+
+**The last pick from each artist drops the weighting entirely — that one is the spice.**
 
 Once a set is built, **the number of repeated artists is shown on screen.** Passing over it in silence
 just looks like the problem was never fixed.
