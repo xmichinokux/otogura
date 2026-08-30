@@ -1,6 +1,7 @@
 'use strict';
 
 const genre = require('./genre');
+const naoshi = require('./naoshi');
 
 /**
  * 気分を言うと、聴くものを絞り込んでくれるところ。
@@ -996,4 +997,76 @@ async function ジャンルをまとめさせる({ キー, 一覧 }) {
     return { ok: false, error: String((e && e.message) || e) };
   }
 }
-module.exports = { ジャンルをまとめさせる, 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };
+/**
+ * ジャンルの付いていない演者に、ジャンルを当てさせる（2026-08-30 本人の希望）。
+ *   > ジャンル名無しのデータがたくさんあってそれをいちいち振り分けるのが大変だから
+ *   > AI の力でジャンル名無しのデータを他のジャンルに振り分けられないでしょうか？
+ *   > 多少の間違いはありにします（振り分けられないことのほうが面倒なので）。
+ *
+ * ★「多少の間違いはあり」と言われたので、頼み文でも
+ * **選ばないより選ぶほうが役に立つ**と伝えている。
+ * ただし**ジャンル名は手元にあるものからしか選ばせない。**
+ * 新しい名前を作られると、カラムが知らない名前で埋まる。
+ *
+ * ★送るのは演者名と盤名と曲数だけ。曲そのものも音も送らない。
+ * 実測（86,044 曲）: ジャンル未定 2,601 曲のうち 59% は手元で決まるので、
+ * AI に訊くのは 160 組・1,755 トークンで足りた。
+ *
+ * ★effort は medium。名前から系統を当てる仕事で、浅いと字面だけで寄せる。
+ */
+async function ジャンルを埋めさせる({ キー, 残り, ジャンル一覧 }) {
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  if (!Array.isArray(残り) || !残り.length) {
+    return { ok: false, error: '埋めるものがありません' };
+  }
+  if (!Array.isArray(ジャンル一覧) || !ジャンル一覧.length) {
+    return { ok: false, error: '選べるジャンルがありません' };
+  }
+
+  let Anthropic; let z; let zodOutputFormat;
+  try {
+    Anthropic = require('@anthropic-ai/sdk').default ?? require('@anthropic-ai/sdk');
+    ({ z } = require('zod'));
+    ({ zodOutputFormat } = require('@anthropic-ai/sdk/helpers/zod'));
+  } catch {
+    return { ok: false, error: 'AI の部品が読み込めません' };
+  }
+
+  const かたち = z.object({
+    割り当て: z.array(z.object({
+      番号: z.number(),
+      ジャンル: z.string(),
+      訳: z.string(),
+    })),
+  });
+
+  try {
+    const client = new Anthropic({ apiKey: キー });
+    /*
+     * ★1 組につき 60 トークンほど（番号・ジャンル名・訳）。
+     * 考えるぶんを 16,000 見て、流し込みで受ける（21,333 の壁）。
+     */
+    const 返り = await client.messages.stream({
+      model: 使うモデル,
+      max_tokens: Math.max(16000, 残り.length * 60 + 16000),
+      system: naoshi.埋める頼み文(残り, ジャンル一覧),
+      messages: [{ role: 'user', content: '振り分けてください。' }],
+      output_config: { effort: 'medium', format: zodOutputFormat(かたち) },
+    }).finalMessage();
+
+    if (返り.stop_reason === 'refusal') return { ok: false, error: 'AI が答えを断りました' };
+    if (返り.stop_reason === 'max_tokens') {
+      return { ok: false, error: '返事が長すぎて切れました。もう一度お試しください' };
+    }
+    const 出 = 返り.parsed_output;
+    if (!出 || !Array.isArray(出.割り当て)) {
+      return { ok: false, error: 'AI の返事を読み取れませんでした' };
+    }
+
+    /* ★手元にあるジャンル名だけを通す。作られた名前は落とす */
+    return { ok: true, ...naoshi.埋める返事を整える(出, 残り, ジャンル一覧) };
+  } catch (e) {
+    return { ok: false, error: String((e && e.message) || e) };
+  }
+}
+module.exports = { ジャンルを埋めさせる, ジャンルをまとめさせる, 木を混ぜる, 使うモデル, 候補の数, 作る曲数, 見せる演者の数, 目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 曲数を丸める, ジャンル一覧を作る, 頼み文, 照らし合わせる, おすすめを聞く, プレイリストの頼み文, 並びを確かめる, プレイリストを作らせる, 木の頼み文, 木を生やす };

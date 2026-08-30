@@ -58,6 +58,16 @@ contextBridge.exposeInMainWorld('mp3', {
    * ★自分の音源（2026-08-30）。演者名で覚える。
    * 曲は消さない。一覧にも残る。くじと AI の候補に入らないだけ。
    */
+  /*
+   * ★手直し（2026-08-30）。消せる別ファイルに残す層。
+   * 消せば完全に元通りになる。
+   */
+  手直しを取る: () => ipcRenderer.invoke('naoshi:get'),
+  手直しを足す: (足すもの, 今日) => ipcRenderer.invoke('naoshi:add', 足すもの, 今日),
+  手直しを捨てる: () => ipcRenderer.invoke('naoshi:forget'),
+  手直しの置き場を開く: () => ipcRenderer.invoke('naoshi:reveal'),
+  ジャンルを埋めさせる: (残り, ジャンル一覧) => ipcRenderer.invoke('genre:fill', 残り, ジャンル一覧),
+
   自分の音源を取る: () => ipcRenderer.invoke('own:get'),
   自分の音源を変える: (演者たち, 入れるか) => ipcRenderer.invoke('own:set', 演者たち, 入れるか),
 

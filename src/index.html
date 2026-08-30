@@ -172,6 +172,12 @@
    */
   tr.mine td { opacity: .72; }
   tr.mine td.title::before { content: '✎ '; opacity: .85; }
+  /*
+   * ★手直しで入れたジャンルの曲（2026-08-30）。手直し.json を消せば戻る。
+   * ★一覧に「ジャンル」の列は無い（ジャンルは上のカラムだけ）ので、
+   * 曲名の**後ろ**に出す。前は skip と mine が使っている。
+   */
+  tr.naoshi td.title::after { content: ' ✚'; color: var(--accent); opacity: .8; }
   td.play-cell { color: var(--accent); text-align: center; cursor: pointer; }
   td.num { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 48px; }
   td.dur { text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; width: 64px; }
@@ -396,6 +402,7 @@
 <audio id="audio"></audio>
 <script src="shuffle.js"></script>
 <script src="genre.js"></script>
+<script src="naoshi.js"></script>
 <script src="resonance.js"></script>
 <script src="loudness.js"></script>
 <script src="renderer.js"></script>

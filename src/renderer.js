@@ -413,12 +413,209 @@ async function ジャンルをまとめる(言った) {
  * まとめただけでは札が古いままになる。描き直すたびにここで直す。
  */
 function まとめのボタンを直す() {
+  /* ★手直しの有無で、2 つのボタンを出し隠しする（欄は作り直さないので、ここで） */
+  const 件 = Object.keys((手直し && 手直し.曲) || {}).length;
+  for (const id of ['naoshishow', 'naoshioff']) {
+    const e = $(id);
+    if (e) e.style.display = 件 ? '' : 'none';
+  }
+  const 捨 = $('naoshioff');
+  if (捨 && 件) 捨.textContent = `手直しを捨てる（${件.toLocaleString('ja-JP')} 曲）`;
   const 組む = $('aigenre');
   if (組む) {
     組む.textContent = ジャンルのまとめ.組.length ? 'ジャンル名をまとめ直す' : 'ジャンル名をまとめる';
   }
   const やめ = $('aigenreoff');
   if (やめ) やめ.style.display = ジャンルのまとめ.組.length ? '' : 'none';
+}
+
+/** 手直しの控え（★消せる別ファイル『手直し.json』に残してある） */
+let 手直し = { 曲: {}, 直した日: '' };
+let 手直しの置き場 = '';
+
+/**
+ * ジャンルの付いていない曲を埋める（2026-08-30 本人の希望）。
+ *   > ジャンル名無しのデータがたくさんあってそれをいちいち振り分けるのが大変だから
+ *   > AI の力でジャンル名無しのデータを他のジャンルに振り分けられないでしょうか？
+ *   > 多少の間違いはありにします
+ *
+ * ★まず手元で決める。AI に訊くのは、それでも決まらなかったぶんだけ。
+ * 実測（86,044 曲）: ジャンル未定 2,601 曲のうち **59% は手元で決まる**。
+ * 同じ演者の別の曲に付いているジャンルを使うので、推測ですらない。
+ */
+async function ジャンルを埋める(言った) {
+  const 全部 = 見える曲();
+  const { 決まった, 残り } = 演者から決める(全部);
+  if (!決まった.length && !残り.length) {
+    知らせる('ジャンルの付いていない曲はありません。');
+    return;
+  }
+
+  /* ★AI に訊くのは、手元で決まらなかったぶんだけ */
+  let AIの分 = { 決まった: [], 落とした: null, 訊いた: 0 };
+  if (残り.length) {
+    言った.textContent = `${残り.length} 組を AI に訊いています…`;
+    const 一覧 = ジャンルを数える(全部).filter((g) => !ジャンル未定か({ genre: g.名 })).map((g) => g.名);
+    const r = await window.mp3.ジャンルを埋めさせる(
+      残り.map((b) => ({ artist: b.artist, 盤: [...b.盤], 曲: b.曲 })),
+      一覧,
+    );
+    if (!r || !r.ok) {
+      言った.textContent = 'だめでした';
+      $('status').textContent = '⚠ 振り分けられませんでした: ' + ((r && r.error) || '不明');
+      /* ★AI がだめでも、手元で決まったぶんは活かす */
+      if (!決まった.length) return;
+    } else {
+      AIの分 = r;
+    }
+  }
+  言った.textContent = '';
+
+  /* AI のぶんを、曲ごとの形にほどく */
+  const AI曲 = [];
+  for (const c of AIの分.決まった) {
+    for (const x of c.曲) {
+      AI曲.push({ path: x.path, genre: c.genre, 元: x.元, 訳: `AI: ${c.訳 || c.artist}` });
+    }
+  }
+
+  const 採る = await 埋め方を見せて訊く(決まった, AIの分, AI曲);
+  if (!採る || !採る.length) {
+    $('status').textContent = 'ジャンルの振り分けはやめました（何も変わっていません）';
+    return;
+  }
+
+  const 返り = await window.mp3.手直しを足す(採る, new Date().toISOString().slice(0, 10));
+  if (!返り || !返り.ok) {
+    $('status').textContent = '⚠ 手直しを覚えられませんでした';
+    return;
+  }
+  手直し = 返り.手直し;
+  /* ★手元の曲にも当てる。走査し直さずに、その場で見えるように */
+  for (const x of 採る) {
+    const i = tracks.findIndex((t) => t.path === x.path);
+    if (i >= 0) tracks[i] = { ...tracks[i], genre: x.genre, 手直し: true };
+  }
+  sel = { ...sel, genre: null, まとめ: null };
+  描き直す();
+  $('status').textContent = `${採る.length.toLocaleString('ja-JP')} 曲にジャンルを入れました`
+    + `（手元で ${採る.filter((x) => !/^AI: /.test(x.訳 || '')).length} 曲、AI で ${採る.filter((x) => /^AI: /.test(x.訳 || '')).length} 曲）`
+    + '。手直し.json に残してあるので、消せば元通りになります';
+}
+
+/**
+ * 埋め方を見せて訊く。★手元で決まったぶんと AI のぶんを、分けて見せる。
+ * どちらを信じるかが違うので、混ぜて見せてはいけない。
+ */
+function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
+  const box = document.getElementById('ask');
+  if (!box) return Promise.resolve(null);
+  if (訊いている) 訊く欄を閉じる(false);
+  const 箱 = box.querySelector('.box');
+  箱.className = 'box wide';
+  const 文 = box.querySelector('.msg');
+  文.innerHTML = '';
+
+  const 見出し = document.createElement('div');
+  見出し.textContent = `ジャンルの付いていない ${(決まった.length + AI曲.length).toLocaleString('ja-JP')} 曲に、ジャンルを入れます。`
+    + String.fromCharCode(10) + '要らない組はチェックを外してください。';
+  文.appendChild(見出し);
+
+  const 印たち = [];
+  const 束 = document.createElement('div');
+  束.className = 'groups';
+  const 段 = (題, 説き) => {
+    const h = document.createElement('div');
+    h.className = 'wake';
+    h.style.padding = '6px 10px';
+    h.style.background = 'var(--accent-bg)';
+    h.textContent = 題 + (説き ? `　${説き}` : '');
+    束.appendChild(h);
+  };
+  const 行 = (札, 訳, 曲たち) => {
+    const l = document.createElement('label');
+    const 印 = document.createElement('input');
+    印.type = 'checkbox';
+    印.checked = true;
+    印たち.push([印, 曲たち]);
+    const 名 = document.createElement('span');
+    名.className = 'oya';
+    名.textContent = ' ' + 札 + ' ';
+    const 数 = document.createElement('span');
+    数.className = 'kazu';
+    数.textContent = `（${曲たち.length} 曲）`;
+    l.append(印, 名, 数);
+    if (訳) {
+      const w = document.createElement('span');
+      w.className = 'wake';
+      w.textContent = 訳;
+      l.appendChild(w);
+    }
+    束.appendChild(l);
+  };
+
+  /* ★手元で決まったぶん。演者ごとにまとめて見せる */
+  if (決まった.length) {
+    段(`◆ 手元で決まったもの（${決まった.length.toLocaleString('ja-JP')} 曲）`,
+      '同じ演者の別の曲に付いているジャンルです。推測ではありません');
+    const 演者ごと = new Map();
+    for (const x of 決まった) {
+      const k = 小文字(String(x.artist || '')) + ' / ' + x.genre;
+      if (!演者ごと.has(k)) 演者ごと.set(k, { artist: x.artist, genre: x.genre, 訳: x.訳, 曲: [] });
+      演者ごと.get(k).曲.push(x);
+    }
+    for (const b of [...演者ごと.values()].sort((a, c) => c.曲.length - a.曲.length)) {
+      行(`${b.artist} → ${b.genre}`, b.訳, b.曲);
+    }
+  }
+
+  /* ★AI のぶん */
+  if (AI曲.length) {
+    段(`◆ AI が当てたもの（${AI曲.length.toLocaleString('ja-JP')} 曲）`,
+      '手元に手がかりが無かったぶんです。多少の外れはあります');
+    for (const c of AIの分.決まった) {
+      const 曲たち = AI曲.filter((x) => x.訳 === `AI: ${c.訳 || c.artist}`);
+      if (曲たち.length) 行(`${c.artist} → ${c.genre}`, c.訳, 曲たち);
+    }
+  }
+  文.appendChild(束);
+
+  const 添え = document.createElement('div');
+  添え.className = 'said';
+  const 言い分 = [];
+  const 落 = AIの分.落とした;
+  if (落 && 落.知らないジャンル && 落.知らないジャンル.length) {
+    言い分.push(`AI が挙げた ${落.知らないジャンル.length} 個は手元に無いジャンル名だったので外しました`);
+  }
+  const 当たらず = (AIの分.訊いた || 0) - (AIの分.決まった || []).length;
+  if (当たらず > 0) 言い分.push(`${当たらず} 組は AI も見当が付きませんでした（そのままです）`);
+  言い分.push('入れたぶんは 手直し.json に残ります。消せば元通りになります');
+  添え.textContent = 言い分.join('。');
+  文.appendChild(添え);
+
+  const 並 = box.querySelector('.row');
+  並.innerHTML = '';
+  const 作る = (札, 答, 主) => {
+    const b = document.createElement('button');
+    b.textContent = 札;
+    if (主) b.className = 'main';
+    b.onclick = () => { 箱.className = 'box'; 訊く欄を閉じる(答); };
+    並.appendChild(b);
+    return b;
+  };
+  作る('やめる', false, false);
+  const はい = 作る('これで入れる', true, true);
+  setTimeout(() => はい.focus(), 0);
+
+  const 出来 = new Promise((決着) => { 訊いている = 決着; });
+  box.className = 'on';
+  return 出来.then((答) => {
+    箱.className = 'box';
+    if (!答) return null;
+    const 出 = [];
+    for (const [印, 曲たち] of 印たち) if (印.checked) 出.push(...曲たち);
+    return 出;
+  });
 }
 
 /** まとめを入れ替えて、索引を作り直す */
@@ -1866,11 +2063,37 @@ function 気分の欄を描く() {
   やめる押す.title = "まとめを捨てて、元のジャンル名だけに戻します";
   やめる押す.style.display = ジャンルのまとめ.組.length ? "" : "none";
 
+  /*
+   * ★手直しを見る／捨てる（2026-08-30 本人の希望）。
+   *   > そのセーブデータを削除や直すことで元通りにすることはできないでしょうか？
+   *
+   * 見る … 手直し.json のある場所を開く。中は読める形で書いてあるので、
+   *        本人が 1 件だけ直したり消したりできる
+   * 捨てる … 丸ごと消す。**これで完全に元通りになる**
+   */
+  const 手直し見る = document.createElement("button");
+  手直し見る.className = "btn"; 手直し見る.id = "naoshishow";
+  手直し見る.textContent = "手直しを見る";
+  手直し見る.title = "手直し.json のある場所を開きます（中を見て、直したり消したりできます）";
+  手直し見る.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
+
+  const 手直し捨てる = document.createElement("button");
+  手直し捨てる.className = "btn"; 手直し捨てる.id = "naoshioff";
+  手直し捨てる.textContent = "手直しを捨てる";
+  手直し捨てる.title = "手直しを丸ごと消して、元のジャンルに戻します";
+  手直し捨てる.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
+
+  /* ── ジャンルの付いていない曲を埋める（2026-08-30 本人の希望） ── */
+  const 埋める押す = document.createElement("button");
+  埋める押す.className = "btn"; 埋める押す.id = "aifill";
+  埋める押す.textContent = "ジャンル名無しを埋める";
+  埋める押す.title = "ジャンルの付いていない曲に、ジャンルを入れます（まず手元で決め、決まらないぶんだけ AI に訊きます。手直し.json に残るので消せば元通り）";
+
   const 言った = document.createElement("span");
   言った.className = "said"; 言った.id = "aisaid";
 
   const 止める = (と) => {
-    for (const e of [押す, 欄, 辿る, 欄2, まとめる押す, やめる押す]) e.disabled = と;
+    for (const e of [押す, 欄, 辿る, 欄2, まとめる押す, やめる押す, 埋める押す, 手直し見る, 手直し捨てる]) e.disabled = と;
     // ★組んでいる最中につまみを動かしても、いま走っているぶんには効かない。
     // 動かせるままだと「効かなかった」と見えるので、いっしょに止める
     for (const id of ["aiwide", "aimany", "aistrict"]) { const e = $(id); if (e) e.disabled = と; }
@@ -1989,6 +2212,44 @@ function 気分の欄を描く() {
   押す.onclick = 気分で;
   辿る.onclick = 辿って;
   まとめる押す.onclick = まとめて;
+  手直し見る.onclick = async () => {
+    const r = await window.mp3.手直しの置き場を開く();
+    $('status').textContent = (r && r.ok)
+      ? `手直しの置き場を開きました: ${r.置き場}`
+      : `⚠ 開けませんでした: ${(r && r.error) || '不明'}`;
+  };
+  手直し捨てる.onclick = async () => {
+    const 件 = Object.keys(手直し.曲 || {}).length;
+    if (!(await 訊く(
+      `手直し ${件.toLocaleString('ja-JP')} 曲ぶんを、丸ごと捨てます。` + String.fromCharCode(10)
+      + '元のジャンルに戻ります。曲は消えません。',
+      true,
+    ))) return;
+    await window.mp3.手直しを捨てる();
+    手直し = { 曲: {}, 直した日: '' };
+    /* ★その場でも元に戻す。走査し直さずに見えるように */
+    for (let i = 0; i < tracks.length; i += 1) {
+      if (tracks[i] && tracks[i].手直し) {
+        const t = { ...tracks[i] };
+        delete t.手直し;
+        tracks[i] = t;
+      }
+    }
+    $('status').textContent = '手直しを捨てました。次に開くと、元のジャンルに戻ります'
+      + '（いま見えているぶんは、印だけ外しました）';
+    描き直す();
+  };
+
+  埋める押す.onclick = async () => {
+    止める(true);
+    try {
+      await ジャンルを埋める($("aisaid") || 言った);
+    } finally {
+      for (const id of ["aigo", "aiword", "restreego", "restree", "aiwide", "aimany", "aistrict", "aigenre", "aifill"]) {
+        const e = $(id); if (e) e.disabled = false;
+      }
+    }
+  };
   やめる押す.onclick = async () => {
     if (!(await 訊く(
       `ジャンルのまとめ（${ジャンルのまとめ.組.length} 組）を捨てます。` + String.fromCharCode(10)
@@ -2005,7 +2266,7 @@ function 気分の欄を描く() {
   欄.onkeydown = (e) => { if (e.key === "Enter") 気分で(); };
   欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
 
-  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 印3, まとめる押す, やめる押す, 言った);
+  box.append(印, 欄, 押す, 印2, 欄2, 辿る, 印3, まとめる押す, 埋める押す, やめる押す, 手直し見る, 手直し捨てる, 言った);
   // ★つまみは 2 段目に置く。1 行に並べると、記入欄が押しつぶされる
   const つまみ = つまみの行();
   if (つまみ) box.append(つまみ);
@@ -2535,6 +2796,8 @@ function 一覧を描く() {
     if (シャッフル除外.has(t.path)) tr.classList.add('skip');
     // ★自分の音源。一覧には残す（押せば鳴る）が、それと分かるようにする
     if (自分のか(t)) tr.classList.add('mine');
+    // ★手直しで入れたジャンル。元の値ではないと分かるようにする
+    if (t.手直し) tr.classList.add('naoshi');
     // ★ダブルクリックだけだと、押せる場所が見えない（実地で「再生する導線が無い」と言われた）。
     // 1回のクリックでも鳴るようにし、行頭に ▶ も出す。
     // ただし**掴んで並べ替えた直後は鳴らさない**（並べ替えるたびに曲が変わってしまう）
@@ -4248,6 +4511,15 @@ $('unhide').onclick = async () => {
 
   // ★覚えた「タグ無しを隠す」を戻す
   タグ無しを隠す = await window.mp3.タグ無しを隠すか();
+  /*
+   * ★手直しを読む（2026-08-30）。
+   * 本体が曲に重ねてから渡してくれるので、ここでは控えを持つだけ。
+   * 置き場は、本人に見せるために覚えておく。
+   */
+  {
+    const 手 = await window.mp3.手直しを取る();
+    if (手) { 手直し = 手.手直し; 手直しの置き場 = 手.置き場; }
+  }
   // ★覚えた「自分の音源」を戻す
   自分の音源 = new Set(await window.mp3.自分の音源を取る());
   // ★覚えたジャンルのまとめを戻す（無ければ空のまま。タブも出ない）

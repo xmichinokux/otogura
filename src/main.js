@@ -14,7 +14,7 @@
  * 指示書に無い判断が要るときは、実装で埋めずに相談する。
  */
 
-const { app, BrowserWindow, ipcMain, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 /*
@@ -27,8 +27,9 @@ const { scanLibrary, アートワークを読む, readTags, 目印 } = require('
 const { 掃除する, m3uにする, m3uを読む, 名前を安全に, 持ち出すm3u } = require('./playlists');
 const { タグを書く } = require('./tags');
 const genre = require('./genre');
+const naoshi = require('./naoshi');
 const { おすすめを聞く, プレイリストを作らせる, 木を生やす, 候補の数, 作る曲数, 見せる演者の数,
-  目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる, ジャンルをまとめさせる } = require('./ai');
+  目盛の数, 既定の目盛, 幅の段, 量の段, 強度の段, 幅を読む, 量を読む, 強度を読む, 木を混ぜる, ジャンルをまとめさせる, ジャンルを埋めさせる } = require('./ai');
 const { 読み込む: 響きを読み込む, 響きの一節 } = require('./resonance');   // 一覧は画面側が作る（見える曲だけを対象にするため）
 
 /**
@@ -427,6 +428,47 @@ ipcMain.handle('resonance:get', async () => {
    ★曲は消さない。一覧にも残る。押せば鳴る。
    くじ（シャッフル）と AI の候補に入らないだけ。 */
 
+/* ── 手直し ─────────────────────────────────────────────
+   ★消せる別ファイル（手直し.json）に残す。消せば完全に元通り。 */
+
+ipcMain.handle('naoshi:get', async () => {
+  手直しの控え = await 手直しを読む();
+  return { 手直し: 手直しの控え, 置き場: 手直しファイル() };
+});
+
+/** 手直しを足す（AI の振り分けも、手で直したぶんも、ここへ入る） */
+ipcMain.handle('naoshi:add', async (_e, 足すもの, 今日) => {
+  const 前 = await 手直しを読む();
+  const 後 = naoshi.手直しに足す(前, 足すもの, typeof 今日 === 'string' ? 今日 : '');
+  await 手直しを書く(後);
+  手直しの控え = 後;
+  return { ok: true, 手直し: 後, 件数: Object.keys(後.曲).length };
+});
+
+/** 手直しを丸ごと捨てる（★これで完全に元通りになる） */
+ipcMain.handle('naoshi:forget', async () => {
+  try { await fs.unlink(手直しファイル()); } catch { /* もともと無い */ }
+  手直しの控え = { 曲: {}, 直した日: '' };
+  return { ok: true };
+});
+
+/** 手直しファイルの置き場を、explorer で開く（本人が中を見て直せるように） */
+ipcMain.handle('naoshi:reveal', async () => {
+  try {
+    await 手直しを書く(await 手直しを読む());   // 無ければ作ってから見せる
+    shell.showItemInFolder(手直しファイル());
+    return { ok: true, 置き場: 手直しファイル() };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || '不明' };
+  }
+});
+
+ipcMain.handle('genre:fill', async (_e, 残り, ジャンル一覧) => {
+  const キー = await キーを読む();
+  if (!キー) return { ok: false, error: 'APIキーが設定されていません' };
+  return ジャンルを埋めさせる({ キー, 残り, ジャンル一覧 });
+});
+
 ipcMain.handle('own:set', async (_e, 演者たち, 入れるか) => {
   const s = await 設定を読む();
   const 今 = new Set(s.自分の音源);
@@ -659,6 +701,34 @@ ipcMain.handle('tracks:unhideAll', async () => {
  * **人が開いて読めるファイルではなくなる。**
  * 設定は小さく保ち、機械が使う大きいものは別にする。
  */
+/*
+ * ★手直し（2026-08-30 本人の希望）。
+ *   > どこかに記録をセーブして、そのセーブデータを削除や直すことで
+ *   > 元通りにすることはできないでしょうか？
+ *
+ * ★覚え書き（library-cache.json・32 MB）とは別のファイルにする。
+ * 覚え書きは走査が作り直すもので、手で直したものを混ぜると
+ * 走査のたびに消えるかどうかが読めなくなる。
+ * こちらは小さいので、本人が開いて見て、直して、消せる。
+ *
+ * ★このファイルを消せば、完全に元通りになる。それがこの層の約束。
+ */
+const 手直しファイル = () => path.join(app.getPath('userData'), '手直し.json');
+
+async function 手直しを読む() {
+  try {
+    return naoshi.手直しを整える(JSON.parse(await fs.readFile(手直しファイル(), 'utf8')));
+  } catch {
+    return { 曲: {}, 直した日: '' };
+  }
+}
+
+async function 手直しを書く(v) {
+  await fs.mkdir(path.dirname(手直しファイル()), { recursive: true });
+  /* ★人が開いて読める形で書く。直せることが値打ちなので、詰めない */
+  await fs.writeFile(手直しファイル(), JSON.stringify(naoshi.手直しを整える(v), null, 2), 'utf8');
+}
+
 const 覚え書きファイル = () => path.join(app.getPath('userData'), 'library-cache.json');
 
 async function 覚え書きを読む() {
@@ -709,6 +779,13 @@ async function 覚え書きを書く(v) {
  * ★走査せずに出すところと、フォルダが無いときの戻り値で、同じものを使う。
  * 2 か所に書くと、片方だけ直す事故になる。
  */
+/*
+ * ★手直しを重ねてから渡す（2026-08-30）。
+ * ここと走査の返しの 2 か所だけで、画面も AI もくじも書き出しも
+ * 直したあとの値を見る。ほかには手を入れなくて済む。
+ */
+let 手直しの控え = { 曲: {}, 直した日: '' };
+
 function 覚えている曲(s, 覚え) {
   const 隠す = new Set(s.hidden);
   const tracks = [];
@@ -718,7 +795,7 @@ function 覚えている曲(s, 覚え) {
     if (p.replace(/^.*[\\/]/, '').startsWith('._')) continue;
     if (v && v.track) tracks.push(v.track);
   }
-  return tracks;
+  return naoshi.手直しを重ねる(tracks, 手直しの控え);
 }
 
 ipcMain.handle('library:cached', async () => {
@@ -850,7 +927,7 @@ ipcMain.handle('scan', async (e) => {
   return {
     // ★途中で止めたことを画面に伝える。黙って「読み終えた」と言わない
     止めた: !!r.止めた,
-    tracks: r.tracks, 見つかった: r.found, 読めなかった: r.unreadable, hidden: r.hidden,
+    tracks: naoshi.手直しを重ねる(r.tracks, 手直しの控え), 見つかった: r.found, 読めなかった: r.unreadable, hidden: r.hidden,
     使い回し: r.使い回し,
     lists: 掃除.lists, リストから落とした: 掃除.落とした,
     // ★覚え書きを残せなかったら、その理由も返す。黙って捨てない

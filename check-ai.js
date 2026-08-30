@@ -401,9 +401,9 @@ const 確認 = (名, 条件, 補足 = '') => {
     /* 受け方が流し込みになっているか（書いてあることも見る） */
     const 本文 = require('node:fs').readFileSync(require('node:path').join(__dirname, 'src/ai.js'), 'utf8');
     確認(
-      '★4 か所とも流し込みで受けている',
-      (本文.match(/messages\.stream\(/g) || []).length === 4
-        && (本文.match(/\.finalMessage\(\)/g) || []).length === 4,
+      '★AI を呼ぶところは、すべて流し込みで受けている',
+      (本文.match(/messages\.stream\(/g) || []).length >= 5
+        && (本文.match(/messages\.stream\(/g) || []).length === (本文.match(/\.finalMessage\(\)/g) || []).length,
       'messages.parse は 21,333 を超えると断られます',
     );
     確認(
