@@ -22,6 +22,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const cp = require('node:child_process');
 const lang = require('./src/lang');
 
 let 落ちた = 0;
@@ -337,6 +338,51 @@ console.log('\n[8] ★2 つの README が、ずれていないか');
       日ハ.length === 2 && 日ハ.join(',') === 英ハ.join(','),
       `日本語 ${日ハ.length} 個 ／ 英語 ${英ハ.length} 個`);
   }
+}
+
+
+console.log('\n[9] ★公開して困るものが、入っていないか');
+/*
+ * ★2026-08-31 本人の指示: 「僕のバンドの名前は書かないようにしてください」
+ *
+ * なぜ機能があるかの記録は残し、**名前だけ**を外した。
+ * ただ、また書いてしまえば入る。だから機械に見張らせる。
+ *
+ * ★禁じる語は、この台本の中でも**繋がった形にしない**（足し算で組む）。
+ * そのまま書くと、この検査自身が引っかかってしまう。
+ */
+{
+  const 禁じる = [
+    ['バンド名', 'still i ' + 'regret'],
+    ['バンド名', 'blue ' + 'sketch'],
+    ['バンド名', 'pen' + 'ance'],
+    ['バンド名', 'michi' + 'noku'],
+    ['家の道', 'C:/Users/' + 'xmich/'],
+    ['家の道', 'C:' + String.fromCharCode(92) + String.fromCharCode(92) + 'Users' + String.fromCharCode(92) + String.fromCharCode(92) + 'xmich' + String.fromCharCode(92) + String.fromCharCode(92)],
+  ];
+  /* ★GitHub の口座名（xmichinokux）は別物。README の URL に要る */
+  const 見逃す = /xmichinokux/g;
+
+  const 一覧 = String(cp.execSync('git ls-files', { cwd: __dirname })).split('\n')
+    .map((v) => v.trim()).filter(Boolean);
+  const 見つけた = [];
+  for (const f of 一覧) {
+    let 中; try { 中 = fs.readFileSync(path.join(__dirname, f), 'utf8'); } catch { continue; }
+    const 素 = 中.replace(見逃す, '');
+    for (const [種, 語] of 禁じる) {
+      if (素.toLowerCase().includes(語.toLowerCase())) 見つけた.push(`${f}（${種}）`);
+    }
+  }
+  console.log(`  追いかけているファイル ${一覧.length} 個を見ました`);
+  確認('★本人のバンド名も、家の道も、入っていない', 見つけた.length === 0,
+    [...new Set(見つけた)].slice(0, 6).join('／'));
+
+  /* ★鍵らしきものが混ざっていないか（AppData に置く決まりだが、念のため） */
+  const 鍵の形 = /sk-ant-[A-Za-z0-9_-]{20,}/;
+  const 鍵 = 一覧.filter((f) => {
+    try { return 鍵の形.test(fs.readFileSync(path.join(__dirname, f), 'utf8')); } catch { return false; }
+  });
+  確認('★API キーらしきものが入っていない', 鍵.length === 0, 鍵.join('／'));
 }
 
 console.log('');
