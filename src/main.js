@@ -1344,7 +1344,38 @@ ipcMain.handle('tags:write', async (_e, filePath, 変更) => {
   if (typeof filePath !== 'string' || !変更 || typeof 変更 !== 'object') {
     return { ok: false, error: '指定が正しくありません' };
   }
-  return タグを書く(filePath, 変更);
+  const r = await タグを書く(filePath, 変更);
+  if (!r || !r.ok) return r;
+
+  /*
+   * ★手で直したら、その欄の手直しは外す（2026-08-30 本人の報告）。
+   *
+   *   > ジャンルをまとめたタブの中でタグ編集をすると反映されなかった
+   *   > （ジャンル名無しを変更しました）
+   *
+   * 「ジャンル名無し」の曲には AI で埋めた手直しが載っている。
+   * 外さないと、**重ねる層のほうが勝ち続けて手の直しが消える。**
+   * mp3 も覚え書きも新しい値なのに、画面だけ古いまま ―― がこれだった。
+   *
+   * ★手のほうが新しく、意図もはっきりしている。手が勝つ。
+   * ★外すのは**書いた欄だけ**。ほかの欄の手直しは残す。
+   */
+  try {
+    const 欄たち = Object.keys(変更).filter((k) => ['genre', 'artist', 'album', 'title'].includes(k));
+    if (欄たち.length) {
+      const 前 = await 手直しを読む();
+      const { 手直し: 後, 外した } = naoshi.手直しから外す(前, filePath, 欄たち);
+      if (外した.length) {
+        await 手直しを書く(後);
+        手直しの控え = 後;
+        return { ...r, 手直しを外した: 外した };
+      }
+    }
+  } catch (e) {
+    /* ★黙らせない。タグは書けているので、そのことも一緒に返す */
+    return { ...r, 手直しの外し方: 'だめでした: ' + ((e && e.message) || '不明') };
+  }
+  return r;
 });
 
 /* ── 音量そろえ ─────────────────────────────────────────
