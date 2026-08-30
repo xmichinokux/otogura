@@ -62,6 +62,15 @@ contextBridge.exposeInMainWorld('mp3', {
    * ★手直し（2026-08-30）。消せる別ファイルに残す層。
    * 消せば完全に元通りになる。
    */
+  /*
+   * ★打った文の履歴（2026-08-30）。設定とは別のファイルに置いてある。
+   * 消したくなるものなので、消しても他を巻き込まない。
+   */
+  履歴を取る: () => ipcRenderer.invoke('hist:get'),
+  履歴に足す: (種, 文) => ipcRenderer.invoke('hist:add', 種, 文),
+  履歴から消す: (種, 文) => ipcRenderer.invoke('hist:remove', 種, 文),
+  履歴を全部消す: (種) => ipcRenderer.invoke('hist:clear', 種),
+
   手直しを取る: () => ipcRenderer.invoke('naoshi:get'),
   手直しを足す: (足すもの, 今日) => ipcRenderer.invoke('naoshi:add', 足すもの, 今日),
   手直しを捨てる: () => ipcRenderer.invoke('naoshi:forget'),

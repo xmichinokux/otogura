@@ -133,9 +133,30 @@ async function 設定を読む() {
   }
 }
 
+/*
+ * ★書けたかを確かめる（2026-08-30）。
+ *
+ * 実地で、settings.json が 5 日間まったく更新されていないのに
+ * 同じ置き場の 手直し.json は書けている、という状態が見つかった。
+ * コードは同じ形で、原因は突き止められていない。
+ *
+ * ★分からないものを黙らせない。書いたあとに読み返して、
+ * 中身が合わなければ**投げる**。呼んだ側から画面へ伝わる。
+ * 設定が黙って失われるのが、いちばん困る。
+ */
 async function 設定を書く(v) {
   await fs.mkdir(path.dirname(設定ファイル()), { recursive: true });
-  await fs.writeFile(設定ファイル(), JSON.stringify(v, null, 2), 'utf8');
+  const 文 = JSON.stringify(v, null, 2);
+  await fs.writeFile(設定ファイル(), 文, 'utf8');
+  let 読み返し;
+  try {
+    読み返し = await fs.readFile(設定ファイル(), 'utf8');
+  } catch (e) {
+    throw new Error('設定を書いたのに読み返せません: ' + ((e && e.message) || '不明'));
+  }
+  if (読み返し !== 文) {
+    throw new Error('設定を書いたのに、中身が変わっていません（' + 設定ファイル() + '）');
+  }
 }
 
 function ウィンドウを作る() {
@@ -431,6 +452,44 @@ ipcMain.handle('resonance:get', async () => {
 /* ── 手直し ─────────────────────────────────────────────
    ★消せる別ファイル（手直し.json）に残す。消せば完全に元通り。 */
 
+/* ── 打った文の履歴 ───────────────────────────────────── */
+
+ipcMain.handle('hist:get', async () => 履歴を読む());
+
+/** 打った文を覚える。★同じ文は上に来るだけで、増えない */
+ipcMain.handle('hist:add', async (_e, 種, 文) => {
+  if (種 !== '気分' && 種 !== '言葉') return 履歴を読む();
+  const t = String(文 ?? '').trim();
+  if (!t) return 履歴を読む();
+  const h = await 履歴を読む();
+  h[種] = [t, ...h[種].filter((x) => x.toLocaleLowerCase('ja') !== t.toLocaleLowerCase('ja'))]
+    .slice(0, 履歴の上限);
+  await 履歴を書く(h);
+  return h;
+});
+
+/** 1 件だけ消す */
+ipcMain.handle('hist:remove', async (_e, 種, 文) => {
+  const h = await 履歴を読む();
+  if (種 === '気分' || 種 === '言葉') {
+    h[種] = h[種].filter((x) => x !== String(文 ?? ''));
+    await 履歴を書く(h);
+  }
+  return h;
+});
+
+/** その種類を全部消す。種類を渡さなければ、履歴ファイルごと消す */
+ipcMain.handle('hist:clear', async (_e, 種) => {
+  if (種 === '気分' || 種 === '言葉') {
+    const h = await 履歴を読む();
+    h[種] = [];
+    await 履歴を書く(h);
+    return h;
+  }
+  try { await fs.unlink(履歴ファイル()); } catch { /* もともと無い */ }
+  return { 気分: [], 言葉: [] };
+});
+
 ipcMain.handle('naoshi:get', async () => {
   手直しの控え = await 手直しを読む();
   return { 手直し: 手直しの控え, 置き場: 手直しファイル() };
@@ -713,6 +772,56 @@ ipcMain.handle('tracks:unhideAll', async () => {
  *
  * ★このファイルを消せば、完全に元通りになる。それがこの層の約束。
  */
+/*
+ * ★打った文の履歴（2026-08-30 本人の希望）。
+ *   > 一回使ったら入力欄の文字は消えてほしいと思う反面、
+ *   > 同じ条件でどんなのできるかな？と試そうとする自分もいて
+ *   > イチイチ文字が消えるのが面倒くさいと思います。
+ *   > 入力欄の履歴が残って入力欄をクリックするとしたに履歴が表示される、
+ *   > みたいな機能があればいいのかな？
+ *   > ちなみに、履歴は消したいとも思うので履歴を消すなにかもほしいのですが。
+ *
+ * ★消したくなるものなので、**設定とは別のファイル**に置く。
+ * 消すときに、ほかの設定を巻き込まない。
+ */
+const 履歴ファイル = () => path.join(app.getPath('userData'), '履歴.json');
+
+/** 履歴は 1 種類につき 20 件まで。それ以上は古いものから捨てる */
+const 履歴の上限 = 20;
+
+function 履歴を整える(v) {
+  const o = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  const 出 = {};
+  for (const 種 of ['気分', '言葉']) {
+    const 生 = Array.isArray(o[種]) ? o[種] : [];
+    const 見た = new Set();
+    const 並び = [];
+    for (const x of 生) {
+      if (typeof x !== 'string') continue;
+      const t = x.trim();
+      if (!t || 見た.has(t.toLocaleLowerCase('ja'))) continue;
+      見た.add(t.toLocaleLowerCase('ja'));
+      並び.push(t.slice(0, 200));
+      if (並び.length >= 履歴の上限) break;
+    }
+    出[種] = 並び;
+  }
+  return 出;
+}
+
+async function 履歴を読む() {
+  try {
+    return 履歴を整える(JSON.parse(await fs.readFile(履歴ファイル(), 'utf8')));
+  } catch {
+    return { 気分: [], 言葉: [] };
+  }
+}
+
+async function 履歴を書く(v) {
+  await fs.mkdir(path.dirname(履歴ファイル()), { recursive: true });
+  await fs.writeFile(履歴ファイル(), JSON.stringify(履歴を整える(v), null, 2), 'utf8');
+}
+
 const 手直しファイル = () => path.join(app.getPath('userData'), '手直し.json');
 
 async function 手直しを読む() {

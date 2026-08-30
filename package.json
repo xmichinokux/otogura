@@ -1,7 +1,7 @@
 {
   "name": "otogura",
   "productName": "Otogura",
-  "version": "0.27.1",
+  "version": "0.28.0",
   "private": false,
   "description": "音蔵 — 大きな音楽ライブラリのためのプレイヤー",
   "author": {
@@ -12,7 +12,7 @@
   "scripts": {
     "start": "electron .",
     "test-music": "node tools/make-test-music.js",
-    "check": "node check-shuffle.js && node check-loudness.js && node check-playlist.js && node check-url.js && node check-tags.js && node check-cache.js && node check-stop.js && node check-sort.js && node check-ai.js && node check-resonance.js && node check-knob.js && node check-genre.js && node check-own.js && node check-naoshi.js && node check-ui.js",
+    "check": "node check-shuffle.js && node check-loudness.js && node check-playlist.js && node check-url.js && node check-tags.js && node check-cache.js && node check-stop.js && node check-sort.js && node check-ai.js && node check-resonance.js && node check-knob.js && node check-genre.js && node check-own.js && node check-naoshi.js && node check-hist.js && node check-ui.js",
     "dist": "electron-builder --win",
     "dist:dir": "electron-builder --win --dir"
   },

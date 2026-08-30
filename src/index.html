@@ -89,6 +89,23 @@
    *   > ボタンが多くてAIの指示欄をあっぱくしてるのでべつのどこかにまとめたいです。
    *   > 一度使ったらあまり使わない機能なので
    */
+  /*
+   * ★打った文の履歴（2026-08-30 本人の希望）。
+   * 欄をクリックすると、下に出る。
+   */
+  #aibar { position: relative; }
+  .histbox { position: absolute; z-index: 40; background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px #0002;
+    max-height: 46vh; overflow-y: auto; min-width: 260px; max-width: 560px; padding: 4px 0; }
+  .histbox .row { display: flex; align-items: center; gap: 6px; padding: 5px 8px 5px 12px;
+    font-size: 12px; cursor: pointer; }
+  .histbox .row:hover { background: var(--accent-bg); }
+  .histbox .row .txt { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .histbox .row .del { color: var(--dim); padding: 0 4px; border-radius: 4px; }
+  .histbox .row .del:hover { background: #0001; color: var(--text); }
+  .histbox .foot { border-top: 1px solid var(--line); margin-top: 4px; padding: 6px 12px;
+    font-size: 12px; color: var(--dim); cursor: pointer; }
+  .histbox .foot:hover { background: var(--accent-bg); color: var(--text); }
   #aibar .tools { flex-basis: 100%; display: none; gap: 8px; flex-wrap: wrap;
     align-items: center; padding: 6px 2px 0; border-top: 1px dashed var(--line); }
   #aibar .tools.on { display: flex; }

@@ -115,6 +115,16 @@ const 確かめる = (文) => 訊く(文, true);
 const 知らせる = (文) => 訊く(文, false);
 
 /* Enter で「はい」、Escape で「やめる」。押しやすさは OS のものと同じにする */
+/* ★履歴の箱は、よそを押したら閉じる */
+document.addEventListener('mousedown', (e) => {
+  if (!出ている履歴) return;
+  if (出ている履歴.contains(e.target) || (e.target.tagName === 'INPUT')) return;
+  履歴を閉じる();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && 出ている履歴) { 履歴を閉じる(); return; }
+});
+
 document.addEventListener('keydown', (e) => {
   if (!訊いている) return;
   if (e.key === 'Escape') { e.preventDefault(); 訊く欄を閉じる(false); }
@@ -618,6 +628,109 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
     for (const [印, 曲たち] of 印たち) if (印.checked) 出.push(...曲たち);
     return 出;
   });
+}
+
+/**
+ * 打った文の履歴（2026-08-30 本人の希望）。
+ *
+ *   > 一回使ったら入力欄の文字は消えてほしいと思う反面、
+ *   > 同じ条件でどんなのできるかな？と試そうとする自分もいて
+ *   > イチイチ文字が消えるのが面倒くさいと思います。
+ *   > 入力欄の履歴が残って入力欄をクリックするとしたに履歴が表示される、
+ *   > みたいな機能があればいいのかな？
+ *
+ * ★消すのはそのまま。**履歴があれば、戻すのは 1 クリック**なので、
+ * 「消えてほしい」と「また使いたい」が両方かなう。
+ */
+let 打った履歴 = { 気分: [], 言葉: [] };
+
+/** いま出している履歴の箱（1 つだけ） */
+let 出ている履歴 = null;
+
+function 履歴を閉じる() {
+  if (出ている履歴) { 出ている履歴.remove(); 出ている履歴 = null; }
+}
+
+/**
+ * 欄の下に履歴を出す。
+ *
+ * @param 欄   その入力欄
+ * @param 種   "気分" か "言葉"
+ * @param 決める 選ばれた文を受け取る
+ */
+function 履歴を出す(欄, 種, 決める) {
+  履歴を閉じる();
+  const 並び = (打った履歴[種] || []).filter(Boolean);
+  if (!並び.length) return;
+
+  const 箱 = document.createElement('div');
+  箱.className = 'histbox';
+  箱.dataset.種 = 種;
+
+  for (const 文 of 並び) {
+    const 行 = document.createElement('div');
+    行.className = 'row';
+    const t = document.createElement('span');
+    t.className = 'txt';
+    t.textContent = 文;
+    t.title = 文;
+    /* ★行のどこを押しても、その文が入る */
+    行.onclick = (e) => {
+      if (e.target.classList.contains("del")) return;
+      決める(文);
+      履歴を閉じる();
+    };
+    const 消 = document.createElement('span');
+    消.className = 'del';
+    消.textContent = '✕';
+    消.title = 'この 1 件を履歴から消す';
+    消.onclick = async (e) => {
+      e.stopPropagation();
+      打った履歴 = await window.mp3.履歴から消す(種, 文);
+      /* ★消したら、その場で出し直す（閉じてしまうと消えたか分からない） */
+      履歴を出す(欄, 種, 決める);
+      欄.focus();
+    };
+    行.append(t, 消);
+    箱.appendChild(行);
+  }
+
+  const 足 = document.createElement('div');
+  足.className = 'foot';
+  足.textContent = `この履歴を全部消す（${並び.length} 件）`;
+  足.onclick = async (e) => {
+    e.stopPropagation();
+    打った履歴 = await window.mp3.履歴を全部消す(種);
+    履歴を閉じる();
+    欄.focus();
+    $('status').textContent = `${種}の履歴を全部消しました`;
+  };
+  箱.appendChild(足);
+
+  document.getElementById('aibar').appendChild(箱);
+  /* 欄の真下に置く（欄の位置は毎回変わるので、そのつど測る） */
+  const 親 = document.getElementById('aibar').getBoundingClientRect();
+  const 元 = 欄.getBoundingClientRect();
+  箱.style.left = `${Math.max(0, 元.left - 親.left)}px`;
+  箱.style.top = `${元.bottom - 親.top + 4}px`;
+  箱.style.minWidth = `${Math.max(260, 元.width)}px`;
+  出ている履歴 = 箱;
+}
+
+/** 欄に、履歴の出し入れを付ける */
+function 履歴をつける(欄, 種) {
+  const 決める = (文) => {
+    欄.value = 文;
+    if (種 === '気分') 打ちかけの言葉 = 文; else 打ちかけの辿る言葉 = 文;
+    欄.focus();
+  };
+  /* ★クリックで出す（本人の言葉どおり）。打っている最中は邪魔しない */
+  欄.addEventListener("mousedown", () => {
+    /* すでに出ていたら閉じる（同じ場所を押したらしまえる） */
+    const 出てた = 出ている履歴 && 出ている履歴.dataset.種 === 種;
+    setTimeout(() => { if (出てた) 履歴を閉じる(); else 履歴を出す(欄, 種, 決める); }, 0);
+  });
+  欄.addEventListener("input", 履歴を閉じる);
 }
 
 /** まとめを入れ替えて、索引を作り直す */
@@ -2227,6 +2340,8 @@ function 気分の欄を描く() {
        * ★画面の欄と、打ちかけの控えの**両方**を消す。片方だと次の描き直しで戻る。
        */
       if (できた) {
+        /* ★組めたときだけ覚える。だめだった文を残しても仕方がない */
+        打った履歴 = await window.mp3.履歴に足す("気分", v);
         打ちかけの言葉 = "";
         const 欄い = $("aiword");
         if (欄い) 欄い.value = "";
@@ -2261,6 +2376,8 @@ function 気分の欄を描く() {
        * 欄が消えないよう、形（none/mood/key）が変わったときだけ作り直す作りだから。
        * だから**画面の欄も直に消す**。気分のほうは最初からそうしていた。
        */
+      /* ★辿れたときだけ覚える。だめだった言葉を残しても仕方がない */
+      打った履歴 = await window.mp3.履歴に足す("言葉", v);
       打ちかけの辿る言葉 = "";
       const 辿る欄 = $("restree");
       if (辿る欄) 辿る欄.value = "";
@@ -2300,6 +2417,9 @@ function 気分の欄を描く() {
       止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
   };
+
+  履歴をつける(欄, "気分");
+  履歴をつける(欄2, "言葉");
 
   押す.onclick = 気分で;
   辿る.onclick = 辿って;
@@ -4653,6 +4773,8 @@ $('unhide').onclick = async () => {
     const 手 = await window.mp3.手直しを取る();
     if (手) { 手直し = 手.手直し; 手直しの置き場 = 手.置き場; }
   }
+  // ★打った文の履歴（設定とは別のファイル）
+  打った履歴 = await window.mp3.履歴を取る();
   // ★覚えた「自分の音源」を戻す
   自分の音源 = new Set(await window.mp3.自分の音源を取る());
   // ★覚えたジャンルのまとめを戻す（無ければ空のまま。タブも出ない）
