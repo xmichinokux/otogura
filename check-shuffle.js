@@ -144,6 +144,8 @@ function 走らせる(仕込み) {
      */
     const 自分の音源 = new Set(仕込み.自分の音源 ?? []);
     const 自分のか = (t) => 自分の音源.has(String((t && t.artist) || '').toLocaleLowerCase('ja').trim());
+    const つなぎか = () => false;   // ★つなぎの小品（2026-08-30）。ここでは誰もつなぎではない
+    void つなぎか;
     void 自分のか;
   `;
   // eslint-disable-next-line no-new-func

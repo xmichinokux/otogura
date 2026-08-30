@@ -84,6 +84,15 @@
   #aibar .knobs .val { min-width: 4.5em; color: var(--text); }
   #aibar .knobs .said { max-width: none; flex: 1; }
   /* ★いま何から組むのか。押す前に見えるところに置く */
+  /*
+   * ★あとから足した「整える」道具は、たたんでおく（2026-08-30 本人の希望）。
+   *   > ボタンが多くてAIの指示欄をあっぱくしてるのでべつのどこかにまとめたいです。
+   *   > 一度使ったらあまり使わない機能なので
+   */
+  #aibar .tools { flex-basis: 100%; display: none; gap: 8px; flex-wrap: wrap;
+    align-items: center; padding: 6px 2px 0; border-top: 1px dashed var(--line); }
+  #aibar .tools.on { display: flex; }
+  #aibar .toolsbtn { margin-left: auto; }
   #aibar .scope { flex-basis: 100%; font-size: 12px; color: var(--dim); padding: 2px 2px 0; }
   #aibar .scope .b { color: var(--accent); font-weight: 600; }
   #aibar .scope .warn { color: #b45309; }
