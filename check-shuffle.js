@@ -114,6 +114,8 @@ function 走らせる(仕込み) {
    * 書き換えないのがいちばん安全。
    */
   const 前置き = `
+    /* ★画面の文は 言() を通る。ここは訳さず、そのまま返せばいい */
+    const 言 = (文) => String(文);
     const 開いているリスト = () => null;
     const 曲を並べる = (a, b) => (a.track ?? 0) - (b.track ?? 0);
     function 絞る(level) {
@@ -281,6 +283,8 @@ const 切り出し5 = 画面.slice(始め5, 終わり5 + 2);
 function 列を走らせる(曲たち) {
   const 環境 = { tracks: 曲たち, 描き直した: 0 };
   const 前置き = `
+    /* ★画面の文は 言() を通る。ここは訳さず、そのまま返せばいい */
+    const 言 = (文) => String(文);
     const 見える曲 = () => 環境.tracks;
     const 小文字 = (v) => String(v).toLocaleLowerCase('ja');
     let sel = { genre: null, artist: null, album: null, 年: null, 月: null, 日: null };

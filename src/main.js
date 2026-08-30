@@ -1057,7 +1057,8 @@ ipcMain.handle('scan', async (e) => {
     if (曲でない(p)) { 落とした += 1; continue; }
     統合[p] = v;
   }
-  if (落とした) 送る('scan:progress', { 段階: `曲でないものを ${落とした.toLocaleString('ja-JP')} 件はずしました`, 済み: 落とした, 全体: null });
+  if (落とした) 送る('scan:progress', { 段階: 言('曲でないものを {n} 件はずしました', { n: 落とした.toLocaleString('ja-JP') }),
+    済み: 落とした, 全体: null });
   let 保存中 = false;
   let 最後の保存 = Date.now();
   const 途中保存 = async () => {

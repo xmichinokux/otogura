@@ -31,7 +31,7 @@ function 不具合を出す(何が, e) {
   const 文 = e && e.message ? e.message : String(e);
   try {
     const s = document.getElementById('status');
-    if (s) s.textContent = `⚠ ${何が}でエラー: ${文}`;
+    if (s) s.textContent = 言('⚠ {何が}でエラー: {文}', { 何が, 文 });
   } catch { /* 画面すら出せないときは、下の console に残る */ }
   console.error(`[${何が}]`, e);
 }
@@ -98,11 +98,11 @@ function 訊く(文, 選ぶか) {
 
   const 出来 = new Promise((決着) => { 訊いている = 決着; });
   if (選ぶか) {
-    作る('やめる', false, false);
-    const はい = 作る('はい', true, true);
+    作る(言('やめる'), false, false);
+    const はい = 作る(言('はい'), true, true);
     setTimeout(() => はい.focus(), 0);
   } else {
-    const 閉 = 作る('閉じる', true, true);
+    const 閉 = 作る(言('閉じる'), true, true);
     setTimeout(() => 閉.focus(), 0);
   }
   box.className = 'on';
@@ -131,8 +131,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); 訊く欄を閉じる(true); }
 });
 
-window.addEventListener('error', (e) => 不具合を出す('画面', e.error || e.message));
-window.addEventListener('unhandledrejection', (e) => 不具合を出す('処理', e.reason));
+window.addEventListener('error', (e) => 不具合を出す(言('画面'), e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => 不具合を出す(言('処理'), e.reason));
 
 /** 全曲。走査のたびに入れ替わる */
 let tracks = [];
@@ -280,8 +280,9 @@ function まとめを見せて訊く(結果) {
 
   const 見出し = document.createElement('div');
   const 曲の合計 = 結果.組.reduce((a, c) => a + c.曲数, 0);
-  見出し.textContent = `AI が ${結果.組.length} 組にまとめました（${曲の合計.toLocaleString('ja-JP')} 曲ぶん）。`
-    + String.fromCharCode(10) + '要らない組はチェックを外してください。外したものは元の名前のまま残ります。';
+  見出し.textContent = 言('AI が {組} 組にまとめました（{曲} 曲ぶん）。',
+    { 組: 結果.組.length, 曲: 曲の合計.toLocaleString('ja-JP') })
+    + String.fromCharCode(10) + 言('要らない組はチェックを外してください。外したものは元の名前のまま残ります。');
   文.appendChild(見出し);
 
   const 並び = document.createElement('div');
@@ -295,10 +296,10 @@ function まとめを見せて訊く(結果) {
     印たち.push([印, c]);
     const 親 = document.createElement('span');
     親.className = 'oya';
-    親.textContent = ' ' + c.親 + ' ';
+    親.textContent = 言(' ') + c.親 + ' ';
     const 数 = document.createElement('span');
     数.className = 'kazu';
-    数.textContent = `（${c.子.length} 個 / ${c.曲数.toLocaleString('ja-JP')} 曲）`;
+    数.textContent = 言('（{名前} 個 / {曲} 曲）', { 名前: c.子.length, 曲: c.曲数.toLocaleString('ja-JP') });
     const 子 = document.createElement('span');
     子.className = 'ko';
     子.textContent = c.子.join('、');
@@ -320,12 +321,12 @@ function まとめを見せて訊く(結果) {
   const 添え = document.createElement('div');
   添え.className = 'said';
   const 言い分 = [];
-  if (結果.残り.length) 言い分.push(`まとめなかった名前 ${結果.残り.length} 個は、そのまま残ります`);
+  if (結果.残り.length) 言い分.push(言('まとめなかった名前 {n} 個は、そのまま残ります', { n: 結果.残り.length }));
   const 落 = 結果.落とした || {};
   if (落.手元に無い && 落.手元に無い.length) {
-    言い分.push(`AI が挙げた ${落.手元に無い.length} 個は手元に無い名前だったので外しました`);
+    言い分.push(言('AI が挙げた {n} 個は手元に無い名前だったので外しました', { n: 落.手元に無い.length }));
   }
-  if (落.二重 && 落.二重.length) 言い分.push(`${落.二重.length} 個は二重だったので先の組に入れました`);
+  if (落.二重 && 落.二重.length) 言い分.push(言('{n} 個は二重だったので先の組に入れました', { n: 落.二重.length }));
   添え.textContent = 言い分.join('。');
   if (言い分.length) 文.appendChild(添え);
 
@@ -342,8 +343,8 @@ function まとめを見せて訊く(結果) {
     行.appendChild(b);
     return b;
   };
-  作る('やめる', false, false);
-  const はい = 作る('これでまとめる', true, true);
+  作る(言('やめる'), false, false);
+  const はい = 作る(言('これでまとめる'), true, true);
   setTimeout(() => はい.focus(), 0);
 
   const 出来 = new Promise((決着) => { 訊いている = 決着; });
@@ -371,30 +372,30 @@ async function ジャンルをまとめる(言った) {
    */
   const 一覧 = ジャンルを数える(見える曲());
   if (!一覧.length) {
-    知らせる('まとめられるジャンル名がありません。先にフォルダを走査してください。');
+    知らせる(言('まとめられるジャンル名がありません。先にフォルダを走査してください。'));
     return;
   }
 
-  言った.textContent = `${一覧.length} 種類のジャンル名をまとめています…`;
+  言った.textContent = 言('{n} 種類のジャンル名をまとめています…', { n: 一覧.length });
   const r = await window.mp3.ジャンルをまとめさせる(
     一覧.map((g) => ({ 名: g.名, 鍵: g.鍵, 曲数: g.曲数 })),
   );
   if (!r || !r.ok) {
     if (止めたか(r, 言った)) return;
     言った.textContent = 言("だめでした");
-    $('status').textContent = '⚠ まとめられませんでした: ' + ((r && r.error) || '不明');
+    $('status').textContent = 言('⚠ まとめられませんでした: ') + ((r && r.error) || 言('不明'));
     return;
   }
   if (!r.組.length) {
-    言った.textContent = '';
-    知らせる('まとめられる組が見つかりませんでした。いまのままで十分ばらけていないようです。');
+    言った.textContent = 言('');
+    知らせる(言('まとめられる組が見つかりませんでした。いまのままで十分ばらけていないようです。'));
     return;
   }
 
-  言った.textContent = '';
+  言った.textContent = 言('');
   const 採る = await まとめを見せて訊く(r);
   if (!採る || !採る.length) {
-    $('status').textContent = 'ジャンルのまとめはやめました（何も変わっていません）';
+    $('status').textContent = 言('ジャンルのまとめはやめました（何も変わっていません）');
     return;
   }
 
@@ -404,7 +405,7 @@ async function ジャンルをまとめる(言った) {
   };
   const 返り = await window.mp3.ジャンルのまとめを覚える(覚え);
   if (!返り || !返り.ok) {
-    $('status').textContent = '⚠ まとめを覚えられませんでした';
+    $('status').textContent = 言('⚠ まとめを覚えられませんでした');
     return;
   }
   まとめを入れる(返り.ジャンルのまとめ);
@@ -413,8 +414,8 @@ async function ジャンルをまとめる(言った) {
   sel = { ...sel, まとめ: null };
   描き直す();
   const 曲 = 採る.reduce((a, c) => a + c.曲数, 0);
-  $('status').textContent = `ジャンルを ${採る.length} 組にまとめました`
-    + `（${曲.toLocaleString('ja-JP')} 曲ぶん）。元のジャンル名はそのまま残っています`;
+  $('status').textContent = 言('ジャンルを {n} 組にまとめました', { n: 採る.length })
+    + 言('（{n} 曲ぶん）。元のジャンル名はそのまま残っています', { n: 曲.toLocaleString('ja-JP') });
 }
 
 /**
@@ -464,8 +465,8 @@ function 言葉のボタンを直す() {
   };
   b.textContent = 札[言葉の設定] || 札.auto;
   b.title = 言葉の設定 === 'auto'
-    ? '画面と AI の言葉。いまは OS に合わせています（押すと 自動→日本語→English）'
-    : '画面と AI の言葉（押すと 自動→日本語→English）';
+    ? 言('画面と AI の言葉。いまは OS に合わせています（押すと 自動→日本語→English）')
+    : 言('画面と AI の言葉（押すと 自動→日本語→English）');
 }
 
 /** 手直しの控え（★消せる別ファイル『手直し.json』に残してある） */
@@ -488,14 +489,14 @@ async function ジャンルを埋める(言った) {
   const 全部 = 見える曲();
   const { 決まった, 残り } = 演者から決める(全部);
   if (!決まった.length && !残り.length) {
-    知らせる('ジャンルの付いていない曲はありません。');
+    知らせる(言('ジャンルの付いていない曲はありません。'));
     return;
   }
 
   /* ★AI に訊くのは、手元で決まらなかったぶんだけ */
   let AIの分 = { 決まった: [], 落とした: null, 訊いた: 0 };
   if (残り.length) {
-    言った.textContent = `${残り.length} 組を AI に訊いています…`;
+    言った.textContent = 言('{n} 組を AI に訊いています…', { n: 残り.length });
     const 一覧 = ジャンルを数える(全部).filter((g) => !ジャンル未定か({ genre: g.名 })).map((g) => g.名);
     const r = await window.mp3.ジャンルを埋めさせる(
       残り.map((b) => ({ artist: b.artist, 盤: [...b.盤], 曲: b.曲 })),
@@ -504,14 +505,14 @@ async function ジャンルを埋める(言った) {
     if (!r || !r.ok) {
       if (止めたか(r, 言った)) return;
       言った.textContent = 言("だめでした");
-      $('status').textContent = '⚠ 振り分けられませんでした: ' + ((r && r.error) || '不明');
+      $('status').textContent = 言('⚠ 振り分けられませんでした: ') + ((r && r.error) || 言('不明'));
       /* ★AI がだめでも、手元で決まったぶんは活かす */
       if (!決まった.length) return;
     } else {
       AIの分 = r;
     }
   }
-  言った.textContent = '';
+  言った.textContent = 言('');
 
   /* AI のぶんを、曲ごとの形にほどく */
   const AI曲 = [];
@@ -523,13 +524,13 @@ async function ジャンルを埋める(言った) {
 
   const 採る = await 埋め方を見せて訊く(決まった, AIの分, AI曲);
   if (!採る || !採る.length) {
-    $('status').textContent = 'ジャンルの振り分けはやめました（何も変わっていません）';
+    $('status').textContent = 言('ジャンルの振り分けはやめました（何も変わっていません）');
     return;
   }
 
   const 返り = await window.mp3.手直しを足す(採る, new Date().toISOString().slice(0, 10));
   if (!返り || !返り.ok) {
-    $('status').textContent = '⚠ 手直しを覚えられませんでした';
+    $('status').textContent = 言('⚠ 手直しを覚えられませんでした');
     return;
   }
   手直し = 返り.手直し;
@@ -540,9 +541,11 @@ async function ジャンルを埋める(言った) {
   }
   sel = { ...sel, genre: null, まとめ: null };
   描き直す();
-  $('status').textContent = `${採る.length.toLocaleString('ja-JP')} 曲にジャンルを入れました`
-    + `（手元で ${採る.filter((x) => !/^AI: /.test(x.訳 || '')).length} 曲、AI で ${採る.filter((x) => /^AI: /.test(x.訳 || '')).length} 曲）`
-    + '。手直し.json に残してあるので、消せば元通りになります';
+  $('status').textContent = 言('{n} 曲にジャンルを入れました', { n: 採る.length.toLocaleString('ja-JP') })
+    + 言('（手元で {手元} 曲、AI で {AI} 曲）',
+      { 手元: 採る.filter((x) => !/^AI: /.test(x.訳 || '')).length,
+        AI: 採る.filter((x) => /^AI: /.test(x.訳 || '')).length })
+    + 言('。手直し.json に残してあるので、消せば元通りになります');
 }
 
 /**
@@ -559,8 +562,9 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
   文.innerHTML = '';
 
   const 見出し = document.createElement('div');
-  見出し.textContent = `ジャンルの付いていない ${(決まった.length + AI曲.length).toLocaleString('ja-JP')} 曲に、ジャンルを入れます。`
-    + String.fromCharCode(10) + '要らない組はチェックを外してください。';
+  見出し.textContent = 言('ジャンルの付いていない {n} 曲に、ジャンルを入れます。',
+    { n: (決まった.length + AI曲.length).toLocaleString('ja-JP') })
+    + String.fromCharCode(10) + 言('要らない組はチェックを外してください。');
   文.appendChild(見出し);
 
   const 印たち = [];
@@ -582,10 +586,10 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
     印たち.push([印, 曲たち]);
     const 名 = document.createElement('span');
     名.className = 'oya';
-    名.textContent = ' ' + 札 + ' ';
+    名.textContent = 言(' ') + 札 + ' ';
     const 数 = document.createElement('span');
     数.className = 'kazu';
-    数.textContent = `（${曲たち.length} 曲）`;
+    数.textContent = 言('（{n} 曲）', { n: 曲たち.length });
     l.append(印, 名, 数);
     if (訳) {
       const w = document.createElement('span');
@@ -598,8 +602,8 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
 
   /* ★手元で決まったぶん。演者ごとにまとめて見せる */
   if (決まった.length) {
-    段(`◆ 手元で決まったもの（${決まった.length.toLocaleString('ja-JP')} 曲）`,
-      '同じ演者の別の曲に付いているジャンルです。推測ではありません');
+    段(言('◆ 手元で決まったもの（{n} 曲）', { n: 決まった.length.toLocaleString('ja-JP') }),
+      言('同じ演者の別の曲に付いているジャンルです。推測ではありません'));
     const 演者ごと = new Map();
     for (const x of 決まった) {
       const k = 小文字(String(x.artist || '')) + ' / ' + x.genre;
@@ -613,8 +617,8 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
 
   /* ★AI のぶん */
   if (AI曲.length) {
-    段(`◆ AI が当てたもの（${AI曲.length.toLocaleString('ja-JP')} 曲）`,
-      '手元に手がかりが無かったぶんです。多少の外れはあります');
+    段(言('◆ AI が当てたもの（{n} 曲）', { n: AI曲.length.toLocaleString('ja-JP') }),
+      言('手元に手がかりが無かったぶんです。多少の外れはあります'));
     for (const c of AIの分.決まった) {
       const 曲たち = AI曲.filter((x) => x.訳 === `AI: ${c.訳 || c.artist}`);
       if (曲たち.length) 行(`${c.artist} → ${c.genre}`, c.訳, 曲たち);
@@ -627,11 +631,11 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
   const 言い分 = [];
   const 落 = AIの分.落とした;
   if (落 && 落.知らないジャンル && 落.知らないジャンル.length) {
-    言い分.push(`AI が挙げた ${落.知らないジャンル.length} 個は手元に無いジャンル名だったので外しました`);
+    言い分.push(言('AI が挙げた {n} 個は手元に無いジャンル名だったので外しました', { n: 落.知らないジャンル.length }));
   }
   const 当たらず = (AIの分.訊いた || 0) - (AIの分.決まった || []).length;
-  if (当たらず > 0) 言い分.push(`${当たらず} 組は AI も見当が付きませんでした（そのままです）`);
-  言い分.push('入れたぶんは 手直し.json に残ります。消せば元通りになります');
+  if (当たらず > 0) 言い分.push(言('{n} 組は AI も見当が付きませんでした（そのままです）', { n: 当たらず }));
+  言い分.push(言('入れたぶんは 手直し.json に残ります。消せば元通りになります'));
   添え.textContent = 言い分.join('。');
   文.appendChild(添え);
 
@@ -645,8 +649,8 @@ function 埋め方を見せて訊く(決まった, AIの分, AI曲) {
     並.appendChild(b);
     return b;
   };
-  作る('やめる', false, false);
-  const はい = 作る('これで入れる', true, true);
+  作る(言('やめる'), false, false);
+  const はい = 作る(言('これで入れる'), true, true);
   setTimeout(() => はい.focus(), 0);
 
   const 出来 = new Promise((決着) => { 訊いている = 決着; });
@@ -712,8 +716,8 @@ function 履歴を出す(欄, 種, 決める) {
     };
     const 消 = document.createElement('span');
     消.className = 'del';
-    消.textContent = '✕';
-    消.title = 'この 1 件を履歴から消す';
+    消.textContent = 言('✕');
+    消.title = 言('この 1 件を履歴から消す');
     消.onclick = async (e) => {
       e.stopPropagation();
       打った履歴 = await window.mp3.履歴から消す(種, 文);
@@ -727,13 +731,13 @@ function 履歴を出す(欄, 種, 決める) {
 
   const 足 = document.createElement('div');
   足.className = 'foot';
-  足.textContent = `この履歴を全部消す（${並び.length} 件）`;
+  足.textContent = 言('この履歴を全部消す（{n} 件）', { n: 並び.length });
   足.onclick = async (e) => {
     e.stopPropagation();
     打った履歴 = await window.mp3.履歴を全部消す(種);
     履歴を閉じる();
     欄.focus();
-    $('status').textContent = `${種}の履歴を全部消しました`;
+    $('status').textContent = 言('{種}の履歴を全部消しました', { 種: 言(種) });
   };
   箱.appendChild(足);
 
@@ -774,8 +778,8 @@ function 履歴をつける(欄, 種) {
  */
 function 止めたか(r, 言った) {
   if (!r || !r.止めた) return false;
-  if (言った) 言った.textContent = '';
-  $('status').textContent = '止めました（何も作っていません）';
+  if (言った) 言った.textContent = 言('');
+  $('status').textContent = 言('止めました（何も作っていません）');
   return true;
 }
 
@@ -1174,11 +1178,11 @@ function つまみの行() {
   行.className = "knobs";
 
   const 幅棒 = 棒を作る("aiwide", AIのつまみ.目盛.幅);
-  幅棒.title = "何を見渡すか。AI に渡す候補の曲数・辿る名前の数・選ばせるジャンル数が、いっしょに変わります";
+  幅棒.title = 言("何を見渡すか。AI に渡す候補の曲数・辿る名前の数・選ばせるジャンル数が、いっしょに変わります");
   const 幅札 = 字("", "val"); 幅札.id = "aiwidelabel";
 
   const 量棒 = 棒を作る("aimany", AIのつまみ.目盛.量);
-  量棒.title = "一本を何曲にするか";
+  量棒.title = 言("一本を何曲にするか");
   const 量札 = 字("", "val"); 量札.id = "aimanylabel";
 
   /*
@@ -1187,7 +1191,7 @@ function つまみの行() {
    * 前は決め打ちで、いつも「外す」側だった。守りたいときに守れなかった。
    */
   const 強棒 = 棒を作る("aistrict", AIのつまみ.目盛.強度 ?? 3);
-  強棒.title = "その言葉・気分の王道を守るか、外すか。外すほど深く考えさせるので、少し高くなります";
+  強棒.title = 言("その言葉・気分の王道を守るか、外すか。外すほど深く考えさせるので、少し高くなります");
   const 強札 = 字("", "val"); 強札.id = "aistrictlabel";
 
   const 説き = 字("", "said"); 説き.id = "aiknobsaid";
@@ -1198,15 +1202,16 @@ function つまみの行() {
     const 強 = (AIのつまみ.強度の段 || [])[Number(強棒.value) - 1];
     if (!幅 || !量) return;
     幅札.textContent = 幅.札;
-    量札.textContent = 量.曲数 + " 曲";
+    量札.textContent = 言('{n} 曲', { n: 量.曲数 });
     強札.textContent = 強 ? 強.札 : "";
     /*
      * ★何が変わるのかを、そのまま出す。
      * 「狭い〜広い」だけだと、押すまで何が起きるか分からない。
      */
-    説き.textContent = `候補 ${幅.候補} 曲 ／ 辿る名前 ${幅.名前} 個 ／ ジャンル ${幅.ジャンル} まで`
-      + (強 ? `　文脈は「${強.札}」` : '')
-      + `　→ ${量.曲数} 曲の一本（目安 ${つまみの目安円(幅, 量)} 円）`;
+    説き.textContent = 言('候補 {候補} 曲 ／ 辿る名前 {名前} 個 ／ ジャンル {ジャンル} まで',
+      { 候補: 幅.候補, 名前: 幅.名前, ジャンル: 幅.ジャンル })
+      + (強 ? 言('　文脈は「{札}」', { 札: 強.札 }) : '')
+      + 言('　→ {n} 曲の一本（目安 {円} 円）', { n: 量.曲数, 円: つまみの目安円(幅, 量) });
   };
 
   /*
@@ -1242,8 +1247,8 @@ function つまみの行() {
     広げる.textContent = 言(入 ? "🌀 拡大解釈 入" : "🌀 拡大解釈 切");
     広げる.classList.toggle("on", 入);
     広げる.title = 入
-      ? "後半は遠くの文脈まで飛びます。飛んだ先で何を選ぶかは、文脈の強度が決めます"
-      : "最後まで同じ文脈を保ちます";
+      ? 言("後半は遠くの文脈まで飛びます。飛んだ先で何を選ぶかは、文脈の強度が決めます")
+      : 言("最後まで同じ文脈を保ちます");
   };
   広げる札();
   広げる.onclick = async () => {
@@ -1460,22 +1465,26 @@ function 組む範囲を書く() {
     }
   }
   const 見せる = (k, v) => (字面[k] && 字面[k].get(v)) || v;
-  const 名 = { genre: "ジャンル", artist: "アーティスト", album: "アルバム", 年: "年", 月: "月", 日: "日", 言葉: "言葉", 響演者: "演者", 響盤: "盤", まとめ: "ジャンル（まとめ）" };
+  const 名 = {
+    genre: 言("ジャンル"), artist: 言("アーティスト"), album: 言("アルバム"),
+    年: 言("年"), 月: 言("月"), 日: 言("日"),
+    言葉: 言("言葉"), 響演者: 言("演者"), 響盤: 言("盤"), まとめ: 言("ジャンル（まとめ）"),
+  };
   const 絞り = Object.entries(sel)
     .filter(([, v]) => v)
-    .map(([k, v]) => `${名[k] || k}: ${[...v].slice(0, 3).map((x) => 見せる(k, x)).join("・")}${v.size > 3 ? `ほか${v.size - 3}` : ""}`);
+    .map(([k, v]) => `${名[k] || k}: ${[...v].slice(0, 3).map((x) => 見せる(k, x)).join("・")}${v.size > 3 ? 言('ほか{n}', { n: v.size - 3 }) : ""}`);
 
   const リスト = 開いているリスト();
   面.innerHTML = '';
   const 足す = (文, 組) => { const e = document.createElement('span'); e.textContent = 文; if (組) e.className = 組; 面.appendChild(e); };
-  足す('組む範囲: ');
-  足す(`${数.toLocaleString('ja-JP')} 曲`, 'b');
-  足す(絞り.length ? `（${絞り.join(' ／ ')}）` : '（ライブラリ全部）');
+  足す(言('組む範囲: '));
+  足す(言('{n} 曲', { n: 数.toLocaleString('ja-JP') }), 'b');
+  足す(絞り.length ? `（${絞り.join(' ／ ')}）` : 言('（ライブラリ全部）'));
   /*
    * ★再生リストを開いているときは、はっきり断る。
    * 「聴いているもの」と「組む元」が違うことが、誤爆の正体だった。
    */
-  if (リスト) 足す(`　※ いま「${リスト.name}」を聴いていますが、組む元はライブラリです`, 'warn');
+  if (リスト) 足す(言('　※ いま「{名}」を聴いていますが、組む元はライブラリです', { 名: リスト.name }), 'warn');
 }
 
 function AIに渡す候補(何曲) {
@@ -1620,7 +1629,7 @@ async function AIに一本組ませる(気分, 言った) {
   const 大きさ = await window.mp3.AIの大きさ();
   const 候補 = AIに渡す候補(大きさ.候補の数);
   if (候補.length < 2) {
-    言った.textContent = 'この範囲には、組める曲がありません';
+    言った.textContent = 言('この範囲には、組める曲がありません');
     return false;
   }
   /*
@@ -1632,8 +1641,8 @@ async function AIに一本組ませる(気分, 言った) {
    * 効かないつまみを黙って置いておくと、動かし続けることになる。
    */
   const 頭打ち = 候補.length < 大きさ.候補の数;
-  言った.textContent = `${候補.length} 曲から組んでいます…`
-    + (頭打ち ? '（この範囲はこれで全部です）' : '');
+  言った.textContent = 言('{n} 曲から組んでいます…', { n: 候補.length })
+    + (頭打ち ? 言('（この範囲はこれで全部です）') : '');
 
   const r = await window.mp3.AIにプレイリストを作らせる({
     気分,
@@ -1644,10 +1653,10 @@ async function AIに一本組ませる(気分, 言った) {
     })),
   });
   if (!r || !r.ok) {
-    const 訳 = (r && r.error) || '不明';
+    const 訳 = (r && r.error) || 言('不明');
     if (止めたか(r, 言った)) return false;
     言った.textContent = 言("だめでした");
-    $('status').textContent = '⚠ 一本を組めませんでした: ' + 訳;
+    $('status').textContent = 言('⚠ 一本を組めませんでした: ') + 訳;
     return false;
   }
 
@@ -1661,7 +1670,7 @@ async function AIに一本組ませる(気分, 言った) {
     演者たち.push(小文字((c.artist || '').trim()));
     if (項.ひとこと) AIのひとこと.set(c.path, 項.ひとこと);
   }
-  if (!道.length) { 言った.textContent = 'AI が曲を選べませんでした'; return false; }
+  if (!道.length) { 言った.textContent = 言('AI が曲を選べませんでした'); return false; }
 
   // 名前は AI がつけたもの。無ければ気分をそのまま使う
   const 名 = '🤖 ' + (r.結果.題 || 気分).slice(0, 24);
@@ -1685,7 +1694,7 @@ async function AIに一本組ませる(気分, 言った) {
    * 本人が欲しかったのは「AI が選んだ順」なので、シャッフルは切る。
    */
   シャッフル = false;
-  $('shuffle').textContent = '🔀 オフ';
+  $('shuffle').textContent = 言('🔀 オフ');
   $('shuffle').classList.remove('on');
 
   描き直す();
@@ -1704,14 +1713,15 @@ async function AIに一本組ませる(気分, 言った) {
    * ★状態の文字は、再生したあとに出す。
    * 先に出すと 再生する() の中の 一覧を描く() に上書きされて、消える（実測）。
    */
-  const 落ち = r.結果.落とした ? `（${r.結果.落とした} 件は候補に無くて落としました）` : '';
+  const 落ち = r.結果.落とした ? 言('（{n} 件は候補に無くて落としました）', { n: r.結果.落とした }) : '';
   /*
    * ★頼んだ曲数が減らされていたら、そう言う。
    * つまみが 2 本あるので「幅は最小・量は最大」（候補 50 で 80 曲）は必ず起きる。
    * 黙って 50 曲にすると、つまみが効いていないように見える。
    */
   const 減り = (r.結果.頼んだ曲数 && r.結果.頼んだ曲数 < 大きさ.作る曲数)
-    ? `（候補が ${候補.length} 曲しかないので ${r.結果.頼んだ曲数} 曲にしました。対象の幅を広げると増やせます）` : '';
+    ? 言('（候補が {候補} 曲しかないので {頼んだ} 曲にしました。対象の幅を広げると増やせます）',
+      { 候補: 候補.length, 頼んだ: r.結果.頼んだ曲数 }) : '';
   /*
    * ★同じ演者が重なったら、黙らない（2026-08-29 本人の報告）。
    * 候補の側で散らしてあるので、重なるのは**もう散らせないとき**だけ。
@@ -1721,12 +1731,14 @@ async function AIに一本組ませる(気分, 言った) {
   for (const a of 演者たち) { if (a) 数.set(a, (数.get(a) ?? 0) + 1); }
   const 重なり = [...数.values()].filter((n) => n > 1).length;
   const 散らし = 重なり
-    ? `（${重なり} 組が 2 曲以上 ― この範囲には ${r.結果.演者の数 ?? 数.size} 組しかいません）`
-    : '（すべて別の演者です）';
+    ? 言('（{重なり} 組が 2 曲以上 ― この範囲には {n} 組しかいません）',
+      { 重なり, n: r.結果.演者の数 ?? 数.size })
+    : 言('（すべて別の演者です）');
   const 打ち止め = 頭打ち
-    ? `　※ この範囲は ${候補.length} 曲で全部なので、対象の幅を広げても増えません`
+    ? 言('　※ この範囲は {n} 曲で全部なので、対象の幅を広げても増えません', { n: 候補.length })
     : '';
-  $('status').textContent = `AI が ${道.length} 曲の一本を組みました: 「${名}」${散らし}${落ち}${減り}${打ち止め}　▶ で頭から流れます`;
+  $('status').textContent = 言('AI が {n} 曲の一本を組みました: 「{名}」{添え}　▶ で頭から流れます',
+    { n: 道.length, 名, 添え: 散らし + 落ち + 減り + 打ち止め });
   return true;
 }
 
@@ -1866,7 +1878,7 @@ function 蔵書の大きさ() {
  */
 async function 木を生やして足す(言葉, 言った) {
   const 大きさ = await window.mp3.木の大きさ();
-  言った.textContent = `「${言葉}」から辿っています…`;
+  言った.textContent = 言('「{言葉}」から辿っています…', { 言葉 });
   /*
    * ★同じ言葉でもう一度辿るときは、**すでに挙げた名前を渡す**（2026-08-29）。
    *   > 一度resonance生成したものと同じ名前で生成しても元の結果と同じままだった
@@ -1890,10 +1902,10 @@ async function 木を生やして足す(言葉, 言った) {
      * 上の欄は狭くて「…」で切れるので、**何が起きたか読めない。**
      * 読めないと、こちらにも伝えられない。
      */
-    const 訳 = (r && r.error) || "不明";
+    const 訳 = (r && r.error) || 言("不明");
     if (止めたか(r, 言った)) return false;
     言った.textContent = 言("だめでした");
-    $("status").textContent = "⚠ 辿れませんでした: " + 訳;
+    $("status").textContent = 言("⚠ 辿れませんでした: ") + 訳;
     return false;
   }
 
@@ -1918,12 +1930,15 @@ async function 木を生やして足す(言葉, 言った) {
    * ★演者が足りないときの逃げ道も、ここで教える（もう一度押せば増える）。
    */
   const 積み = (すでにある.length && r.全部で)
-    ? `（${すでにある.length} 個に足して、いま ${r.全部で} 個）` : "";
-  言った.textContent = `「${言葉}」から ${生.length} 個${積み} ― 手元に ${あった.length} 個`;
-  $("status").textContent = `🌐「${言葉}」から ${生.length} 個辿りました${積み}`
-    + `　手元にあった ${あった.length} 個: ${あった.slice(0, 6).map((n) => n.name).join(" / ")}`
-    + (無かった.length ? `　／ 手元に無い ${無かった.length} 個（発見）: ${無かった.slice(0, 6).map((n) => n.name).join(" / ")}` : "")
-    + "　※ 同じ言葉でもう一度「辿る」と、演者を増やせます";
+    ? 言('（{すでに} 個に足して、いま {全部で} 個）', { すでに: すでにある.length, 全部で: r.全部で }) : "";
+  言った.textContent = 言('「{言葉}」から {n} 個{積み} ― 手元に {あった} 個',
+    { 言葉, n: 生.length, 積み, あった: あった.length });
+  $("status").textContent = 言('🌐「{言葉}」から {n} 個辿りました{積み}', { 言葉, n: 生.length, 積み })
+    + 言('　手元にあった {n} 個: {名前}',
+      { n: あった.length, 名前: あった.slice(0, 6).map((x) => x.name).join(" / ") })
+    + (無かった.length ? 言('　／ 手元に無い {n} 個（発見）: {名前}',
+      { n: 無かった.length, 名前: 無かった.slice(0, 6).map((x) => x.name).join(" / ") }) : "")
+    + 言("　※ 同じ言葉でもう一度「辿る」と、演者を増やせます");
   // ★手元に 1 曲も無ければ、一本は組めない。呼んだ側に伝える
   return あった.length > 0;
 }
@@ -1975,10 +1990,10 @@ function 交差を描く(box, 交差) {
 
   const 頭 = document.createElement('div');
   頭.className = 'misshead';
-  頭.textContent = '交差 ― いくつもの言葉から辿り着いた名前です。'
-    + '別々の言葉が同じ名前を指すのは偶然ではありません。'
-    + 'その人の中で、いくつもの筋がそこへ通じているということです。'
-    + '★言葉を辿るほど増えます（1 本目では起きません）。選ばれやすさも上がります。';
+  頭.textContent = 言('交差 ― いくつもの言葉から辿り着いた名前です。')
+    + 言('別々の言葉が同じ名前を指すのは偶然ではありません。')
+    + 言('その人の中で、いくつもの筋がそこへ通じているということです。')
+    + 言('★言葉を辿るほど増えます（1 本目では起きません）。選ばれやすさも上がります。');
   面.appendChild(頭);
 
   for (const a of 交差) {
@@ -1987,8 +2002,8 @@ function 交差を描く(box, 交差) {
 
     const 数 = document.createElement('span');
     数.className = 'missdepth';
-    数.textContent = a.言葉数 + ' 本';
-    数.title = a.言葉数 + ' つの言葉から辿り着きました';
+    数.textContent = 言('{n} 本', { n: a.言葉数 });
+    数.title = 言('{n} つの言葉から辿り着きました', { n: a.言葉数 });
 
     const 名 = document.createElement('span');
     名.className = 'missname';
@@ -1996,7 +2011,7 @@ function 交差を描く(box, 交差) {
 
     const 説 = document.createElement('span');
     説.className = 'said';
-    説.textContent = `${a.曲数} 曲　［${a.言葉たち.join('・')}］`;
+    説.textContent = 言('{n} 曲　［{言葉たち}］', { n: a.曲数, 言葉たち: a.言葉たち.join('・') });
 
     行.append(数, 名, 説);
     面.appendChild(行);
@@ -2010,10 +2025,10 @@ function 確かめる候補を描く(box, 外れ) {
 
   const 頭 = document.createElement('div');
   頭.className = 'misshead';
-  頭.textContent = '確かめる候補 ― 手元で見つからなかった名前です。'
-    + '演者名だけでなく、盤名・曲名にも当ててみて、それでも見つからなかったものだけ出しています。'
-    + 'それでも「持っているのに書かれ方が違う」「AI の思い違い」は残ります。'
-    + '買う前に確かめてください。';
+  頭.textContent = 言('確かめる候補 ― 手元で見つからなかった名前です。')
+    + 言('演者名だけでなく、盤名・曲名にも当ててみて、それでも見つからなかったものだけ出しています。')
+    + 言('それでも「持っているのに書かれ方が違う」「AI の思い違い」は残ります。')
+    + 言('買う前に確かめてください。');
   面.appendChild(頭);
 
   for (const m of 外れ) {
@@ -2022,10 +2037,10 @@ function 確かめる候補を描く(box, 外れ) {
 
     const 深 = document.createElement('span');
     深.className = 'missdepth';
-    深.textContent = '深さ' + m.depth;
+    深.textContent = 言('深さ') + m.depth;
     深.title = m.depth <= 1
-      ? '入口を持っていません（意外な穴）'
-      : (m.depth >= 3 ? 'まだ辿り着いていない場所（探索の先端）' : '');
+      ? 言('入口を持っていません（意外な穴）')
+      : (m.depth >= 3 ? 言('まだ辿り着いていない場所（探索の先端）') : '');
 
     const 名 = document.createElement('span');
     名.className = 'missname';
@@ -2035,8 +2050,8 @@ function 確かめる候補を描く(box, 外れ) {
     説.className = 'said';
     // ★交差していれば、そう出す。手元に無いなかでも、いちばん確かめる値打ちがある
     const 交差 = (m.言葉数 > 1)
-      ? `［${m.言葉数} 本の言葉から: ${m.言葉たち.join('・')}］`
-      : `［「${m.keyword}」から］`;
+      ? 言('［{n} 本の言葉から: {言葉たち}］', { n: m.言葉数, 言葉たち: m.言葉たち.join('・') })
+      : 言('［「{言葉}」から］', { 言葉: m.keyword });
     説.textContent = (m.description ? m.description + '　' : '') + 交差;
 
     行.append(深, 名, 説);
@@ -2061,10 +2076,11 @@ function 響きの欄を描く() {
   box.innerHTML = '';
 
   const 印 = document.createElement('span');
-  印.textContent = '🌐';
+  印.textContent = 言('🌐');
   const 文 = document.createElement('span');
   文.className = 'said';
-  文.textContent = `${響きの当たり.当たり.length} 組・${響きの当たり.曲.size.toLocaleString("ja-JP")} 曲`;
+  文.textContent = 言('{組} 組・{曲} 曲',
+    { 組: 響きの当たり.当たり.length, 曲: 響きの当たり.曲.size.toLocaleString("ja-JP") });
   box.append(印, 文);
 
   // 辿った言葉ごとに、名前を変える／消す
@@ -2081,7 +2097,7 @@ function 響きの欄を描く() {
         if (v && v !== e.keyword) {
           const r = await window.mp3.響きの名前を変える(e.keyword, v);
           if (r && r.ok) { 響きの木 = r.木; 響きを合わせ直す(); }
-          else $("status").textContent = "名前を変えられませんでした（" + ((r && r.error) || "不明") + "）";
+          else $("status").textContent = 言("名前を変えられませんでした（") + ((r && r.error) || 言("不明")) + "）";
         }
         描き直す();
       };
@@ -2102,7 +2118,7 @@ function 響きの欄を描く() {
      */
     const 札 = document.createElement("span");
     札.className = "resword";
-    札.title = e.savedAt ? ("辿った日: " + e.savedAt.slice(0, 10)) : "";
+    札.title = e.savedAt ? (言("辿った日: ") + e.savedAt.slice(0, 10)) : "";
 
     const 名 = document.createElement("span");
     名.textContent = e.keyword;
@@ -2113,20 +2129,20 @@ function 響きの欄を描く() {
 
     const 直す = document.createElement("button");
     直す.textContent = "✎";
-    直す.title = "この言葉の名前を変える";
+    直す.title = 言("この言葉の名前を変える");
     直す.onclick = () => { 言葉の名前変え = e.keyword; 描き直す(); };
 
     const 消す = document.createElement("button");
     消す.className = "del"; 消す.textContent = "×";
-    消す.title = "この言葉で辿ったものを消す（音楽ファイルには触りません）";
+    消す.title = 言("この言葉で辿ったものを消す（音楽ファイルには触りません）");
     消す.onclick = async () => {
-      if (!await 確かめる(`「${e.keyword}」で辿ったものを消しますか？\n\n曲は何も変わりません。`)) return;
+      if (!await 確かめる(言('「{言葉}」で辿ったものを消しますか？', { 言葉: e.keyword }) + '\n\n' + 言('曲は何も変わりません。'))) return;
       const r = await window.mp3.響きをひとつ消す(e.keyword);
-      if (!r || !r.ok) { $("status").textContent = "消せませんでした（" + ((r && r.error) || "不明") + "）"; return; }
+      if (!r || !r.ok) { $("status").textContent = 言("消せませんでした（") + ((r && r.error) || 言("不明")) + "）"; return; }
       響きの木 = r.木;
       響きを合わせ直す();
       描き直す();
-      $("status").textContent = `「${e.keyword}」を消しました`;
+      $("status").textContent = 言('「{言葉}」を消しました', { 言葉: e.keyword });
     };
 
     札.append(直す, 消す);
@@ -2147,8 +2163,8 @@ function 響きの欄を描く() {
   if (交差.length) {
     const 開閉 = document.createElement("button");
     開閉.className = "restag";
-    開閉.textContent = (交差を開く ? "▼ " : "▶ ") + "交差 " + 交差.length;
-    開閉.title = "いくつもの言葉から辿り着いた名前です。言葉を辿るほど増えます";
+    開閉.textContent = (交差を開く ? "▼ " : "▶ ") + 言("交差 {n}", { n: 交差.length });
+    開閉.title = 言("いくつもの言葉から辿り着いた名前です。言葉を辿るほど増えます");
     開閉.onclick = () => { 交差を開く = !交差を開く; 描き直す(); };
     box.appendChild(開閉);
   }
@@ -2157,9 +2173,9 @@ function 響きの欄を描く() {
   if (外れ.length) {
     const 開閉 = document.createElement("button");
     開閉.className = "restag";
-    開閉.textContent = (確かめる候補を開く ? "▼ " : "▶ ") + "確かめる候補 " + 外れ.length;
-    開閉.title = "手元で見つからなかった名前です。演者名だけでなく盤名・曲名にも当てて、"
-      + "それでも無かったものだけ出しています（買い物リストではありません）";
+    開閉.textContent = (確かめる候補を開く ? "▼ " : "▶ ") + 言("確かめる候補 {n}", { n: 外れ.length });
+    開閉.title = 言("手元で見つからなかった名前です。演者名だけでなく盤名・曲名にも当てて、")
+      + 言("それでも無かったものだけ出しています（買い物リストではありません）");
     開閉.onclick = () => { 確かめる候補を開く = !確かめる候補を開く; 描き直す(); };
     box.appendChild(開閉);
   }
@@ -2176,21 +2192,24 @@ function 響きの欄を描く() {
    * 勝手には作らない ―― 押したときだけ。
    */
   const 組む = document.createElement("button");
-  組む.className = "restag";
-  組む.textContent = "🔀 この響きで一本を組む";
-  組む.title = "いま響きで選ばれている曲から、AI が厳選して並べます（勝手には流れません）";
+  組む.className = "restag"; 組む.id = "resgo";
+  組む.textContent = 言("🔀 この響きで一本を組む");
+  組む.title = 言("いま響きで選ばれている曲から、AI が厳選して並べます（勝手には流れません）");
   組む.onclick = async () => {
     const 言葉 = (響きの木 && Array.isArray(響きの木.木))
-      ? 響きの木.木.map((e) => e.keyword).join("・") : "響き";
+      ? 響きの木.木.map((e) => e.keyword).join("・") : 言("響き");
     const 言った = $("aisaid");
-    if (!言った) { $("status").textContent = "⚠ 先に APIキーを入れてください"; return; }
+    if (!言った) { $("status").textContent = 言("⚠ 先に APIキーを入れてください"); return; }
     組む.disabled = true;
     try {
-      言った.textContent = "響きから組んでいます…";
+      言った.textContent = 言("響きから組んでいます…");
       await AIに一本組ませる(言葉, $("aisaid") || 言った);
     } finally {
-      const b = [...document.querySelectorAll("#resbar button")]
-        .find((x) => (x.textContent || "").includes("一本を組む"));
+      /*
+       * ★id で見つける（2026-08-30）。
+       * もとは札の文で当てていたが、英語にすると当たらなくなる。
+       */
+      const b = $("resgo");
       if (b) b.disabled = false;
     }
   };
@@ -2198,22 +2217,22 @@ function 響きの欄を描く() {
 
   const 外す = document.createElement("button");
   外す.className = "restag";
-  外す.textContent = "× 全部外す";
-  外す.title = "辿ったものを全部忘れます（音楽ファイルには触りません）";
+  外す.textContent = 言("× 全部外す");
+  外す.title = 言("辿ったものを全部忘れます（音楽ファイルには触りません）");
   外す.onclick = async () => {
-    if (!await 確かめる("辿ったものを全部忘れますか？\n\n曲は何も変わりません。")) return;
+    if (!await 確かめる(言("辿ったものを全部忘れますか？\n\n曲は何も変わりません。"))) return;
     /*
      * ★何をしているか出す（2026-08-29 本人の希望）。
      *   > 処理に時間がかかるなら何かしらのインフォメーションは出せないですか？
      * 実際は速い（描き直しで 148 ms）が、**黙って固まったように見えるより、
      * 一言あるほうがいい。**
      */
-    $("status").textContent = "響きを外しています…";
+    $("status").textContent = 言("響きを外しています…");
     await window.mp3.響きを消す();
     響きの木 = null; 響きの当たり = null;
     響きを合わせ直す();
     描き直す();
-    $("status").textContent = "響きを全部外しました";
+    $("status").textContent = 言("響きを全部外しました");
   };
   box.appendChild(外す);
 
@@ -2262,15 +2281,15 @@ function 気分の欄を描く() {
     const 欄 = document.createElement("input");
     欄.id = "aikeyinput";
     欄.type = "password";                          // 肩越しに見えないように
-    欄.placeholder = "Anthropic の API キーを貼り付けて Enter";
+    欄.placeholder = 言("Anthropic の API キーを貼り付けて Enter");
     欄.oninput = () => { キー入力.value = 欄.value; };
     const しまう = document.createElement("button");
-    しまう.className = "btn"; しまう.id = "aikeysave"; しまう.textContent = "しまう";
+    しまう.className = "btn"; しまう.id = "aikeysave"; しまう.textContent = 言("しまう");
     const やめる = document.createElement("button");
-    やめる.className = "btn"; やめる.textContent = "やめる";
+    やめる.className = "btn"; やめる.textContent = 言("やめる");
     const 断り = document.createElement("span");
     断り.className = "said";
-    断り.textContent = "暗号化してこの PC の中だけに保存します。送るのはジャンル名と気分の文だけです";
+    断り.textContent = 言("暗号化してこの PC の中だけに保存します。送るのはジャンル名と気分の文だけです");
 
     const 保存 = async () => {
       const v = (キー入力.value || "").trim();
@@ -2278,13 +2297,13 @@ function 気分の欄を描く() {
       しまう.disabled = true; 欄.disabled = true;
       const r = await window.mp3.AIのキーを入れる(v);
       しまう.disabled = false; 欄.disabled = false;
-      if (!r || !r.ok) { 断り.textContent = "しまえませんでした（" + ((r && r.error) || "不明") + "）"; return; }
+      if (!r || !r.ok) { 断り.textContent = 言("しまえませんでした（") + ((r && r.error) || 言("不明")) + "）"; return; }
       キー入力 = null;                              // ★画面にキーを残さない
       AIが使える = true;
       // ★キーを入れて初めて欄が出る。つまみもここで取る（起動時は取れていない）
       await AIのつまみを取り直す();
       描き直す();
-      $("status").textContent = "APIキーをしまいました。上の欄に気分を書けます";
+      $("status").textContent = 言("APIキーをしまいました。上の欄に気分を書けます");
     };
     しまう.onclick = 保存;
     欄.onkeydown = (e) => { if (e.key === "Enter") 保存(); };
@@ -2319,7 +2338,7 @@ function 気分の欄を描く() {
   欄.oninput = () => { 打ちかけの言葉 = 欄.value; };
   const 押す = document.createElement("button");
   押す.className = "btn"; 押す.id = "aigo"; 押す.textContent = 言("一本を組む");
-  押す.title = "書いた気分に合うジャンルに絞って、そこから 30 曲の一本を組みます";
+  押す.title = 言("書いた気分に合うジャンルに絞って、そこから 30 曲の一本を組みます");
 
   /* ── 言葉から辿る ── */
   const 印2 = document.createElement("span");
@@ -2331,7 +2350,7 @@ function 気分の欄を描く() {
   欄2.oninput = () => { 打ちかけの辿る言葉 = 欄2.value; };
   const 辿る = document.createElement("button");
   辿る.className = "btn"; 辿る.id = "restreego"; 辿る.textContent = 言("辿る");
-  辿る.title = "その言葉から辿れる音楽を探し、手元にあったものを響きタブに集めます（一本は組みません）";
+  辿る.title = 言("その言葉から辿れる音楽を探し、手元にあったものを響きタブに集めます（一本は組みません）");
 
   /* ── ジャンル名をまとめる（2026-08-30 本人の希望） ── */
   const 印3 = document.createElement("span");
@@ -2339,7 +2358,7 @@ function 気分の欄を描く() {
   const まとめる押す = document.createElement("button");
   まとめる押す.className = "btn"; まとめる押す.id = "aigenre";
   まとめる押す.textContent = 言(ジャンルのまとめ.組.length ? "ジャンル名をまとめ直す" : "ジャンル名をまとめる");
-  まとめる押す.title = "散らかったジャンル名を、見て回りやすい大きさにまとめます（元の名前も mp3 のタグも変えません）";
+  まとめる押す.title = 言("散らかったジャンル名を、見て回りやすい大きさにまとめます（元の名前も mp3 のタグも変えません）");
 
   /*
    * ★捨てるボタン。まとめてあるときだけ出す。
@@ -2349,7 +2368,7 @@ function 気分の欄を描く() {
   const やめる押す = document.createElement("button");
   やめる押す.className = "btn"; やめる押す.id = "aigenreoff";
   やめる押す.textContent = 言("まとめをやめる");
-  やめる押す.title = "まとめを捨てて、元のジャンル名だけに戻します";
+  やめる押す.title = 言("まとめを捨てて、元のジャンル名だけに戻します");
   やめる押す.style.display = ジャンルのまとめ.組.length ? "" : "none";
 
   /*
@@ -2363,20 +2382,20 @@ function 気分の欄を描く() {
   const 手直し見る = document.createElement("button");
   手直し見る.className = "btn"; 手直し見る.id = "naoshishow";
   手直し見る.textContent = 言("手直しを見る");
-  手直し見る.title = "手直し.json のある場所を開きます（中を見て、直したり消したりできます）";
+  手直し見る.title = 言("手直し.json のある場所を開きます（中を見て、直したり消したりできます）");
   手直し見る.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
 
   const 手直し捨てる = document.createElement("button");
   手直し捨てる.className = "btn"; 手直し捨てる.id = "naoshioff";
   手直し捨てる.textContent = 言("手直しを捨てる");
-  手直し捨てる.title = "手直しを丸ごと消して、元のジャンルに戻します";
+  手直し捨てる.title = 言("手直しを丸ごと消して、元のジャンルに戻します");
   手直し捨てる.style.display = Object.keys(手直し.曲 || {}).length ? "" : "none";
 
   /* ── ジャンルの付いていない曲を埋める（2026-08-30 本人の希望） ── */
   const 埋める押す = document.createElement("button");
   埋める押す.className = "btn"; 埋める押す.id = "aifill";
   埋める押す.textContent = 言("ジャンル名無しを埋める");
-  埋める押す.title = "ジャンルの付いていない曲に、ジャンルを入れます（まず手元で決め、決まらないぶんだけ AI に訊きます。手直し.json に残るので消せば元通り）";
+  埋める押す.title = 言("ジャンルの付いていない曲に、ジャンルを入れます（まず手元で決め、決まらないぶんだけ AI に訊きます。手直し.json に残るので消せば元通り）");
 
   /*
    * ★「整える」道具は、たたんでおく（2026-08-30 本人の希望）。
@@ -2393,7 +2412,7 @@ function 気分の欄を描く() {
   const 道具ボタン = document.createElement("button");
   道具ボタン.className = "btn toolsbtn"; 道具ボタン.id = "aitoolsbtn";
   道具ボタン.textContent = 言(道具箱を開いている ? "🛠 整える ▲" : "🛠 整える ▼");
-  道具ボタン.title = "ジャンル名をまとめる・ジャンル名無しを埋める・手直しの出し入れ";
+  道具ボタン.title = 言("ジャンル名をまとめる・ジャンル名無しを埋める・手直しの出し入れ");
   道具ボタン.onclick = () => {
     道具箱を開いている = !道具箱を開いている;
     道具箱.classList.toggle("on", 道具箱を開いている);
@@ -2411,7 +2430,7 @@ function 気分の欄を描く() {
   const 中断押す = document.createElement("button");
   中断押す.className = "btn"; 中断押す.id = "aistop";
   中断押す.textContent = 言("⏹ 止める");
-  中断押す.title = "走っている生成を途中で切ります（そこまでに使ったぶんは請求されます）";
+  中断押す.title = 言("走っている生成を途中で切ります（そこまでに使ったぶんは請求されます）");
   中断押す.onclick = async () => {
     中断押す.disabled = true;
     await window.mp3.AIを止める();
@@ -2465,16 +2484,16 @@ function 気分の欄を描く() {
        * **選び直させるほうが外れる。**
        */
       if (自分で絞っているか()) {
-        言った.textContent = "いま絞っている範囲から組みます…";
+        言った.textContent = 言("いま絞っている範囲から組みます…");
       } else {
         const r = await window.mp3.気分でおすすめ({
           気分: v, ジャンル一覧: AIに渡すジャンル(), 年一覧: AIに渡す年(),
         });
         if (!r || !r.ok) {
-          const 訳 = (r && r.error) || "不明";
+          const 訳 = (r && r.error) || 言("不明");
           if (止めたか(r, 言った)) return;
         言った.textContent = 言("だめでした");
-          $("status").textContent = "⚠ 絞り込めませんでした: " + 訳;
+          $("status").textContent = 言("⚠ 絞り込めませんでした: ") + 訳;
           return;
         }
         当てはめる(r.結果);
@@ -2548,8 +2567,8 @@ function 気分の欄を描く() {
        * 先に出すと 一覧を描く() に上書きされて消える（前に踏んでいる）。
        */
       const 曲数 = 絞る(3).length;
-      $("status").textContent = `🌐「${v}」で絞りました（${曲数.toLocaleString("ja-JP")} 曲）`
-        + '　▶ で流せます。🔀 を押すとこの範囲でシャッフルします';
+      $("status").textContent = 言('🌐「{言葉}」で絞りました（{n} 曲）', { 言葉: v, n: 曲数.toLocaleString("ja-JP") })
+        + 言('　▶ で流せます。🔀 を押すとこの範囲でシャッフルします');
     } finally {
       止める(false);   // ★一覧は 止める() ひとつ（増やさない）
     }
@@ -2574,14 +2593,14 @@ function 気分の欄を描く() {
   手直し見る.onclick = async () => {
     const r = await window.mp3.手直しの置き場を開く();
     $('status').textContent = (r && r.ok)
-      ? `手直しの置き場を開きました: ${r.置き場}`
-      : `⚠ 開けませんでした: ${(r && r.error) || '不明'}`;
+      ? 言('手直しの置き場を開きました: {場所}', { 場所: r.置き場 })
+      : 言('⚠ 開けませんでした: {理由}', { 理由: (r && r.error) || 言('不明') });
   };
   手直し捨てる.onclick = async () => {
     const 件 = Object.keys(手直し.曲 || {}).length;
     if (!(await 訊く(
-      `手直し ${件.toLocaleString('ja-JP')} 曲ぶんを、丸ごと捨てます。` + String.fromCharCode(10)
-      + '元のジャンルに戻ります。曲は消えません。',
+      言('手直し {n} 曲ぶんを、丸ごと捨てます。', { n: 件.toLocaleString('ja-JP') }) + String.fromCharCode(10)
+      + 言('元のジャンルに戻ります。曲は消えません。'),
       true,
     ))) return;
     await window.mp3.手直しを捨てる();
@@ -2594,8 +2613,8 @@ function 気分の欄を描く() {
         tracks[i] = t;
       }
     }
-    $('status').textContent = '手直しを捨てました。次に開くと、元のジャンルに戻ります'
-      + '（いま見えているぶんは、印だけ外しました）';
+    $('status').textContent = 言('手直しを捨てました。次に開くと、元のジャンルに戻ります')
+      + 言('（いま見えているぶんは、印だけ外しました）');
     描き直す();
   };
 
@@ -2609,8 +2628,8 @@ function 気分の欄を描く() {
   };
   やめる押す.onclick = async () => {
     if (!(await 訊く(
-      `ジャンルのまとめ（${ジャンルのまとめ.組.length} 組）を捨てます。` + String.fromCharCode(10)
-      + '元のジャンル名はそのまま残っているので、完全に元通りになります。',
+      言('ジャンルのまとめ（{n} 組）を捨てます。', { n: ジャンルのまとめ.組.length }) + String.fromCharCode(10)
+      + 言('元のジャンル名はそのまま残っているので、完全に元通りになります。'),
       true,
     ))) return;
     await window.mp3.ジャンルのまとめを捨てる();
@@ -2618,7 +2637,7 @@ function 気分の欄を描く() {
     if (カラムタブ === 'まとめ') カラムタブ = 'tag';
     sel = { ...sel, まとめ: null };
     描き直す();
-    $('status').textContent = 'ジャンルのまとめを捨てました（元のジャンル名に戻っています）';
+    $('status').textContent = 言('ジャンルのまとめを捨てました（元のジャンル名に戻っています）');
   };
   欄.onkeydown = (e) => { if (e.key === "Enter") 気分で(); };
   欄2.onkeydown = (e) => { if (e.key === "Enter") 辿って(); };
@@ -2654,12 +2673,13 @@ function 当てはめる(結果) {
   描き直す();
 
   const 何曲 = 絞る(3).length;
-  const 選んだ = [...結果.ジャンル, ...結果.年].join(" / ") || "（絞り込みなし）";
+  const 選んだ = [...結果.ジャンル, ...結果.年].join(" / ") || 言("（絞り込みなし）");
   // ★実在しなかったものは黙らない。AI がそう言ったことは事実なので、出す
-  const 無し = 結果.無かったもの.length ? "／手元に無かったもの: " + 結果.無かったもの.join(", ") : "";
+  const 無し = 結果.無かったもの.length ? 言("／手元に無かったもの: ") + 結果.無かったもの.join(", ") : "";
   const 言った = $("aisaid");
   if (言った) 言った.textContent = 結果.ひとこと || 選んだ;
-  $("status").textContent = `AI が選んだ範囲: ${選んだ} ― ${何曲.toLocaleString("ja-JP")} 曲${無し}　この中から一本を組んでいます…`;
+  $("status").textContent = 言('AI が選んだ範囲: {選んだ} ― {n} 曲{無し}　この中から一本を組んでいます…',
+    { 選んだ, n: 何曲.toLocaleString("ja-JP"), 無し });
 }
 
 /** そのタブで、いくつ選んでいるか（0 なら絞っていない） */
@@ -2689,31 +2709,31 @@ function 絞りを外すボタンを直す() {
     b.id = 'clearsel';
     b.className = 'btn';
     b.style.marginLeft = 'auto';
-    b.title = '見えていないタブのぶんも含めて、絞り込みを全部外します';
+    b.title = 言('見えていないタブのぶんも含めて、絞り込みを全部外します');
     b.onclick = () => {
       絞りを外す();
       描き直す();
-      $('status').textContent = '絞り込みを全部外しました（ライブラリ全体に戻っています）';
+      $('status').textContent = 言('絞り込みを全部外しました（ライブラリ全体に戻っています）');
     };
     置き.appendChild(b);
   }
-  b.textContent = `✕ 絞りを外す（${数}）`;
+  b.textContent = 言('✕ 絞りを外す（{n}）', { n: 数 });
 }
 
 function カラムタブを描く() {
   const box = $('coltabs');
   box.innerHTML = '';
   const 札 = [
-    ['tag', 'ジャンル / アーティスト / アルバム'],
-    ['date', '日付（年 / 月 / 日）'],
+    ['tag', 言('ジャンル / アーティスト / アルバム')],
+    ['date', 言('日付（年 / 月 / 日）')],
   ];
   /*
    * ★まとめのタブは、まとめてあるときだけ出す。
    * 何もまとめていないと、ジャンルの列と同じものが並ぶだけになる。
    */
-  if (ジャンルのまとめ.組.length) 札.push(['まとめ', `🏷 ジャンル（まとめ ${ジャンルのまとめ.組.length} 組）`]);
+  if (ジャンルのまとめ.組.length) 札.push(['まとめ', 言('🏷 ジャンル（まとめ {n} 組）', { n: ジャンルのまとめ.組.length })]);
   // ★響きのタブは、辿ったものがあるときだけ出す（無いと空の列を見せるだけになる）
-  if (響きの当たり && 響きの当たり.曲.size) 札.push(['resonance', `🌐 響き（${響きの当たり.当たり.length} 組）`]);
+  if (響きの当たり && 響きの当たり.曲.size) 札.push(['resonance', 言('🌐 響き（{n} 組）', { n: 響きの当たり.当たり.length })]);
   for (const [名, 表示] of 札) {
     const b = document.createElement('button');
     b.textContent = 表示;
@@ -2724,7 +2744,7 @@ function カラムタブを描く() {
       m.className = 'mark';
       m.textContent = `● ${数}`;
       b.appendChild(m);
-      b.title = `このタブで ${数} 個選んだままです（絞り込みは効いています）`;
+      b.title = 言('このタブで {n} 個選んだままです（絞り込みは効いています）', { n: 数 });
     }
     /*
      * ★タブを押したら、再生リストを閉じてライブラリに戻る（本人の希望）。
@@ -2772,9 +2792,9 @@ function 列を描く(ulId, level, 定義) {
 
   const すべて = document.createElement('li');
   const 選んだ数 = 選択中 ? 選択中.size : 0;
-  すべて.textContent = 語 ? `合うもの（${一覧.length}）` : `すべて（${一覧.length}）`;
+  すべて.textContent = 語 ? 言('合うもの（{n}）', { n: 一覧.length }) : 言('すべて（{n}）', { n: 一覧.length });
   // ★何個選んでいるかを出す。複数選べるようにすると、見ないと分からなくなる
-  if (選んだ数) すべて.textContent += `　― ${選んだ数} 個を選択中`;
+  if (選んだ数) すべて.textContent += 言('　― {n} 個を選択中', { n: 選んだ数 });
   すべて.className = 選択中 === null ? 'on' : '';
   すべて.onclick = () => 選ぶ(level, null);
   ul.appendChild(すべて);
@@ -2814,7 +2834,7 @@ function 列を描く(ulId, level, 定義) {
   if (一覧.length > 上限) {
     const li = document.createElement('li');
     li.className = 'more';
-    li.textContent = `ほかに ${(一覧.length - 上限).toLocaleString('ja-JP')} 件（上の欄で絞り込んでください）`;
+    li.textContent = 言('ほかに {n} 件（上の欄で絞り込んでください）', { n: (一覧.length - 上限).toLocaleString('ja-JP') });
     ul.appendChild(li);
   }
 }
@@ -2833,7 +2853,7 @@ function 列の絞りを作る(ul, key, 件数) {
   li.className = 'findrow';                     // ★li で包む（ul の直下に input を置かない）
   const inp = document.createElement('input');
   inp.className = 'colfind';
-  inp.placeholder = `${件数.toLocaleString('ja-JP')} 件から探す`;
+  inp.placeholder = 言('{n} 件から探す', { n: 件数.toLocaleString('ja-JP') });
   inp.value = 列の絞り[key];
   inp.autocomplete = 'off';
   inp.onclick = (e) => e.stopPropagation();     // 行を選んだ扱いにしない
@@ -2961,7 +2981,7 @@ let 列幅 = {};
 function 幅の取っ手(id, colgroup, 番) {
   const 取っ手 = document.createElement('span');
   取っ手.className = 'resizer';
-  取っ手.title = 'ドラッグで幅を変える';
+  取っ手.title = 言('ドラッグで幅を変える');
 
   取っ手.onmousedown = (e) => {
     e.preventDefault();
@@ -3097,14 +3117,14 @@ function 一覧を描く() {
   const 見出し = [
     ...(リスト ? [['grip', '', null, 'grip']] : [['pick', '', null, 'pick']]),
     ['num', '', null, 'num'],
-    ['', '曲名', 'title', 'title'],
-    ['', 'アーティスト', 'artist', 'artist'],
-    ['', 'アルバム', 'album', 'album'],
-    ['dur', '長さ', null, 'dur'],
+    ['', 言('曲名'), 'title', 'title'],
+    ['', 言('アーティスト'), 'artist', 'artist'],
+    ['', 言('アルバム'), 'album', 'album'],
+    ['dur', 言('長さ'), null, 'dur'],
     // ★日付。押すと「新しい順」から始まる（下の 見出しを作る を参照）
-    ['date', '日付', 'date', 'date'],
-    ['plays', '再生', 'plays', 'plays'],
-    ...(リスト ? [['move', '並べ替え', null, 'move']] : []),
+    ['date', 言('日付'), 'date', 'date'],
+    ['plays', 言('再生'), 'plays', 'plays'],
+    ...(リスト ? [['move', 言('並べ替え'), null, 'move']] : []),
     ['act', '', null, リスト ? 'actlist' : 'act'],
   ];
 
@@ -3135,7 +3155,7 @@ function 一覧を描く() {
       th.classList.add('sortable');
       th.textContent = label + (並び.key === key ? (並び.逆 ? ' ▼' : ' ▲') : '');
       if (並び.key === key) th.classList.add('sorted');
-      th.title = `${label}で並べ替え`;
+      th.title = 言('{label}で並べ替え', { label });
       th.onclick = () => {
         /*
          * ★日付だけは、最初に押したとき「新しい順」から始める（2026-08-29）。
@@ -3217,8 +3237,8 @@ function 一覧を描く() {
     if (リスト) {
       const grip = document.createElement('td');
       grip.className = 'grip';
-      grip.textContent = '⠿';
-      grip.title = 'ドラッグして並べ替え';
+      grip.textContent = 言('⠿');
+      grip.title = 言('ドラッグして並べ替え');
       tr.appendChild(grip);
 
       tr.draggable = true;
@@ -3292,7 +3312,7 @@ function 一覧を描く() {
     const 頭 = document.createElement('td');
     頭.className = 'num play-cell';
     頭.textContent = t.path === nowPath ? '♪' : '▶';
-    頭.title = 'クリックで再生';
+    頭.title = 言('クリックで再生');
     tr.appendChild(頭);
     tr.appendChild(td('title', t.title));   // ★class は印（🚫）を出すため。幅は colgroup 側
     tr.appendChild(td('', t.artist));
@@ -3317,10 +3337,10 @@ function 一覧を描く() {
         描き直す();
       };
       const up = document.createElement('button');
-      up.className = 'mini'; up.textContent = '↑'; up.title = '上へ';
+      up.className = 'mini'; up.textContent = 言('↑'); up.title = 言('上へ');
       up.disabled = i === 0; up.onclick = 動かす(-1);
       const down = document.createElement('button');
-      down.className = 'mini'; down.textContent = '↓'; down.title = '下へ';
+      down.className = 'mini'; down.textContent = 言('↓'); down.title = 言('下へ');
       down.disabled = i === 対象.length - 1; down.onclick = 動かす(1);
       mv.append(up, down);
       tr.appendChild(mv);
@@ -3332,7 +3352,7 @@ function 一覧を描く() {
     a.className = 'link';
     if (リスト) {
       // 再生リストから外す。曲そのものは消えない
-      a.textContent = 'この曲を外す';
+      a.textContent = 言('この曲を外す');
       a.onclick = async (e) => {
         e.stopPropagation();
         const rest = [...リスト.tracks];
@@ -3342,13 +3362,14 @@ function 一覧を描く() {
       };
     } else {
       // 「一覧から外す」。ファイルは消さない
-      a.textContent = '一覧から外す';
+      a.textContent = 言('一覧から外す');
       a.onclick = async (e) => {
         e.stopPropagation();
         // ★同名の曲が別フォルダにあると、曲名だけでは区別がつかない
         //   （指示書の「先に確かめたほうがいいこと」が、まさにここを警告していた）
         const 場所 = t.path.replace(/[\\/][^\\/]*$/, '');
-        if (!await 確かめる(`「${t.title}」を一覧から外しますか？\n\n場所: ${場所}\n\nファイルは削除されません。`)) return;
+        if (!await 確かめる(言('「{名}」を一覧から外しますか？', { 名: t.title }) + '\n\n'
+          + 言('場所: {場所}', { 場所 }) + '\n\n' + 言('ファイルは削除されません。'))) return;
         await window.mp3.一覧から外す(t.path);
 
         /*
@@ -3378,10 +3399,10 @@ function 一覧を描く() {
       const 外れている = シャッフル除外.has(t.path);
       const sk = document.createElement('span');
       sk.className = 'link';
-      sk.textContent = 外れている ? 'くじに戻す' : 'くじに入れない';
+      sk.textContent = 外れている ? 言('くじに戻す') : 言('くじに入れない');
       sk.title = 外れている
-        ? 'くじで選ばれるように戻します'
-        : '一覧には残り、押せば鳴ります。くじで選ばれなくなるだけです';
+        ? 言('くじで選ばれるように戻します')
+        : 言('一覧には残り、押せば鳴ります。くじで選ばれなくなるだけです');
       sk.onclick = async (e) => {
         e.stopPropagation();
         シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([t.path], !外れている));
@@ -3407,16 +3428,16 @@ function 一覧を描く() {
     const td = document.createElement('td');
     td.colSpan = 見出し.length;
     td.className = 'more';
-    td.textContent = `ほかに ${残り.toLocaleString('ja-JP')} 曲あります。`
-      + '上のジャンル・アーティスト・アルバムで絞ると、全部見えます。';
+    td.textContent = 言('ほかに {n} 曲あります。', { n: 残り.toLocaleString('ja-JP') })
+      + 言('上のジャンル・アーティスト・アルバムで絞ると、全部見えます。');
     tr.appendChild(td);
     tbody.appendChild(tr);
   }
 
-  const 曲数 = `${対象.length.toLocaleString('ja-JP')} 曲`;
-  const 但し = 残り > 0 ? `（上から ${描く分.length} 曲を表示中）` : '';
+  const 曲数 = 言('{n} 曲', { n: 対象.length.toLocaleString('ja-JP') });
+  const 但し = 残り > 0 ? 言('（上から {n} 曲を表示中）', { n: 描く分.length }) : '';
   $('status').textContent = リスト
-    ? `${曲数}（再生リスト「${リスト.name}」）`
+    ? 言('{曲数}（再生リスト「{名}」）', { 曲数, 名: リスト.name })
     : `${曲数}${但し}`;
 }
 
@@ -3438,7 +3459,7 @@ function タブを描く() {
     return b;
   };
 
-  タブ('ライブラリ', null);
+  タブ(言('ライブラリ'), null);
 
   /*
    * ★数が増えたので、探せるようにする（2026-08-29 本人の希望）。
@@ -3452,7 +3473,7 @@ function タブを描く() {
     const inp = document.createElement('input');
     inp.className = 'sidefind';
     inp.id = "listfind";
-    inp.placeholder = `${lists.length} 本から探す`;
+    inp.placeholder = 言('{n} 本から探す', { n: lists.length });
     inp.value = 再生リストの絞り;
     inp.autocomplete = 'off';
     inp.oninput = () => {
@@ -3472,8 +3493,8 @@ function タブを描く() {
   const 見出し = document.createElement('div');
   見出し.className = 'sidehead';
   見出し.textContent = 語
-    ? `合う再生リスト（${出す.length} / ${lists.length}）`
-    : `再生リスト（${lists.length}）`;
+    ? 言('合う再生リスト（{n} / {全体}）', { n: 出す.length, 全体: lists.length })
+    : 言('再生リスト（{n}）', { n: lists.length });
   box.appendChild(見出し);
 
   for (const l of 出す) タブ(`${l.name}（${l.tracks.length}）`, l.id, l.name);
@@ -3481,13 +3502,13 @@ function タブを描く() {
   if (語 && !出す.length) {
     const 無 = document.createElement('div');
     無.className = 'sidehead';
-    無.textContent = '合うものがありません';
+    無.textContent = 言('合うものがありません');
     box.appendChild(無);
   }
 
   const 新規 = document.createElement('button');
   新規.className = 'tab sideadd';
-  新規.textContent = '＋ 新しい再生リスト';
+  新規.textContent = 言('＋ 新しい再生リスト');
   // ★prompt() は使わない。Electron では動かない（alert / confirm は動くのに prompt だけ使えない）。
   // 実地で「押しても反応がない」となった原因。画面内の入力欄に置き換えた。
   新規.onclick = () => { 名前入力 = { mode: 'new', id: null, value: '' }; 描き直す(); };
@@ -3495,7 +3516,7 @@ function タブを描く() {
 
   const 読込 = document.createElement('button');
   読込.className = 'tab sideadd';
-  読込.textContent = 'm3u を読み込む';
+  読込.textContent = 言('m3u を読み込む');
   読込.onclick = async () => {
     const r = await window.mp3.m3uを読み込む();
     if (!r) return;
@@ -3512,7 +3533,7 @@ function タブを描く() {
 function 名前入力を描く(box) {
   const inp = document.createElement('input');
   inp.value = 名前入力.value;
-  inp.placeholder = '再生リストの名前';
+  inp.placeholder = 言('再生リストの名前');
   inp.autocomplete = 'off';
   inp.style.cssText = 'padding:5px 8px;border:1px solid var(--accent);border-radius:4px;font-size:12px;min-width:200px;outline:none;';
   inp.oninput = () => { 名前入力.value = inp.value; };
@@ -3538,12 +3559,12 @@ function 名前入力を描く(box) {
 
   const ok = document.createElement('button');
   ok.className = 'btn';
-  ok.textContent = 名前入力.mode === 'new' ? '作る' : '変える';
+  ok.textContent = 名前入力.mode === 'new' ? 言('作る') : 言('変える');
   ok.onclick = 決める;
 
   const ng = document.createElement('button');
   ng.className = 'btn';
-  ng.textContent = 'やめる';
+  ng.textContent = 言('やめる');
   ng.onclick = やめる;
 
   box.append(inp, ok, ng);
@@ -3563,7 +3584,7 @@ function タグ編集を描く(box) {
     wrap.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;color:var(--dim);';
     const inp = document.createElement('input');
     inp.value = タグ編集.値[key];
-    inp.placeholder = '（変えない）';
+    inp.placeholder = 言('（変えない）');
     inp.autocomplete = 'off';
     inp.style.cssText = 'padding:4px 7px;border:1px solid var(--line);border-radius:4px;font-size:12px;width:130px;outline:none;';
     inp.oninput = () => { タグ編集.値[key] = inp.value; 書くボタンを更新(); };
@@ -3574,7 +3595,7 @@ function タグ編集を描く(box) {
 
   const 説明 = document.createElement('span');
   説明.style.cssText = 'font-size:12px;color:var(--text);font-weight:600;';
-  説明.textContent = `${タグ編集.対象.length} 曲のタグを直す:`;
+  説明.textContent = 言('{n} 曲のタグを直す:', { n: タグ編集.対象.length });
   box.appendChild(説明);
 
   欄('genre', 'ジャンル');
@@ -3587,35 +3608,37 @@ function タグ編集を描く(box) {
 
   const やめる = document.createElement('button');
   やめる.className = 'btn';
-  やめる.textContent = 'やめる';
+  やめる.textContent = 言('やめる');
   やめる.onclick = () => { タグ編集 = null; 描き直す(); };
   box.appendChild(やめる);
 
   const 注意 = document.createElement('span');
   注意.style.cssText = 'font-size:11px;color:#b45309;';
-  注意.textContent = '※ MP3 ファイルそのものを書き換えます（空欄は変えません）';
+  注意.textContent = 言('※ MP3 ファイルそのものを書き換えます（空欄は変えません）');
   box.appendChild(注意);
 
   function 書くボタンを更新() {
     const 入っている = Object.entries(タグ編集.値).filter(([, v]) => v.trim());
     書く.disabled = 入っている.length === 0;
     書く.textContent = 入っている.length
-      ? `${入っている.map(([k]) => ({ genre: 'ジャンル', artist: 'アーティスト', album: 'アルバム' })[k]).join('・')}を書き込む`
-      : '書き込む';
+      ? 言('{欄}を書き込む',
+        { 欄: 入っている.map(([k]) => 言({ genre: 'ジャンル', artist: 'アーティスト', album: 'アルバム' }[k])).join('・') })
+      : 言('書き込む');
   }
   書くボタンを更新();
 
   書く.onclick = async () => {
     const 値 = Object.fromEntries(Object.entries(タグ編集.値).filter(([, v]) => v.trim()));
-    const 中身 = Object.entries(値).map(([k, v]) => `${({ genre: 'ジャンル', artist: 'アーティスト', album: 'アルバム' })[k]} → ${v}`).join('\n');
+    const 中身 = Object.entries(値).map(([k, v]) => `${言({ genre: 'ジャンル', artist: 'アーティスト', album: 'アルバム' }[k])} → ${v}`).join('\n');
     /*
      * ★曲数が多いときは、かかる時間も伝える。
      * 「まとめて選択」は絞り込んだ全曲を選ぶので、うっかり数万曲になることがある。
      * MP3 そのものを書き換える操作なので、**押す前に重さが分かるようにする。**
      */
     const 数 = タグ編集.対象.length;
-    const 目安 = 数 > 500 ? `\n\n※ ${数.toLocaleString('ja-JP')} 曲だと、おおよそ ${Math.ceil(数 / 60)} 秒かかります。`
-      + '\n途中でやめられません。曲数が多すぎるときは、上の3カラムで絞ってからにしてください。' : '';
+    const 目安 = 数 > 500 ? '\n\n' + 言('　※ {n} 曲だと、おおよそ {秒} 秒かかります。',
+      { n: 数.toLocaleString('ja-JP'), 秒: Math.ceil(数 / 60) })
+      + '\n' + 言('　途中でやめられません。曲数が多すぎるときは、上の3カラムで絞ってからにしてください。') : '';
     /*
      * ★MP3 でないものが混じっていたら、押す前に言う（2026-08-28）。
      * .m4a を一覧に出すようにしたので、選択に混ざる。
@@ -3625,18 +3648,20 @@ function タグ編集を描く(box) {
      */
     const 書けない数 = タグ編集.対象.filter((p) => !/\.mp3$/i.test(p)).length;
     const 書けない断り = 書けない数
-      ? `\n\n※ このうち ${書けない数.toLocaleString('ja-JP')} 曲は MP3 ではないので（m4a など）、`
-        + 'タグを書き換えられません。飛ばします。\nファイルは壊れていません。再生はできます。'
+      ? '\n\n' + 言('　※ このうち {n} 曲は MP3 ではないので（m4a など）、',
+        { n: 書けない数.toLocaleString('ja-JP') })
+        + 言('タグを書き換えられません。飛ばします。') + '\n' + 言('ファイルは壊れていません。再生はできます。')
       : '';
     if (数 === 書けない数) {
-      await 知らせる('選んだ曲は MP3 ではないので（m4a など）、タグを書き換えられません。\n'
-        + 'ファイルは壊れていません。再生はできます。');
+      await 知らせる(言('選んだ曲は MP3 ではないので（m4a など）、タグを書き換えられません。\n')
+        + 言('ファイルは壊れていません。再生はできます。'));
       return;
     }
     if (!await 確かめる(
-      `${(数 - 書けない数).toLocaleString('ja-JP')} 曲の MP3 ファイルを書き換えます。\n\n${中身}\n\n`
-      + 'ファイルそのものが書き換わります（音のデータは変わりません）。'
-      + `${書けない断り}${目安}\n\nよろしいですか？`,
+      言('{n} 曲の MP3 ファイルを書き換えます。', { n: (数 - 書けない数).toLocaleString('ja-JP') })
+      + '\n\n' + 中身 + '\n\n'
+      + 言('ファイルそのものが書き換わります（音のデータは変わりません）。')
+      + 書けない断り + 目安 + '\n\n' + 言('よろしいですか？'),
     )) return;
 
     /*
@@ -3651,11 +3676,12 @@ function タグ編集を描く(box) {
     for (const p of タグ編集.対象) {
       const r = await window.mp3.タグを書く(p, 値);
       if (r?.ok) 成功 += 1;
-      else 失敗.push(`${p.replace(/^.*[\\/]/, '')}: ${r?.error ?? '不明'}`);
+      else 失敗.push(`${p.replace(/^.*[\\/]/, '')}: ${r?.error ?? 言('不明')}`);
       const 済み = 成功 + 失敗.length;
       if (済み % 20 === 0 || 済み === 全体) {
-        $('status').textContent = `タグを書いています ${済み.toLocaleString('ja-JP')} / ${全体.toLocaleString('ja-JP')}`
-          + (失敗.length ? `（うまくいかなかったもの ${失敗.length}）` : '');
+        $('status').textContent = 言('タグを書いています {済み} / {全体}',
+          { 済み: 済み.toLocaleString('ja-JP'), 全体: 全体.toLocaleString('ja-JP') })
+          + (失敗.length ? 言('（うまくいかなかったもの {n}）', { n: 失敗.length }) : '');
         // 画面を描き直す隙を作る（詰まったように見えないように）
         await new Promise((r2) => setTimeout(r2, 0));
       }
@@ -3674,7 +3700,7 @@ function タグ編集を描く(box) {
      * ★まとめて読み直す。1 曲ずつ頼まない。
      * 覚え書きは 60 MB あるので、1 曲ごとに書き直すと 14 曲で 14 回書くことになる。
      */
-    $('status').textContent = '読み直しています…';
+    $('status').textContent = 言('読み直しています…');
     const 返り = await window.mp3.まとめて読み直す(直した);
     const 新しい = 返り.tracks;
     let 読み直した = 0;
@@ -3693,9 +3719,9 @@ function タグ編集を描く(box) {
      * 届くようにしたので、だめなときは隠さず出す。
      */
     const 覚え注意 = 返り.覚え && 返り.覚え.ok === false
-      ? `\n\n⚠ ただし、覚え書きに残せませんでした（${返り.覚え.error}）。\n`
-        + 'このまま閉じると、次に開いたとき古い内容に戻って見えます。\n'
-        + '「再スキャン」を最後まで走らせると直ります。'
+      ? '\n\n' + 言('　⚠ ただし、覚え書きに残せませんでした（{理由}）。', { 理由: 返り.覚え.error }) + '\n'
+        + 言('このまま閉じると、次に開いたとき古い内容に戻って見えます。') + '\n'
+        + 言('「再スキャン」を最後まで走らせると直ります。')
       : '';
 
     /*
@@ -3711,11 +3737,14 @@ function タグ編集を描く(box) {
     描き直す();
 
     // 黙って終わらせない。失敗があれば必ず見せる。何件読み直したかも出す
-    const 但し = 読み直した < 成功 ? `\n（うち ${成功 - 読み直した} 曲は一覧に見当たらず、表示を更新できませんでした）` : '';
+    const 但し = 読み直した < 成功 ? '\n' + 言('（うち {n} 曲は一覧に見当たらず、表示を更新できませんでした）', { n: 成功 - 読み直した }) : '';
     if (失敗.length) {
-      await 知らせる(`${成功} 曲を書き換えました。${但し}\n\n${失敗.length} 曲は失敗しました:\n${失敗.slice(0, 10).join('\n')}${覚え注意}`);
+      await 知らせる(言('{n} 曲を書き換えました。{但し}', { n: 成功, 但し })
+        + '\n\n' + 言('{n} 曲は失敗しました:', { n: 失敗.length })
+        + '\n' + 失敗.slice(0, 10).join('\n') + 覚え注意);
     } else {
-      await 知らせる(`${成功} 曲のタグを書き換えました。${但し}\n\n絞り込みを外したので、変えた内容が一覧で確かめられます。${覚え注意}`);
+      await 知らせる(言('{n} 曲のタグを書き換えました。{但し}', { n: 成功, 但し })
+        + '\n\n' + 言('絞り込みを外したので、変えた内容が一覧で確かめられます。') + 覚え注意);
     }
   };
 }
@@ -3744,7 +3773,7 @@ function 道具を描く() {
     // タグをまとめて直すときにも使うので、追加専用の道具ではない
     const 見えている = 絞る(3);
     const 全部選ばれている = 見えている.length > 0 && 見えている.every((t) => 選択中.has(t.path));
-    ボタン(全部選ばれている ? 'まとめて解除' : `まとめて選択（${見えている.length}）`, () => {
+    ボタン(全部選ばれている ? 言('まとめて解除') : 言('まとめて選択（{n}）', { n: 見えている.length }), () => {
       if (全部選ばれている) 見えている.forEach((t) => 選択中.delete(t.path));
       else 見えている.forEach((t) => 選択中.add(t.path));
       描き直す();
@@ -3764,8 +3793,8 @@ function 道具を描く() {
        */
       const 見えている集合 = new Set(見えている.map((t) => t.path));
       const 見えない数 = [...選択中].filter((p) => !見えている集合.has(p)).length;
-      const 但し = 見えない数 ? `（うち ${見えない数} 曲は、いまの絞り込みでは見えていません）` : '';
-      ボタン(`選んだ ${n0} 曲のタグを直す${但し}`, () => {
+      const 但し = 見えない数 ? 言('（うち {n} 曲は、いまの絞り込みでは見えていません）', { n: 見えない数 }) : '';
+      ボタン(言('選んだ {n} 曲のタグを直す{但し}', { n: n0, 但し }), () => {
         タグ編集 = { 対象: [...選択中], 値: { genre: '', artist: '', album: '' } };
         描き直す();
       });
@@ -3778,17 +3807,17 @@ function 道具を描く() {
        */
       const 外れ数 = [...選択中].filter((p) => シャッフル除外.has(p)).length;
       if (外れ数 < n0) {
-        ボタン(`選んだ ${n0 - 外れ数} 曲をシャッフルに入れない`, async () => {
+        ボタン(言('選んだ {n} 曲をシャッフルに入れない', { n: n0 - 外れ数 }), async () => {
           シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([...選択中], true));
           描き直す();
-          $('status').textContent = `${(n0 - 外れ数).toLocaleString('ja-JP')} 曲をシャッフルから外しました（一覧には残ります）`;
+          $('status').textContent = 言('{n} 曲をシャッフルから外しました（一覧には残ります）', { n: (n0 - 外れ数).toLocaleString('ja-JP') });
         });
       }
       if (外れ数) {
-        ボタン(`選んだ ${外れ数} 曲をシャッフルに戻す`, async () => {
+        ボタン(言('選んだ {n} 曲をシャッフルに戻す', { n: 外れ数 }), async () => {
           シャッフル除外 = new Set(await window.mp3.シャッフル除外を変える([...選択中], false));
           描き直す();
-          $('status').textContent = `${外れ数.toLocaleString('ja-JP')} 曲をシャッフルに戻しました`;
+          $('status').textContent = 言('{n} 曲をシャッフルに戻しました', { n: 外れ数.toLocaleString('ja-JP') });
         });
       }
 
@@ -3820,31 +3849,35 @@ function 道具を描く() {
 
         if (まだ.length) {
           const n = 曲数(まだ);
-          ボタン(`${まだ.length === 1 ? `「${まだ[0]}」` : `${まだ.length} 組`}を自分の音源にする（${n.toLocaleString("ja-JP")} 曲）`, async () => {
+          ボタン(言('{名前}を自分の音源にする（{n} 曲）',
+            { 名前: まだ.length === 1 ? 言('「{名}」', { 名: まだ[0] }) : 言('{n} 組', { n: まだ.length }),
+              n: n.toLocaleString("ja-JP") }), async () => {
             if (!await 確かめる(
               `${まだ.join("、")}`
               + String.fromCharCode(10) + String.fromCharCode(10)
-              + `この演者の ${n.toLocaleString("ja-JP")} 曲を「自分の音源」にします。`
+              + 言('この演者の {n} 曲を「自分の音源」にします。', { n: n.toLocaleString("ja-JP") })
               + String.fromCharCode(10) + String.fromCharCode(10)
-              + '・一覧には残ります。押せば鳴ります'
-              + String.fromCharCode(10) + '・シャッフルのくじに入りません'
-              + String.fromCharCode(10) + '・AI DJ と Resonance の候補にも入りません'
-              + String.fromCharCode(10) + '・曲は消えません。あとから戻せます',
+              + 言('・一覧には残ります。押せば鳴ります')
+              + String.fromCharCode(10) + 言('・シャッフルのくじに入りません')
+              + String.fromCharCode(10) + 言('・AI DJ と Resonance の候補にも入りません')
+              + String.fromCharCode(10) + 言('・曲は消えません。あとから戻せます'),
             )) return;
             自分の音源 = new Set(await window.mp3.自分の音源を変える(まだ, true));
             選択中.clear();
             描き直す();
-            $('status').textContent = `${まだ.join('、')} を自分の音源にしました`
-              + `（${n.toLocaleString('ja-JP')} 曲。一覧には残っています）`;
+            $('status').textContent = 言('{名前} を自分の音源にしました', { 名前: まだ.join('、') })
+              + 言('（{n} 曲。一覧には残っています）', { n: n.toLocaleString('ja-JP') });
           });
         }
         if (入っている.length) {
           const n = 曲数(入っている);
-          ボタン(`${入っている.length === 1 ? `「${入っている[0]}」` : `${入っている.length} 組`}を自分の音源から戻す（${n.toLocaleString("ja-JP")} 曲）`, async () => {
+          ボタン(言('{名前}を自分の音源から戻す（{n} 曲）',
+            { 名前: 入っている.length === 1 ? 言('「{名}」', { 名: 入っている[0] }) : 言('{n} 組', { n: 入っている.length }),
+              n: n.toLocaleString("ja-JP") }), async () => {
             自分の音源 = new Set(await window.mp3.自分の音源を変える(入っている, false));
             描き直す();
-            $('status').textContent = `${入っている.join('、')} を自分の音源から戻しました`
-              + `（${n.toLocaleString('ja-JP')} 曲。またくじに入ります）`;
+            $('status').textContent = 言('{名前} を自分の音源から戻しました', { 名前: 入っている.join('、') })
+              + 言('（{n} 曲。またくじに入ります）', { n: n.toLocaleString('ja-JP') });
           });
         }
       }
@@ -3853,14 +3886,14 @@ function 道具を描く() {
        * ★「一覧から外す」もまとめてできるようにする（本人の希望 2026-08-25）。
        * ファイルは消さない。一覧から外すだけ、という約束は変えない。
        */
-      ボタン(`選んだ ${n0} 曲を一覧から外す`, async () => {
+      ボタン(言('選んだ {n} 曲を一覧から外す', { n: n0 }), async () => {
         if (!await 確かめる(
-          `${n0.toLocaleString('ja-JP')} 曲を一覧から外します。\n\n`
-          + 'ファイルは削除されません。一覧に出なくなるだけです。\n'
-          + '（「外したものを戻す」で戻せます）',
+          言('{n} 曲を一覧から外します。', { n: n0.toLocaleString('ja-JP') }) + '\n\n'
+          + 言('ファイルは削除されません。一覧に出なくなるだけです。') + '\n'
+          + 言('（「外したものを戻す」で戻せます）'),
         )) return;
         const 外す = [...選択中];
-        $('status').textContent = '外しています…';
+        $('status').textContent = 言('外しています…');
         const 合計 = await window.mp3.まとめて一覧から外す(外す);
         const 外す集合 = new Set(外す);
         tracks = tracks.filter((t) => !外す集合.has(t.path));
@@ -3869,12 +3902,12 @@ function 道具を描く() {
         // ★外した直後に「戻す」ボタンを出す。案内だけして操作が無いのを直した
         外したものボタンを直す(合計);
         描き直す();
-        $('status').textContent = `${外す.length.toLocaleString('ja-JP')} 曲を一覧から外しました（ファイルは残っています）`;
+        $('status').textContent = 言('{n} 曲を一覧から外しました（ファイルは残っています）', { n: 外す.length.toLocaleString('ja-JP') });
       });
 
       // ★「選択を解除」は、再生リストが無くても出す。
       //   身に覚えのない選択を、その場で消せるようにするため
-      ボタン('選択を解除', () => { 選択中.clear(); 描き直す(); });
+      ボタン(言('選択を解除'), () => { 選択中.clear(); 描き直す(); });
     }
 
     if (!lists.length) return;                 // 追加先が無いときは、ここまで
@@ -3887,7 +3920,7 @@ function 道具を描く() {
       sel2.appendChild(o);
     }
     box.appendChild(sel2);
-    ボタン(`選んだ ${n} 曲を追加`, async () => {
+    ボタン(言('選んだ {n} 曲を追加', { n }), async () => {
       // 指示書: 同じ曲を複数回追加できる → 重複を確かめずそのまま足す
       lists = await window.mp3.リストに足す(sel2.value, [...選択中]);
       選択中.clear();
@@ -3904,17 +3937,17 @@ function 道具を描く() {
    * **その一本に紐づいた曲だけ**を、m3u と一緒にフォルダへコピーする。
    * ★元のファイルは触らない。コピーするだけ。
    */
-  ボタン('📱 スマホへ持ち出す', async () => {
+  ボタン(言('📱 スマホへ持ち出す'), async () => {
     const 曲情報 = リスト.tracks
       .map((道) => tracks.find((t) => t.path === 道))
       .filter(Boolean)
       .map((t) => ({ path: t.path, artist: t.artist, title: t.title, duration: t.duration }));
-    $('status').textContent = '📱 持ち出す先を選んでください…';
+    $('status').textContent = 言('📱 持ち出す先を選んでください…');
     const r = await window.mp3.スマホへ持ち出す(リスト.id, 曲情報);
     if (!r) return;
-    if (r.canceled) { $('status').textContent = ''; return; }
+    if (r.canceled) { $('status').textContent = 言(''); return; }
     if (!r.ok) {
-      $('status').textContent = '⚠ 持ち出せませんでした: ' + (r.error || '不明');
+      $('status').textContent = 言('⚠ 持ち出せませんでした: ') + (r.error || 言('不明'));
       return;
     }
     /*
@@ -3924,28 +3957,30 @@ function 道具を描く() {
      */
     const mb = (r.大きさ / 1024 / 1024).toFixed(0);
     const 但し = [];
-    if (r.見つからない) 但し.push(`${r.見つからない} 曲は元のファイルが見当たりませんでした`);
-    if (r.運べなかった && r.運べなかった.length) 但し.push(`${r.運べなかった.length} 曲は運べませんでした`);
-    if (r.余り) 但し.push(`この一本に無いファイルが ${r.余り} 個、先に残っています（消していません）`);
-    $('status').textContent = `📱 ${r.運んだ} 曲（${mb} MB）を運びました: ${r.先}`
-      + (但し.length ? `　※ ${但し.join(' ／ ')}` : '')
-      + `　スマホに繋いで、このフォルダごとコピーしてください（${r.題ファイル || 'm3u'} を開けば並び順どおりに鳴ります）`;
+    if (r.見つからない) 但し.push(言('{n} 曲は元のファイルが見当たりませんでした', { n: r.見つからない }));
+    if (r.運べなかった && r.運べなかった.length) 但し.push(言('{n} 曲は運べませんでした', { n: r.運べなかった.length }));
+    if (r.余り) 但し.push(言('この一本に無いファイルが {n} 個、先に残っています（消していません）', { n: r.余り }));
+    $('status').textContent = 言('📱 {n} 曲（{mb} MB）を運びました: {先}', { n: r.運んだ, mb, 先: r.先 })
+      + (但し.length ? 言('　※ {但し}', { 但し: 但し.join(' ／ ') }) : '')
+      + 言('　スマホに繋いで、このフォルダごとコピーしてください（{題} を開けば並び順どおりに鳴ります）',
+        { 題: r.題ファイル || 'm3u' });
   });
 
-  ボタン('m3u で保存', async () => {
+  ボタン(言('m3u で保存'), async () => {
     const r = await window.mp3.m3uに書き出す(リスト.id, tracks);
-    if (r?.ok) await 知らせる(`保存しました\n${r.path}`);
-    else if (r && !r.canceled) await 知らせる(`保存できませんでした（${r.error ?? '不明'}）`);
+    if (r?.ok) await 知らせる(言('保存しました') + '\n' + r.path);
+    else if (r && !r.canceled) await 知らせる(言('保存できませんでした（{理由}）', { 理由: r.error ?? 言('不明') }));
   }, リスト.tracks.length === 0);
 
-  ボタン('名前を変える', () => {
+  ボタン(言('名前を変える'), () => {
     名前入力 = { mode: 'rename', id: リスト.id, value: リスト.name };
     描き直す();
   });
 
   // 指示書:「再生リストを削除するとき、確認ダイアログを出す: 出す」
-  ボタン('この再生リストを削除', async () => {
-    if (!await 確かめる(`再生リスト「${リスト.name}」を削除しますか？\n\n曲のファイルは削除されません。`)) return;
+  ボタン(言('この再生リストを削除'), async () => {
+    if (!await 確かめる(言('再生リスト「{名}」を削除しますか？', { 名: リスト.name })
+          + '\n\n' + 言('曲のファイルは削除されません。'))) return;
     lists = await window.mp3.リストを消す(リスト.id);
     開いているID = null;
     描き直す();
@@ -3969,10 +4004,10 @@ function 道具を描く() {
 function キーのボタンを直す() {
   const b = $('aikey');
   if (!b) return;
-  b.textContent = AIが使える ? '🔑 APIキーを消す' : '🔑 APIキーを入れる';
+  b.textContent = AIが使える ? 言('🔑 APIキーを消す') : 言('🔑 APIキーを入れる');
   b.title = AIが使える
-    ? 'この PC にしまってある Anthropic の API キーを消します（曲は何も変わりません）'
-    : 'Anthropic の API キーを登録します。入れると、上に「気分を書く」欄と「言葉から辿る」欄が出ます';
+    ? 言('この PC にしまってある Anthropic の API キーを消します（曲は何も変わりません）')
+    : 言('Anthropic の API キーを登録します。入れると、上に「気分を書く」欄と「言葉から辿る」欄が出ます');
 }
 
 function 描き直す() {
@@ -3980,7 +4015,7 @@ function 描き直す() {
   ['c-genre', 'c-artist', 'c-album'].forEach((id, i) => {
     // 見出しも中身に合わせて書き換える（ジャンル/アーティスト/アルバム ↔ 年/月/日）
     const h = $(id).parentElement.querySelector('h2');
-    if (h) h.textContent = 列たち[i].見出し;
+    if (h) h.textContent = 言(列たち[i].見出し);
     列を描く(id, i, 列たち[i]);
   });
   カラムタブを描く();
@@ -4043,7 +4078,7 @@ function 裏で描き直す() {
  */
 window.mp3.持ち出しの進みを受ける((p) => {
   const mb = (p.大きさ / 1024 / 1024).toFixed(0);
-  $('status').textContent = `📱 スマホへ運んでいます… ${p.済み} / ${p.全体} 曲（${mb} MB）`;
+  $('status').textContent = 言('📱 スマホへ運んでいます… {済み} / {全体} 曲（{mb} MB）', { 済み: p.済み, 全体: p.全体, mb });
 });
 
 /*
@@ -4052,7 +4087,7 @@ window.mp3.持ち出しの進みを受ける((p) => {
  */
 window.mp3.持ち出しの進みを受ける((p) => {
   const mb = (p.大きさ / 1024 / 1024).toFixed(0);
-  $('status').textContent = `📱 スマホへ運んでいます… ${p.済み} / ${p.全体} 曲（${mb} MB）`;
+  $('status').textContent = 言('📱 スマホへ運んでいます… {済み} / {全体} 曲（{mb} MB）', { 済み: p.済み, 全体: p.全体, mb });
 });
 
 /* ── 再生 ───────────────────────────────────────────── */
@@ -4073,8 +4108,8 @@ function ファイルURL(win路) {
 
 function 再生できない(理由) {
   // ★黙って止まらない。何が起きたか画面に出す
-  $('sub').textContent = `再生できませんでした（${理由}）`;
-  $('play').textContent = '▶';
+  $('sub').textContent = 言('再生できませんでした（{理由}）', { 理由 });
+  $('play').textContent = 言('▶');
 }
 
 /**
@@ -4136,7 +4171,7 @@ function 再生する(t, { 列を保つ = false } = {}) {
    * 倍率の測定も decodeAudioData なので、同じ理由で失敗する。無駄に走らせない。
    */
   if (t.鳴らせる === false) {
-    再生できない(`${t.codec ?? 'この形式'} は音蔵では鳴らせません`);
+    再生できない(言('{形式} は音蔵では鳴らせません', { 形式: t.codec ?? 言('この形式') }));
     audio.removeAttribute('src');
     audio.load();                                // 前の曲が鳴り続けないように止める
     return;
@@ -4147,7 +4182,7 @@ function 再生する(t, { 列を保つ = false } = {}) {
   測って覚える(t);
 
   audio.src = ファイルURL(t.path);
-  audio.play().catch((e) => 再生できない(e?.message || '不明'));
+  audio.play().catch((e) => 再生できない(e?.message || 言('不明')));
 }
 
 /* ── 音量そろえ ─────────────────────────────────────────
@@ -4220,7 +4255,8 @@ async function 測って覚える(t) {
       // ★黙って飛ばさない。「そろっていない」ことが分かるようにする
       if (t.path === nowPath) {
         $('status').textContent =
-          `${Math.round(返り.大きすぎる / 1024 / 1024)} MB あるので、音量そろえは測っていません`;
+          言('{mb} MB あるので、音量そろえは測っていません',
+            { mb: Math.round(返り.大きすぎる / 1024 / 1024) });
       }
       return;
     }
@@ -4275,7 +4311,7 @@ function 流し始める() {
   const 列 = いまの列();
   const 鳴る列 = 列.filter((t) => t.鳴らせる !== false);
   if (!鳴る列.length) {
-    $('sub').textContent = 列.length ? '流せる曲がありません（この範囲は鳴らせない曲だけです）' : '流せる曲がありません';
+    $('sub').textContent = 列.length ? 言('流せる曲がありません（この範囲は鳴らせない曲だけです）') : 言('流せる曲がありません');
     return;
   }
   巡 = new Set();
@@ -4284,7 +4320,7 @@ function 流し始める() {
     // ★くじの候補からは、シャッフルに入れない曲を外す
     const くじ列 = 鳴る列.filter((x) => !シャッフル除外.has(x.path) && !自分のか(x));
     if (!くじ列.length) {
-      $('sub').textContent = 'この範囲は、全部シャッフルから外してあります';
+      $('sub').textContent = 言('この範囲は、全部シャッフルから外してあります');
       return;
     }
     const p = 次を選ぶ(くじ列.map((x) => x.path), 再生回数, 巡);
@@ -4377,13 +4413,13 @@ function 送る(方向) {
 
   if (t) {
     再生する(t, { 列を保つ: true });
-    if (飛ばした) $('sub').textContent += `（鳴らせない ${飛ばした} 曲を飛ばしました）`;
+    if (飛ばした) $('sub').textContent += 言('（鳴らせない {n} 曲を飛ばしました）', { n: 飛ばした });
   } else {
     nowPath = 元のいま;                          // 飛ばしただけで終わったので、起点を戻す
     audio.pause();
     $('sub').textContent = 飛ばした
-      ? `鳴らせない曲が ${飛ばした} 曲続いたので止まりました`
-      : '最後まで再生しました';
+      ? 言('鳴らせない曲が {n} 曲続いたので止まりました', { n: 飛ばした })
+      : 言('最後まで再生しました');
   }
 }
 
@@ -4408,9 +4444,9 @@ audio.addEventListener('timeupdate', async () => {
 audio.onerror = () => {
   const code = audio.error?.code;
   const 説明 = {
-    1: '読み込みが中断された', 2: 'ファイルを読めなかった',
-    3: 'ファイルが壊れている', 4: 'この形式は再生できない',
-  }[code] ?? `コード ${code}`;
+    1: 言('読み込みが中断された'), 2: 言('ファイルを読めなかった'),
+    3: 言('ファイルが壊れている'), 4: 言('この形式は再生できない'),
+  }[code] ?? 言('コード {code}', { code });
   再生できない(説明);
 };
 
@@ -4430,10 +4466,11 @@ $('play').onclick = () => {
 $('next').onclick = () => 送る(1);
 $('prev').onclick = () => 送る(-1);
 
+/* ★日本語のまま持ち、読むときに訳す（読み込みのときに固まってしまうため） */
 const 繰り返しの表示 = { none: '🔁 しない', one: '🔁 1曲', all: '🔁 全体' };
 $('repeat').onclick = () => {
   繰り返し = { none: 'one', one: 'all', all: 'none' }[繰り返し];
-  $('repeat').textContent = 繰り返しの表示[繰り返し];
+  $('repeat').textContent = 言(繰り返しの表示[繰り返し]);
   $('repeat').classList.toggle('on', 繰り返し !== 'none');
 };
 
@@ -4457,31 +4494,31 @@ $('vol').onchange = () => { window.mp3.音量を覚える(音量); };
 $('untagged').onclick = async () => {
   タグ無しを隠す = !タグ無しを隠す;
   $('untagged').classList.toggle('on', タグ無しを隠す);
-  $('untagged').textContent = タグ無しを隠す ? '🏷 タグ無しを隠す' : '🏷 タグ無しも出す';
+  $('untagged').textContent = タグ無しを隠す ? 言('🏷 タグ無しを隠す') : 言('🏷 タグ無しも出す');
   await window.mp3.タグ無しを隠す設定(タグ無しを隠す);
   const 隠れる = tracks.filter((t) => !t.タグあり).length;
   描き直す();
   $('status').textContent = タグ無しを隠す
-    ? `${見える曲().length} 曲（タグが無く非表示 ${隠れる} 件）`
-    : `${見える曲().length} 曲（タグの無い ${隠れる} 件も出しています）`;
+    ? 言('{n} 曲（タグが無く非表示 {隠れる} 件）', { n: 見える曲().length, 隠れる })
+    : 言('{n} 曲（タグの無い {隠れる} 件も出しています）', { n: 見える曲().length, 隠れる });
 };
 
 $('level').onclick = () => {
   音量そろえ = !音量そろえ;
-  $('level').textContent = 音量そろえ ? '🔊 音量そろえる' : '🔊 そのまま';
+  $('level').textContent = 音量そろえ ? 言('🔊 音量そろえる') : 言('🔊 そのまま');
   $('level').classList.toggle('on', 音量そろえ);
   倍率をかける(倍率表[nowPath] ?? 1);
 };
 
 $('shuffle').onclick = () => {
   シャッフル = !シャッフル;
-  $('shuffle').textContent = シャッフル ? '🔀 オン' : '🔀 オフ';
+  $('shuffle').textContent = シャッフル ? 言('🔀 オン') : 言('🔀 オフ');
   $('shuffle').classList.toggle('on', シャッフル);
   巡 = new Set();                                // 切り替えたら巡を仕切り直す
   if (シャッフル && nowPath) 巡.add(nowPath);
 };
-audio.onplay = () => { $('play').textContent = '⏸'; };
-audio.onpause = () => { $('play').textContent = '▶'; };
+audio.onplay = () => { $('play').textContent = 言('⏸'); };
+audio.onpause = () => { $('play').textContent = 言('▶'); };
 audio.ontimeupdate = () => {
   const d = audio.duration;
   if (Number.isFinite(d) && d > 0) $('seek').value = String(Math.round((audio.currentTime / d) * 1000));
@@ -4504,8 +4541,8 @@ function フォルダを描く(s) {
     name.textContent = f;
     name.title = f;
     const x = document.createElement('b');
-    x.textContent = '×';
-    x.title = 'スキャン対象から外す';
+    x.textContent = 言('×');
+    x.title = 言('スキャン対象から外す');
     x.onclick = async () => {
       const ns = await window.mp3.フォルダを外す(f);
       フォルダを描く(ns);
@@ -4552,9 +4589,9 @@ function 残り時間(済み, 全体) {
   if (!読み始め || 済み < 50 || !全体) return '';
   const 一曲 = (Date.now() - 読み始め) / 済み;
   const 秒 = Math.round(((全体 - 済み) * 一曲) / 1000);
-  if (秒 < 90) return `（あと ${秒} 秒ほど）`;
-  if (秒 < 5400) return `（あと ${Math.round(秒 / 60)} 分ほど）`;
-  return `（あと ${(秒 / 3600).toFixed(1)} 時間ほど）`;
+  if (秒 < 90) return 言('（あと {n} 秒ほど）', { n: 秒 });
+  if (秒 < 5400) return 言('（あと {n} 分ほど）', { n: Math.round(秒 / 60) });
+  return 言('（あと {n} 時間ほど）', { n: (秒 / 3600).toFixed(1) });
 }
 
 // 進み具合。「読み込み中…」だけだと、止まっているのか進んでいるのか分からない
@@ -4571,8 +4608,8 @@ window.mp3.走査の進みを受ける((p) => {
    */
   const 残り = p.段階 === '読んでいます' ? 残り時間(p.済み, p.全体) : '';
   const 添え = (p.段階 === '読んでいます' && p.全体 > 20000)
-    ? ' ／ 途中で閉じても、次に開いたとき続きから進みます' : '';
-  $('status').textContent = `${p.段階} ${n}${全}${残り}${添え}`;
+    ? 言(' ／ 途中で閉じても、次に開いたとき続きから進みます') : '';
+  $('status').textContent = `${言(p.段階)} ${n}${全}${残り}${添え}`;
 });
 
 /*
@@ -4637,13 +4674,13 @@ async function 走査する(押された = false) {
   if (走査中) {
     if (押された) {
       const 経過 = 走査を始めた ? Math.round((Date.now() - 走査を始めた) / 1000) : 0;
-      const 何分 = 経過 >= 60 ? `${Math.round(経過 / 60)} 分前` : `${経過} 秒前`;
+      const 何分 = 経過 >= 60 ? 言('{n} 分前', { n: Math.round(経過 / 60) }) : 言('{n} 秒前', { n: 経過 });
       await 知らせる(
-        'いま確かめている最中です。\n\n'
-        + `${何分}に始まり、まだ終わっていません。\n`
-        + '終わるまで、もう一度は始められません（一覧が二重になるため）。\n\n'
-        + '進み具合は画面の下端に出ています。\n'
-        + '足したファイルは、この確認が終わったときに一覧へ入ります。',
+        言('いま確かめている最中です。\n\n')
+        + 言('{何分}に始まり、まだ終わっていません。', { 何分 }) + '\n'
+        + 言('終わるまで、もう一度は始められません（一覧が二重になるため）。') + '\n\n'
+        + 言('進み具合は画面の下端に出ています。') + '\n'
+        + 言('足したファイルは、この確認が終わったときに一覧へ入ります。'),
       );
     }
     return;
@@ -4665,8 +4702,8 @@ async function 走査する(押された = false) {
   読み始め = 0;                           // 残り時間は、この回の速さで測り直す
   出ている道 = null;                      // 重複よけの一覧は、この回で作り直す
   $('status').textContent = tracks.length
-    ? `${tracks.length.toLocaleString('ja-JP')} 曲（確かめています…）`
-    : '読み込み中…';
+    ? 言('{n} 曲（確かめています…）', { n: tracks.length.toLocaleString('ja-JP') })
+    : 言('読み込み中…');
 
   try {
     const r = await window.mp3.走査する();
@@ -4681,9 +4718,9 @@ async function 走査する(押された = false) {
       響きを合わせ直す();
       裏で描き直す();
       $('status').textContent = tracks.length
-        ? `⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください`
-          + `　（いま出ている ${tracks.length.toLocaleString('ja-JP')} 曲は、前に読んだ記録です）`
-        : '⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください';
+        ? 言(言('⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください'))
+          + 言('　（いま出ている {n} 曲は、前に読んだ記録です）', { n: tracks.length.toLocaleString('ja-JP') })
+        : 言('⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください');
       // ★外したものを戻すボタンは、走査しなくても出す（記録は生きているので）
       外したものボタンを直す(r.hidden);
       return;   // ★走査中の後始末は finally がやる
@@ -4699,8 +4736,8 @@ async function 走査する(押された = false) {
     // 表示されなかったファイルがあることを、黙って隠さない
     const 補足 = [];
     const 隠したタグ無し = tracks.filter((t) => !t.タグあり).length;
-    if (タグ無しを隠す && 隠したタグ無し) 補足.push(`タグが無く非表示 ${隠したタグ無し} 件`);
-    if (r.読めなかった) 補足.push(`読めなかった ${r.読めなかった} 件`);
+    if (タグ無しを隠す && 隠したタグ無し) 補足.push(言('タグが無く非表示 {n} 件', { n: 隠したタグ無し }));
+    if (r.読めなかった) 補足.push(言('読めなかった {n} 件', { n: r.読めなかった }));
     // ★数を出すだけでなく、戻すボタンも出す（案内だけして操作が無いのを直した）
     外したものボタンを直す(r.hidden);
 
@@ -4711,25 +4748,28 @@ async function 走査する(押された = false) {
      */
     if (r.覚え書きの保存 && r.覚え書きの保存.ok === false) {
       await 知らせる(
-        '読み込んだ結果を保存できませんでした。\n\n'
-        + `理由: ${r.覚え書きの保存.error}\n\n`
-        + 'このままだと、次に開いたときに**また最初から読み直し**になります。\n'
-        + 'ディスクの空きを確かめてください。',
+        言('読み込んだ結果を保存できませんでした。\n\n')
+        + 言('理由: {理由}', { 理由: r.覚え書きの保存.error }) + '\n\n'
+        + 言('このままだと、次に開いたときに**また最初から読み直し**になります。') + '\n'
+        + 言('ディスクの空きを確かめてください。'),
       );
     }
-    if (r.hidden) 補足.push(`一覧から外した ${r.hidden} 件`);
-    if (r.使い回し) 補足.push(`変わっていない ${r.使い回し} 件は読み直していません`);
+    if (r.hidden) 補足.push(言('一覧から外した {n} 件', { n: r.hidden }));
+    if (r.使い回し) 補足.push(言('変わっていない {n} 件は読み直していません', { n: r.使い回し }));
     /*
      * ★途中で止めたときは、そう言う。
      * 「N 曲」とだけ出すと、全部読み終えたように見えてしまう。
      */
     const 止め = r.止めた
-      ? `　■ 途中で止めました（次は続きから進みます${r.補った ? ' ／ まだ見ていない ' + r.補った.toLocaleString('ja-JP') + ' 曲は前の記録から出しています' : ''}）`
+      ? 言('　■ 途中で止めました（次は続きから進みます{補い}）',
+        { 補い: r.補った ? 言(' ／ まだ見ていない {n} 曲は前の記録から出しています',
+          { n: r.補った.toLocaleString('ja-JP') }) : '' })
       : '';
-    $('status').textContent = `${見える曲().length} 曲${補足.length ? '（' + 補足.join(' / ') + '）' : ''}${止め}`;
+    $('status').textContent = 言('{n} 曲{補足}{止め}',
+      { n: 見える曲().length, 補足: 補足.length ? '（' + 補足.join(' / ') + '）' : '', 止め });
   } catch (e) {
     // ★黙って失敗させない
-    $('status').textContent = '読み込めませんでした: ' + (e && e.message ? e.message : '不明');
+    $('status').textContent = 言('読み込めませんでした: ') + (e && e.message ? e.message : 言('不明'));
   } finally {
     走査中 = false;
     再スキャンのボタンを直す();                 // ★「再スキャン」に戻す
@@ -4756,30 +4796,32 @@ $('add').onclick = async () => {
 if ($('resload')) $('resload').onclick = async () => {
   const r = await window.mp3.響きを読み込む();
   if (!r || r.canceled) return;
-  if (!r.ok) { await 知らせる("読めませんでした: " + r.error); return; }
+  if (!r.ok) { await 知らせる(言("読めませんでした: ") + r.error); return; }
   響きの木 = r.木;
   響きを合わせ直す();
   描き直す();
   const 当 = 響きの当たり.当たり;
   $("status").textContent = 当.length
-    ? `響き ${r.木.木.length} 本を読みました ― ${当.length} 組・${響きの当たり.曲.size.toLocaleString("ja-JP")} 曲が手元にありました`
-    : `響き ${r.木.木.length} 本を読みましたが、手元に当たるものがありませんでした（音楽の言葉で辿った木だと当たります）`;
+    ? 言('響き {n} 本を読みました ― {組} 組・{曲} 曲が手元にありました',
+      { n: r.木.木.length, 組: 当.length, 曲: 響きの当たり.曲.size.toLocaleString("ja-JP") })
+    : 言('響き {n} 本を読みましたが、手元に当たるものがありませんでした（音楽の言葉で辿った木だと当たります）',
+      { n: r.木.木.length });
 };
 
 $('aikey').onclick = async () => {
   const 状態 = await window.mp3.AIが使えるか();
   if (状態.使える) {
-    if (await 確かめる("APIキーを消しますか？\n\n「気分から一本を組む」と「言葉から辿る」が使えなくなります。\n曲は何も変わりません。")) {
+    if (await 確かめる(言("APIキーを消しますか？\n\n「気分から一本を組む」と「言葉から辿る」が使えなくなります。\n曲は何も変わりません。"))) {
       await window.mp3.AIのキーを消す();
       AIが使える = false;
       キー入力 = null;
       描き直す();
-      $('status').textContent = 'APIキーを消しました';
+      $('status').textContent = 言('APIキーを消しました');
     }
     return;
   }
   if (!状態.しまえる) {
-    await 知らせる("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。");
+    await 知らせる(言("この環境では、キーを暗号化して保存できません。\n平文で保存はしないので、この機能は使えません。"));
     return;
   }
   /*
@@ -4788,7 +4830,7 @@ $('aikey').onclick = async () => {
    */
   キー入力 = { value: "" };
   描き直す();
-  $('status').textContent = '上の欄に API キーを貼り付けてください（console.anthropic.com で作れます）';
+  $('status').textContent = 言('上の欄に API キーを貼り付けてください（console.anthropic.com で作れます）');
 };
 
 /**
@@ -4809,11 +4851,11 @@ $('aikey').onclick = async () => {
 function 再スキャンのボタンを直す() {
   const b = $('rescan');
   if (!b) return;
-  b.textContent = 走査中 ? '■ 止める' : '再スキャン';
+  b.textContent = 走査中 ? 言('■ 止める') : 言('再スキャン');
   b.classList.toggle('on', 走査中);
   b.title = 走査中
-    ? '読み込みを途中で止めます。★そこまで読んだぶんは残るので、次は続きから進みます'
-    : 'フォルダをもう一度読み込みます';
+    ? 言('読み込みを途中で止めます。★そこまで読んだぶんは残るので、次は続きから進みます')
+    : 言('フォルダをもう一度読み込みます');
 }
 
 $('rescan').onclick = async () => {
@@ -4823,7 +4865,7 @@ $('rescan').onclick = async () => {
      * 30 秒ごとに覚え書きを保存しているので、次は続きから進む。
      * 途中でやめたら全部やり直し、では押せるボタンにならない。
      */
-    $('status').textContent = '止めています…';
+    $('status').textContent = 言('止めています…');
     await window.mp3.走査を止める();
     return;
   }
@@ -4838,7 +4880,7 @@ function 外したものボタンを直す(件数) {
   const b = $('unhide');
   if (!件数) { b.style.display = 'none'; return; }
   b.style.display = '';
-  b.textContent = `↩ 外した ${件数.toLocaleString('ja-JP')} 曲を戻す`;
+  b.textContent = 言('↩ 外した {n} 曲を戻す', { n: 件数.toLocaleString('ja-JP') });
 }
 
 $('unhide').onclick = async () => {
@@ -4849,11 +4891,13 @@ $('unhide').onclick = async () => {
   // 何を戻すのか見せてから聞く。件数だけでは判断できない
   const 見本 = 外れている.slice(0, 8).map((p) => '  ・' + p.replace(/^.*[\\/]/, '')).join('\n');
   if (!await 確かめる(
-    `一覧から外した ${外れている.length.toLocaleString('ja-JP')} 曲を、すべて戻します。\n\n`
-    + `${見本}${外れている.length > 8 ? `\n  ほか ${外れている.length - 8} 曲` : ''}\n\nよろしいですか？`,
+    言('一覧から外した {n} 曲を、すべて戻します。', { n: 外れている.length.toLocaleString('ja-JP') })
+    + '\n\n'
+    + 見本 + (外れている.length > 8 ? '\n' + 言('　ほか {n} 曲', { n: 外れている.length - 8 }) : '')
+    + '\n\n' + 言('よろしいですか？'),
   )) return;
 
-  $('status').textContent = '戻しています…';
+  $('status').textContent = 言('戻しています…');
   await window.mp3.外したものを戻す();
   /*
    * ★戻したぶんだけ読み直す。走査し直さない。
@@ -4874,10 +4918,45 @@ $('unhide').onclick = async () => {
 
   const 読めなかった = 返り.tracks.filter((t) => !t).length;
 
-$('status').textContent = `${戻した.toLocaleString('ja-JP')} 曲を一覧に戻しました`
-    + (読めなかった ? `（${読めなかった} 曲は読めませんでした）` : '');
+$('status').textContent = 言('{n} 曲を一覧に戻しました', { n: 戻した.toLocaleString('ja-JP') })
+    + (読めなかった ? 言('（{n} 曲は読めませんでした）', { n: 読めなかった }) : '');
 };
 
+/*
+ * ★index.html にもとからある文を訳す（2026-08-30）。
+ *
+ * 画面じゅうの文字を訳しにいくのは**危ない**。
+ * 「再生」という名前の曲があれば、曲名まで訳してしまう。
+ * だから、この台本が動き出した時点で見えているものだけを覚えておき、
+ * 言葉が変わるたびに、覚えた**元の日本語から**訳し直す。
+ */
+const 画面のもとの文 = [];
+function 画面の文を覚える() {
+  const 歩く = (el) => {
+    for (const 名 of ['title', 'placeholder']) {
+      const v = el.getAttribute && el.getAttribute(名);
+      if (v && v.trim()) 画面のもとの文.push([el, 名, v]);
+    }
+    for (const n of el.childNodes) {
+      if (n.nodeType === 3) { if (n.nodeValue.trim()) 画面のもとの文.push([n, null, n.nodeValue]); }
+      else if (n.nodeType === 1) 歩く(n);
+    }
+  };
+  歩く(document.body);
+}
+
+/** 覚えた元の日本語から、いまの言葉に訳し直す */
+function 画面を訳す() {
+  for (const [的, 欄, 元] of 画面のもとの文) {
+    const 芯 = 元.trim();
+    const 文 = 言(芯);
+    if (欄) 的.setAttribute(欄, 文);
+    else 的.nodeValue = 元.split(芯).join(文);
+  }
+}
+
+/* ★台本が動き出した、いま覚える。ここから先は作られたものが混ざる */
+画面の文を覚える();
 /*
  * ★言葉を切り替える（2026-08-30 本人の希望）。
  * 日本語 → English → 自動（OS に合わせる）→ 日本語 … と回る。
@@ -4888,13 +4967,15 @@ $('langbtn').onclick = async () => {
   const 返り = await window.mp3.言葉を変える(次);
   言葉の設定 = 返り.設定;
   言葉を入れる(返り.いま);
+  画面を訳す();                              // ★index.html にもとからある文
   /* ★AI の欄は形が変わったときしか作り直さないので、作り直させる */
   const box = $('aibar');
   if (box) box.dataset.形 = '';
   描き直す();
   $('status').textContent = 言葉の設定 === 'auto'
-    ? `言葉を OS に合わせます（いまは ${いまの() === 'ja' ? '日本語' : 'English'}）`
-    : `言葉を ${いまの() === 'ja' ? '日本語' : 'English'} にしました`;
+    ? 言('言葉を OS に合わせます（いまは {言葉}）',
+      { 言葉: いまの() === 'ja' ? 言('日本語') : 'English' })
+    : 言('言葉を {言葉} にしました', { 言葉: いまの() === 'ja' ? 言('日本語') : 'English' });
 };
 
 (async () => {
@@ -4945,6 +5026,7 @@ $('langbtn').onclick = async () => {
   {
     const 返り = await window.mp3.言葉を取る();
     if (返り) { 言葉の設定 = 返り.設定; 言葉を入れる(返り.いま); }
+    画面を訳す();
   }
   // ★打った文の履歴（設定とは別のファイル）
   打った履歴 = await window.mp3.履歴を取る();
@@ -4969,7 +5051,7 @@ $('langbtn').onclick = async () => {
    */
   try { 響きの木 = await window.mp3.響きを取る(); } catch { 響きの木 = null; }
   $('untagged').classList.toggle('on', タグ無しを隠す);
-  $('untagged').textContent = タグ無しを隠す ? '🏷 タグ無しを隠す' : '🏷 タグ無しも出す';
+  $('untagged').textContent = タグ無しを隠す ? 言('🏷 タグ無しを隠す') : 言('🏷 タグ無しも出す');
 
   /*
    * ★アプリ名を変えたときの引き継ぎ。
@@ -4980,20 +5062,22 @@ $('langbtn').onclick = async () => {
     const 引 = await window.mp3.引っ越しの結果();
     if (引 && 引.ok === false) {
       await 知らせる(
-        '以前のデータを引き継げませんでした。\n\n'
-        + `元の場所: ${引.元}\n理由: ${引.error}\n\n`
-        + 'データは消えていません。上の場所に残っています。\n'
-        + 'このまま使うと、フォルダの登録からやり直しになります。',
+        言('以前のデータを引き継げませんでした。\n\n')
+        + 言('元の場所: {場所}', { 場所: 引.元 }) + '\n'
+        + 言('理由: {理由}', { 理由: 引.error }) + '\n\n'
+        + 言('データは消えていません。上の場所に残っています。') + '\n'
+        + 言('このまま使うと、フォルダの登録からやり直しになります。'),
       );
     } else if (引 && 引.ok) {
-      引き継ぎの知らせ = `以前のデータを引き継ぎました（${引.写した.length} 件）`;
+      引き継ぎの知らせ = 言('以前のデータを引き継ぎました（{n} 件）', { n: 引.写した.length });
     }
   } catch { /* 古い版には無い窓口。無くても困らない */ }
 
   const r = await window.mp3.リストを取る();
   lists = r.lists;
   if (r.落とした) {
-    await 知らせる(`再生リストから ${r.落とした} 曲を取り除きました。\n\n元の MP3 ファイルが見つからなくなったためです。`);
+    await 知らせる(言('再生リストから {n} 曲を取り除きました。', { n: r.落とした })
+      + '\n\n' + 言('元の MP3 ファイルが見つからなくなったためです。'));
   }
 
   /*
@@ -5016,7 +5100,7 @@ $('langbtn').onclick = async () => {
         響きを合わせ直す();                    // ★覚え書きから出したぶんも突き合わせる
         描き直す();
         $('status').textContent = (引き継ぎの知らせ ? 引き継ぎの知らせ + ' ／ ' : '')
-          + `${c.件数.toLocaleString('ja-JP')} 曲（前回のぶん。いま確かめています…）`;
+          + 言('{n} 曲（前回のぶん。いま確かめています…）', { n: c.件数.toLocaleString('ja-JP') });
       }
     } catch { /* 覚えていないだけ。走査すれば出る */ }
     await 走査する();
@@ -5039,9 +5123,10 @@ $('langbtn').onclick = async () => {
       if (c.tracks.length) { tracks = c.tracks; 響きを合わせ直す(); }
     } catch { /* 覚えていないだけ。フォルダを足せば出る */ }
     描き直す();                                 // フォルダが無くてもタブは出す
-    const 足してください = '⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください';
+    const 足してください = 言('⚠ 音楽フォルダが登録されていません。下の「＋ フォルダを足す」から入れてください');
     $('status').textContent = tracks.length
-      ? `${足してください}　（いま出ている ${tracks.length.toLocaleString('ja-JP')} 曲は、前に読んだ記録です）`
+      ? 足してください + 言('　（いま出ている {n} 曲は、前に読んだ記録です）',
+        { n: tracks.length.toLocaleString('ja-JP') })
       : 足してください;
   }
 })();

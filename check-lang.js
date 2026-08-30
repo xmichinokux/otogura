@@ -143,11 +143,23 @@ console.log('\n[5] ★どこまで訳したか');
 {
   const 日本語 = /[぀-ヿ一-龯]/;
   const 素にする = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  const Q = String.fromCharCode(34);
   const 通した = new Set();
   for (const f of ['src/renderer.js', 'src/main.js', 'src/ai.js']) {
     const src = 素にする(fs.readFileSync(path.join(__dirname, f), 'utf8'));
+    /*
+     * ★ソースの "\\n" は、走るときには本物の改行になる。
+     * 訳の鍵は走るときの形なので、ここで解いておかないと当たらない。
+     */
+    const 解く = (囲, 中) => JSON.parse(囲 === Q
+      ? Q + 中 + Q
+      : Q + 中.split(String.fromCharCode(92) + Q).join(Q)
+          .split(String.fromCharCode(92) + "'").join("'")
+          .split(Q).join(String.fromCharCode(92) + Q) + Q);
     for (const m of src.matchAll(/言\(\s*(['"])((?:[^'"\\]|\\.)*)\1/g)) {
-      if (日本語.test(m[2])) 通した.add(m[2]);
+      if (!日本語.test(m[2])) continue;
+      let 文; try { 文 = 解く(m[1], m[2]); } catch { 文 = m[2]; }
+      通した.add(文);
     }
   }
   const 訳表 = lang.訳.en || {};
@@ -253,6 +265,38 @@ console.log('\n[6] ★英語のとき、AI への頼み文が英語になって�
     '★日本語に戻せば、頼み文も日本語に戻る',
     /あなたは DJ です/.test(日) && !/You are a DJ/.test(日),
   );
+}
+
+
+console.log('\n[7] ★画面に並べて読み込む台本が、名前をぶつけていないか');
+/*
+ * ★2026-08-30、実地で見つけた。
+ * genre.js と naoshi.js が、どちらも大域に const 言う を作っていた。
+ * 画面では <script> として並ぶので、**2 本目が丸ごと読み込まれない。**
+ * node からは別々に読むため、ほかのどの検査にも掛からなかった。
+ * 開いて見て初めて分かる類なので、ここで文面から捕まえる。
+ */
+{
+  const 頁 = fs.readFileSync(path.join(__dirname, 'src/index.html'), 'utf8');
+  const 並び = [...頁.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
+  const 持ち主 = new Map();
+  const ぶつかり = [];
+  for (const 名 of 並び) {
+    let 中; try { 中 = fs.readFileSync(path.join(__dirname, 'src', 名), 'utf8'); } catch { continue; }
+    const 素 = 中.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+    /* ★桁 0 から始まるものだけを大域と見なす（この作りではそう書いてある） */
+    const 出た = new Set();
+    for (const m of 素.matchAll(/^(?:const|let|var|function)\s+([A-Za-z_$\u3040-\u30ff\u4e00-\u9faf][\w$\u3040-\u30ff\u4e00-\u9faf]*)/gm)) {
+      出た.add(m[1]);
+    }
+    for (const 名前 of 出た) {
+      if (持ち主.has(名前)) ぶつかり.push(`${名前}（${持ち主.get(名前)} と ${名}）`);
+      else 持ち主.set(名前, 名);
+    }
+  }
+  console.log(`  画面に並べる台本 ${並び.length} 本 ／ 大域の名前 ${持ち主.size} 個`);
+  確認('★大域の名前がぶつかっていない', ぶつかり.length === 0,
+    ぶつかり.join('／') || '同じ名前を 2 本が作ると、2 本目が丸ごと読み込まれません');
 }
 
 console.log('');
