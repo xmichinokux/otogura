@@ -1018,8 +1018,8 @@ Get-FileHash Otogura-Setup-0.23.0.exe -Algorithm SHA256
 
 | ファイル | SHA256 |
 |---|---|
-| `Otogura-Setup-0.27.1.exe` | `815afb570b7dcfa8ff02358c1eb80026d2471f0e6666040a1663efcea94e5260` |
-| `Otogura-Portable-0.27.1.exe` | `25f41f4fe39dc012da4d39a9387384b11fa74e9ddec6f221eab2d6d7f4cacecc` |
+| `Otogura-Setup-0.28.0.exe` | `5fd9e0f4482e3d47c01a85b4f1e301da9bb3d3431769858fb51e6dac8ac0f1fc` |
+| `Otogura-Portable-0.28.0.exe` | `01c05cc00c98cd2756dae4e2b34c3db7ee60618e28ae6a3dd948a53c44da1a2e` |
 
 ★これは**途中で書き換えられていないこと**の確認です。
 「作った人が信用できるか」は別の話なので、そこは中身を読んで判断してください。
