@@ -149,6 +149,9 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '　※ AI は {挙げた} 組挙げましたが、手元にあったのは {あった} 組でした': "　* The AI named {挙げた} artists; you own {あった} of them",
+    '（{名前} などは持っていません）': "({名前} and others are not in your library)",
+    '（この気分で手元にあったのが {n} 組なので、{n} 曲にしました）': "(you own {n} artists that fit, so the set is {n} songs)",
     '・★挙げる演者は、**その音そのもののど真ん中**に留めてください': "- ★Keep the artists you name **right at the centre of that sound**",
     '　「〇〇といえばこれ」と並べられる、同じ棚に置ける演者だけです':
       "  Only artists that belong on the same shelf — the ones anyone would name first",
