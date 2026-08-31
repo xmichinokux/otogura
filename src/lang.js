@@ -149,6 +149,16 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '演者 {n} 組: {名前} ほか': "{n} artists: {名前} and others",
+    '・★**「Rock」「Alternative」のような大まかな名前は避けてください。**': "- ★**Avoid catch-all names like \"Rock\" or \"Alternative\".**",
+    '　もっと具体的な名前が一覧にあるなら、そちらを選んでください': "  If the list has something more specific, choose that instead",
+    '■ 演者について': "■ About artists",
+    '・その気分に**近い演者を 80 組**挙げてください。あなたの知識から': "- Name **80 artists close to that mood**, from your own knowledge",
+    '・手元にあるかどうかは気にしないでください。こちらで突き合わせます': "- Do not worry about whether they own them. We check that on our side",
+    '・★気分の文に**バンド名が入っていたら、そこを最優先**にしてください。': "- ★If they named a band, **make that the first thing you go on.**",
+    '　その演者そのものと、鳴りの近い演者を挙げます': "  Name that artist and others that sound close to them",
+    '・ジャンル名では言い表せないもの（音の質感、時代、界隈）は、ここで効きます':
+      "- What a genre name cannot carry — the texture, the era, the scene — belongs here",
     '（同じ演者・同じ盤が {n} 曲重なっていたので落としました）': "({n} repeated the same artist or album, so they were dropped)",
     '・★候補は**演者ごとにまとまっています**（同じ演者の曲が続けて並んでいます）':
       "- ★The list is **grouped by artist** — an artist's songs run together",

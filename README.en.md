@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.34.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.34.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.35.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.35.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.34.1.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.35.0.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.34.1.exe` | `189f00a542be4c28787ad28cfa9f872181c304095fe5e4ec556701c0425c15c9` |
-| `Otogura-Portable-0.34.1.exe` | `83693c5cbcf2fdf6212a4e5b8bdd1667c90f1595bf7ecf87bf0cf52bffa44241` |
+| `Otogura-Setup-0.35.0.exe` | `6fdc949c97cb57cb6597494e2e8daad33c9824dffe7c902f0b6024177830abc3` |
+| `Otogura-Portable-0.35.0.exe` | `1378fca3e382ce248a1e19050dc0532b79d64789881525c5b7fc61b7e10c6414` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
@@ -248,6 +248,25 @@ and both pricing and exchange rates move (Opus 5 at $5 / $25 per million tokens,
 **A finished set does not start playing by itself.** You get a playlist. Press ▶ when you want to hear it.
 
 ### The AI does not choose songs. It chooses a filter
+
+**Since 0.35.0 it can choose artists as well as genres.**
+A genre name cannot carry texture, era, scene, or "something like Helmet" — an artist name can.
+
+The trigger for this was a real failure. Asked for "hard-hitting alternative rock like Helmet",
+the set came back with Napalm Death and So Hideous in it. Reading the actual tags showed why:
+those files are literally tagged `"Rock"` and `"Alternative"`. Nothing had leaked — in this
+library those two names are a **catch-all**, holding Godspeed You! Black Emperor, Puffy,
+Bauhaus and a Napalm Death live album alike (7 of 172 sampled artists, 4%). Meanwhile the same
+Napalm Death has 302 songs correctly tagged `"Grindcore"` in another folder.
+
+And by the broad sense of the word — a band with distorted guitars — **nine tenths of this
+library is rock.** Defining "rock" properly would not narrow anything.
+
+So the mood text now yields **80 artist names from the model's own knowledge**, matched against
+your library on this machine. If enough of them are owned, the filter uses artists; otherwise it
+falls back to genres. **The list of your artists is never sent** — only the matching happens here.
+Matching is exact (case-insensitive): a partial match would drag in a different band with a
+similar name, the same reasoning as the Resonance tab.
 
 ```
 what you wrote
@@ -489,7 +508,7 @@ Otogura otherwise **runs entirely on your machine.** This feature is the single 
 | | |
 |---|---|
 | **Sent** | the list of genre names (with counts) ／ the list of years acquired ／ what you typed ／ **the title, artist and album of 200 candidate songs** |
-| **Not sent** | **file paths, and the audio itself** (since 0.8.0 the titles of the 200 candidates are sent) |
+| **Not sent** | **file paths, and the audio itself** (since 0.8.0 the titles of the 200 candidates are sent)／★**the list of your artists is not sent either** (0.35.0 — the AI names artists from its own knowledge and we match them locally) |
 | **When** | only when you press the button. Nothing goes out in the background |
 | **Default** | **off.** Until a key is entered, the input bar does not even appear |
 | **Model** | `claude-opus-5` |
