@@ -149,6 +149,18 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '・★挙げる演者は、**その音そのもののど真ん中**に留めてください': "- ★Keep the artists you name **right at the centre of that sound**",
+    '　「〇〇といえばこれ」と並べられる、同じ棚に置ける演者だけです':
+      "  Only artists that belong on the same shelf — the ones anyone would name first",
+    '・★**近い界隈へ広げないでください。** 影響元・影響先・共演者は、まだ遠い':
+      "- ★**Do not reach into neighbouring scenes.** Influences, descendants and tourmates are still too far",
+    '・挙げる演者は、**その音の中心**から選んでください': "- Name artists from **the centre of that sound**",
+    '・近い界隈へは、ほんの少しだけ': "- Reach into neighbouring scenes only a little",
+    '・挙げる演者は、その音を軸に、**近い界隈まで**でよい': "- Work out from that sound, **as far as the neighbouring scenes**",
+    '・挙げる演者は、**近い界隈から少し外れたところ**まで広げてよい': "- You may reach **a little past the neighbouring scenes**",
+    '　同じ気配を別のやり方でやっている演者を入れてください': "  Include artists chasing the same feeling by other means",
+    '・挙げる演者は、**思い切って外して**構いません': "- **Go well off-centre** with the artists you name",
+    '　ジャンルも時代も跨いで、気配だけが通じるものを': "  Across genres and eras — only the feeling has to carry over",
     '演者 {n} 組: {名前} ほか': "{n} artists: {名前} and others",
     '・★**「Rock」「Alternative」のような大まかな名前は避けてください。**': "- ★**Avoid catch-all names like \"Rock\" or \"Alternative\".**",
     '　もっと具体的な名前が一覧にあるなら、そちらを選んでください': "  If the list has something more specific, choose that instead",
