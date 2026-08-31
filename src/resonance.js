@@ -102,12 +102,37 @@ function 読み込む(文) {
  *   > depth が深いほど強く。遠いところの当たりのほうが発見として面白いので
  *   > savedAt が新しいほど強く
  *
- * ★深さは 0〜3 なので (1 + depth) で 1〜4 倍。
  * ★新しさは 60 日で半分になる緩やかな減り方にした。
  *   実物の木は 5 月〜8 月に散らばっていて、急に切ると古いものが死ぬ。
+ *
+ * ★深さの向きを、つまみ（王道↔外す）に繋いだ（2026-08-31 本人の希望）。
+ *
+ *   > 響きを知覚を濃くするためにつまみに繋げてください。
+ *
+ * それまでは**固定で「深いほど重い」**（1〜4 倍）だった。
+ * 遠い当たりのほうが発見として面白い、という当初の指示による。
+ * だが「軸のそばを濃くしたい」ときは、これが逆に働く。
+ *
+ * ★既定の動きが変わる。「ふつう」は深さで差を付けない。
+ * これまでどおりが良ければ、つまみを 1 つ右（やや外す）へ。
  */
-function 重みを出す(depth, savedAt, いま) {
-  const 深さぶん = 1 + (Number.isFinite(depth) ? Math.max(0, Math.min(3, depth)) : 0);
+const 深さの段 = [
+  [4, 3, 2, 1],        // 王道     … 浅いほど重い。軸のそばを濃くする
+  [3, 2.5, 2, 1.5],    // やや王道
+  [1, 1, 1, 1],        // ふつう   … 深さで差を付けない
+  [1, 2, 3, 4],        // やや外す … ★これまでの既定の動き
+  [1, 3, 5, 7],        // 外す     … 遠くほど強く
+];
+
+/** つまみの目盛（1〜5）。範囲の外は「ふつう」に丸める */
+function 深さの重み(depth, 目盛) {
+  const d = Number.isFinite(depth) ? Math.max(0, Math.min(3, Math.round(depth))) : 0;
+  const i = Number.isFinite(目盛) ? Math.max(1, Math.min(5, Math.round(目盛))) : 3;
+  return 深さの段[i - 1][d];
+}
+
+function 重みを出す(depth, savedAt, いま, 目盛 = 3) {
+  const 深さぶん = 深さの重み(depth, 目盛);
   const t = Date.parse(savedAt || '');
   if (!Number.isFinite(t)) return 深さぶん;              // 日付が無ければ深さだけ
   const 経過日 = Math.max(0, (いま - t) / 86400000);
@@ -151,7 +176,7 @@ function 重みを出す(depth, savedAt, いま) {
  *   外れ: [{ name, description, keyword, depth, savedAt, 重み }],           // 緩く探しても無かった。重い順
  * }
  */
-function 突き合わせる(木, tracks, いま = Date.now()) {
+function 突き合わせる(木, tracks, いま = Date.now(), 目盛 = 3) {
   const 空 = { 当たり: [], 曲: new Map(), 外れ: [] };
   if (!木 || !Array.isArray(木.木) || !Array.isArray(tracks)) return 空;
 
@@ -184,7 +209,7 @@ function 突き合わせる(木, tracks, いま = Date.now()) {
       if (n.genre !== 'music') continue;
       const k = ならす(n.name);
       if (!k) continue;
-      const 重み = 重みを出す(n.depth, e.savedAt, いま);
+      const 重み = 重みを出す(n.depth, e.savedAt, いま, 目盛);
       const 前 = 候補.get(k);
       if (!前) {
         候補.set(k, {
@@ -304,5 +329,5 @@ function 響きの一節(当たり, 上限 = 12) {
 // Node（本体・検査）と画面（<script> 読み込み）の両方で使えるようにしておく。
 // 同じ処理を 2 か所に書くと、片方だけ直す事故になる（shuffle.js と同じ形）。
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { ならす, 読み込む, 重みを出す, 突き合わせる, 緩く探す, 響きの一節 };
+  module.exports = { ならす, 読み込む, 重みを出す, 深さの重み, 深さの段, 突き合わせる, 緩く探す, 響きの一節 };
 }
