@@ -1927,7 +1927,10 @@ async function AIに一本組ませる(気分, 言った) {
  * ★たたんでおく。当たり（鳴らせる曲）が主で、こちらは脇なので、
  * 開いたときだけ場所を取るようにする。
  */
-let 確かめる候補を開く = false;
+/* ★どの言葉の「確かめる候補」を開いているか。null なら閉じている（2026-08-31） */
+let 確かめる候補の言葉 = null;
+/* ★辿った言葉の一覧を開いているか。増えると煩雑になるので、たためる */
+let 言葉の一覧を開く = true;
 
 /**
  * ★交差（いくつの言葉から辿り着いたか）を開いているか。
@@ -2240,9 +2243,7 @@ function 響きの欄を描く() {
   const box = $('resbar');
   /*
    * ★響きタブを開いているときだけ出す（2026-08-29 本人の指示）。
-   *   > 響きの編集欄は響きタブを選んだ時のみ表示にしてほしいです。
-   *
-   * ここは「辿った言葉を直す・消す」ための欄。
+   * ここは「辿った言葉を直す・消す・そこから組む」ための欄。
    * ほかのタブを見ているときに出ていても、押す用が無い。
    */
   if (カラムタブ !== 'resonance' || !響きの木 || !響きの当たり || !響きの当たり.曲.size) {
@@ -2251,170 +2252,170 @@ function 響きの欄を描く() {
   box.className = 'on';
   box.innerHTML = '';
 
+  const 木たち = Array.isArray(響きの木.木) ? 響きの木.木 : [];
+  const 全外れ = (響きの当たり && Array.isArray(響きの当たり.外れ)) ? 響きの当たり.外れ : [];
+
+  /* ── 上の 1 行（まとめ） ── */
   const 印 = document.createElement('span');
   印.textContent = 言('🌐');
   const 文 = document.createElement('span');
   文.className = 'said';
   文.textContent = 言('{組} 組・{曲} 曲',
-    { 組: 響きの当たり.当たり.length, 曲: 響きの当たり.曲.size.toLocaleString("ja-JP") });
+    { 組: 響きの当たり.当たり.length, 曲: 響きの当たり.曲.size.toLocaleString('ja-JP') });
   box.append(印, 文);
 
-  // 辿った言葉ごとに、名前を変える／消す
-  for (const e of 響きの木.木) {
+  /*
+   * ★言葉ごとの一覧は、たたんでおける（2026-08-31 本人の希望）。
+   *   > そうすると今の響き編集項目のバーの部分が煩雑になるので、
+   *   > リスト化してボタンか何かで隠す
+   * 言葉が増えるほど、札が横に伸びて読めなくなっていた。
+   */
+  const 開閉 = document.createElement('button');
+  開閉.className = 'restag';
+  開閉.textContent = (言葉の一覧を開く ? '▼ ' : '▶ ') + 言('辿った言葉 {n} 本', { n: 木たち.length });
+  開閉.onclick = () => { 言葉の一覧を開く = !言葉の一覧を開く; 描き直す(); };
+  box.appendChild(開閉);
+
+  /* ★交差は言葉をまたぐものなので、上に置いたまま */
+  const 交差 = (響きの当たり && Array.isArray(響きの当たり.当たり))
+    ? 響きの当たり.当たり.filter((a) => (a.言葉数 ?? 1) > 1) : [];
+  if (交差.length) {
+    const b = document.createElement('button');
+    b.className = 'restag';
+    b.textContent = (交差を開く ? '▼ ' : '▶ ') + 言('交差 {n}', { n: 交差.length });
+    b.title = 言('いくつもの言葉から辿り着いた名前です。言葉を辿るほど増えます');
+    b.onclick = () => { 交差を開く = !交差を開く; 描き直す(); };
+    box.appendChild(b);
+  }
+
+  const 外す = document.createElement('button');
+  外す.className = 'restag';
+  外す.textContent = 言('× 全部外す');
+  外す.title = 言('辿ったものを全部忘れます（音楽ファイルには触りません）');
+  外す.onclick = async () => {
+    if (!await 確かめる(言('辿ったものを全部忘れますか？\n\n曲は何も変わりません。'))) return;
+    $('status').textContent = 言('響きを外しています…');
+    await window.mp3.響きを消す();
+    響きの木 = null; 響きの当たり = null;
+    響きを合わせ直す();
+    描き直す();
+    $('status').textContent = 言('響きを全部外しました');
+  };
+  box.appendChild(外す);
+
+  if (交差を開く && 交差.length) 交差を描く(box, 交差);
+  if (!言葉の一覧を開く) return;
+
+  /* ── 言葉ごとの行 ── */
+  for (const e of 木たち) {
+    const 行札 = document.createElement('div');
+    行札.className = 'resrow';
+
+    /* 名前を変えている最中は、そこだけ入力欄にする */
     if (言葉の名前変え === e.keyword) {
-      const inp = document.createElement("input");
+      const inp = document.createElement('input');
       inp.value = e.keyword;
-      inp.style.font = "inherit"; inp.style.fontSize = "11px";
-      inp.style.padding = "1px 6px"; inp.style.border = "1px solid var(--line)";
-      inp.style.borderRadius = "10px"; inp.style.width = "140px";
+      inp.style.font = 'inherit'; inp.style.fontSize = '11px';
+      inp.style.padding = '1px 6px'; inp.style.border = '1px solid var(--line)';
+      inp.style.borderRadius = '10px'; inp.style.width = '160px';
       const 決める = async () => {
         const v = inp.value.trim();
         言葉の名前変え = null;
         if (v && v !== e.keyword) {
           const r = await window.mp3.響きの名前を変える(e.keyword, v);
           if (r && r.ok) { 響きの木 = r.木; 響きを合わせ直す(); }
-          else $("status").textContent = 言("名前を変えられませんでした（") + ((r && r.error) || 言("不明")) + "）";
+          else $('status').textContent = 言('名前を変えられませんでした（') + ((r && r.error) || 言('不明')) + '）';
         }
         描き直す();
       };
       inp.onkeydown = (ev) => {
-        if (ev.key === "Enter") 決める();
-        if (ev.key === "Escape") { 言葉の名前変え = null; 描き直す(); }
+        if (ev.key === 'Enter') 決める();
+        if (ev.key === 'Escape') { 言葉の名前変え = null; 描き直す(); }
       };
       inp.onblur = 決める;
-      box.appendChild(inp);
+      行札.appendChild(inp);
+      box.appendChild(行札);
       setTimeout(() => { inp.focus(); inp.select(); }, 0);
       continue;
     }
-    /*
-     * ★1 つの札にまとめる（2026-08-29 本人の指摘）。
-     *   > resonanceでできた項目の選択や編集の選択部分のデザインが少し煩雑
-     * 前は［言葉］［✎］［×］が別々の丸で、言葉 3 つで丸が 9 個並んでいた。
-     * 1 つのものは 1 つに見せる。
-     */
-    const 札 = document.createElement("span");
-    札.className = "resword";
-    札.title = e.savedAt ? (言("辿った日: ") + e.savedAt.slice(0, 10)) : "";
 
-    const 名 = document.createElement("span");
+    const 札 = document.createElement('span');
+    札.className = 'resword';
+    札.title = e.savedAt ? (言('辿った日: ') + e.savedAt.slice(0, 10)) : '';
+    const 名 = document.createElement('span');
     名.textContent = e.keyword;
-    const 数 = document.createElement("span");
-    数.className = "resnum";
+    const 数 = document.createElement('span');
+    数.className = 'resnum';
     数.textContent = e.nodes.length;
     札.append(名, 数);
+    行札.appendChild(札);
 
-    const 直す = document.createElement("button");
-    直す.textContent = "✎";
-    直す.title = 言("この言葉の名前を変える");
+    const 直す = document.createElement('button');
+    直す.className = 'restag';
+    直す.textContent = '✎';
+    直す.title = 言('この言葉の名前を変える');
     直す.onclick = () => { 言葉の名前変え = e.keyword; 描き直す(); };
+    行札.appendChild(直す);
 
-    const 消す = document.createElement("button");
-    消す.className = "del"; 消す.textContent = "×";
-    消す.title = 言("この言葉で辿ったものを消す（音楽ファイルには触りません）");
+    /*
+     * ★確かめる候補は、言葉ごとに分ける（2026-08-31 本人の希望）。
+     *   > 確かめる候補が一つにまとまっているので、生成ごとに分ける
+     * 何本も辿ると、どの言葉から出た名前か分からなくなっていた。
+     */
+    const この外れ = 全外れ.filter((x) => x.keyword === e.keyword);
+    if (この外れ.length) {
+      const b = document.createElement('button');
+      b.className = 'restag';
+      const 開いている = 確かめる候補の言葉 === e.keyword;
+      b.textContent = (開いている ? '▼ ' : '▶ ') + 言('確かめる候補 {n}', { n: この外れ.length });
+      b.title = 言('手元で見つからなかった名前です。演者名だけでなく盤名・曲名にも当てて、')
+        + 言('それでも無かったものだけ出しています（買い物リストではありません）');
+      b.onclick = () => { 確かめる候補の言葉 = 開いている ? null : e.keyword; 描き直す(); };
+      行札.appendChild(b);
+    }
+
+    /*
+     * ★一本を組むも、言葉ごとに（2026-08-31 本人の希望）。
+     * その言葉だけを 3 カラムで選んでから組むので、
+     * **何から組んだのかが画面に残る。**
+     */
+    const 組む = document.createElement('button');
+    組む.className = 'restag';
+    組む.textContent = 言('🔀 一本を組む');
+    組む.title = 言('この言葉で辿ったものだけから、AI が厳選して並べます（勝手には流れません）');
+    組む.onclick = async () => {
+      const 言った = $('aisaid');
+      if (!言った) { $('status').textContent = 言('⚠ 先に APIキーを入れてください'); return; }
+      /* ★その言葉だけを選んでから組む。何から組んだかが画面に残る */
+      sel = { ...sel, 言葉: new Set([小文字(e.keyword)]) };
+      描き直す();
+      組む.disabled = true;
+      try {
+        言った.textContent = 言('響きから組んでいます…');
+        await AIに一本組ませる(e.keyword, $('aisaid') || 言った);
+      } finally { 描き直す(); }
+    };
+    行札.appendChild(組む);
+
+    const 消す = document.createElement('button');
+    消す.className = 'restag del';
+    消す.textContent = '×';
+    消す.title = 言('この言葉で辿ったものを消す（音楽ファイルには触りません）');
     消す.onclick = async () => {
-      if (!await 確かめる(言('「{言葉}」で辿ったものを消しますか？', { 言葉: e.keyword }) + '\n\n' + 言('曲は何も変わりません。'))) return;
+      if (!await 確かめる(言('「{言葉}」で辿ったものを消しますか？', { 言葉: e.keyword })
+        + '\n\n' + 言('曲は何も変わりません。'))) return;
       const r = await window.mp3.響きをひとつ消す(e.keyword);
-      if (!r || !r.ok) { $("status").textContent = 言("消せませんでした（") + ((r && r.error) || 言("不明")) + "）"; return; }
+      if (!r || !r.ok) { $('status').textContent = 言('消せませんでした（') + ((r && r.error) || 言('不明')) + '）'; return; }
       響きの木 = r.木;
       響きを合わせ直す();
       描き直す();
-      $("status").textContent = 言('「{言葉}」を消しました', { 言葉: e.keyword });
+      $('status').textContent = 言('「{言葉}」を消しました', { 言葉: e.keyword });
     };
+    行札.appendChild(消す);
 
-    札.append(直す, 消す);
-    box.appendChild(札);
+    box.appendChild(行札);
+    if (確かめる候補の言葉 === e.keyword && この外れ.length) 確かめる候補を描く(box, この外れ);
   }
-
-  // 全部忘れさせる。★消えるのは控えだけで、音楽ファイルには触らない
-  /*
-   * ★確かめる候補（手元で見つからなかった名前）。
-   * 0 個なら出さない ―― 「0」を出しても押す用が無い。
-   */
-  /*
-   * ★交差（2 本以上の言葉から辿り着いた名前）。
-   * 使うほど増えるものなので、増えたことが見えるようにする。
-   */
-  const 交差 = (響きの当たり && Array.isArray(響きの当たり.当たり))
-    ? 響きの当たり.当たり.filter((a) => (a.言葉数 ?? 1) > 1) : [];
-  if (交差.length) {
-    const 開閉 = document.createElement("button");
-    開閉.className = "restag";
-    開閉.textContent = (交差を開く ? "▼ " : "▶ ") + 言("交差 {n}", { n: 交差.length });
-    開閉.title = 言("いくつもの言葉から辿り着いた名前です。言葉を辿るほど増えます");
-    開閉.onclick = () => { 交差を開く = !交差を開く; 描き直す(); };
-    box.appendChild(開閉);
-  }
-
-  const 外れ = (響きの当たり && Array.isArray(響きの当たり.外れ)) ? 響きの当たり.外れ : [];
-  if (外れ.length) {
-    const 開閉 = document.createElement("button");
-    開閉.className = "restag";
-    開閉.textContent = (確かめる候補を開く ? "▼ " : "▶ ") + 言("確かめる候補 {n}", { n: 外れ.length });
-    開閉.title = 言("手元で見つからなかった名前です。演者名だけでなく盤名・曲名にも当てて、")
-      + 言("それでも無かったものだけ出しています（買い物リストではありません）");
-    開閉.onclick = () => { 確かめる候補を開く = !確かめる候補を開く; 描き直す(); };
-    box.appendChild(開閉);
-  }
-
-  /*
-   * ★響きで選ばれたバンドから、一本を組む（2026-08-29 本人の希望）。
-   *   > やはりResonanceで選出されたバンドを元にプレイリストを作りたい
-   *   > シャッフルで流せばいいと思ったんですが、それだと曲数が多すぎる問題が
-   *   > あるので、resonanceが選んだバンドから更に厳選して曲を選んで
-   *
-   * ★前に「響きのところに一本を作るボタンは置かない」と決めた（0.13.0）。
-   * あのときは**押すつもりのないボタンが 2 つ**あって、事故が起きたから。
-   * いまは 1 つだけ、何が起きるかを名前に書いて置く。
-   * 勝手には作らない ―― 押したときだけ。
-   */
-  const 組む = document.createElement("button");
-  組む.className = "restag"; 組む.id = "resgo";
-  組む.textContent = 言("🔀 この響きで一本を組む");
-  組む.title = 言("いま響きで選ばれている曲から、AI が厳選して並べます（勝手には流れません）");
-  組む.onclick = async () => {
-    const 言葉 = (響きの木 && Array.isArray(響きの木.木))
-      ? 響きの木.木.map((e) => e.keyword).join("・") : 言("響き");
-    const 言った = $("aisaid");
-    if (!言った) { $("status").textContent = 言("⚠ 先に APIキーを入れてください"); return; }
-    組む.disabled = true;
-    try {
-      言った.textContent = 言("響きから組んでいます…");
-      await AIに一本組ませる(言葉, $("aisaid") || 言った);
-    } finally {
-      /*
-       * ★id で見つける（2026-08-30）。
-       * もとは札の文で当てていたが、英語にすると当たらなくなる。
-       */
-      const b = $("resgo");
-      if (b) b.disabled = false;
-    }
-  };
-  box.appendChild(組む);
-
-  const 外す = document.createElement("button");
-  外す.className = "restag";
-  外す.textContent = 言("× 全部外す");
-  外す.title = 言("辿ったものを全部忘れます（音楽ファイルには触りません）");
-  外す.onclick = async () => {
-    if (!await 確かめる(言("辿ったものを全部忘れますか？\n\n曲は何も変わりません。"))) return;
-    /*
-     * ★何をしているか出す（2026-08-29 本人の希望）。
-     *   > 処理に時間がかかるなら何かしらのインフォメーションは出せないですか？
-     * 実際は速い（描き直しで 148 ms）が、**黙って固まったように見えるより、
-     * 一言あるほうがいい。**
-     */
-    $("status").textContent = 言("響きを外しています…");
-    await window.mp3.響きを消す();
-    響きの木 = null; 響きの当たり = null;
-    響きを合わせ直す();
-    描き直す();
-    $("status").textContent = 言("響きを全部外しました");
-  };
-  box.appendChild(外す);
-
-  // ★開いているときだけ場所を取る。当たり（鳴らせる曲）が主で、こちらは脇なので
-  if (交差を開く && 交差.length) 交差を描く(box, 交差);
-  if (確かめる候補を開く && 外れ.length) 確かめる候補を描く(box, 外れ);
 }
 
 /** いま見えている曲から、AI に渡すジャンル一覧を作る（件数の多い順） */

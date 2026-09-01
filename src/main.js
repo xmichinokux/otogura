@@ -666,8 +666,13 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
     手元の演者: (手がかり && 手がかり.手元の演者) || [],
     幅目盛: (await 設定を読む()).AIの目盛.幅,
     蔵書: (手がかり && 手がかり.蔵書) || null,
-    // ★同じ言葉なら、すでに挙げた名前を渡して「別のものを」と頼む
-    すでにある: (手がかり && Array.isArray(手がかり.すでにある)) ? 手がかり.すでにある : [],
+    /*
+     * ★「すでに挙げた名前」は渡さない（2026-08-31）。
+     * 渡すと 2 本目が 1 本目の**補集合**になる。
+     * 王道で辿り直したのに、1 本目に出た Helmet 自身が外れてしまう。
+     * 生成ごとに別物として残すので、1 本ずつ完結していてよい。
+     */
+    すでにある: [],
     強度目盛: (await 設定を読む()).AIの目盛.強度,
   });
   if (!r.ok) return r;
@@ -691,8 +696,25 @@ ipcMain.handle('ai:tree', async (_e, 手がかり) => {
   前.version = 1;
   前.exportedAt = new Date().toISOString();
   const 前の同じ = 前.entries.find((e) => e && e.keyword === r.結果.keyword);
-  const 混ぜた = 木を混ぜる(前の同じ, r.結果);
-  前.entries = [混ぜた, ...前.entries.filter((e) => e && e.keyword !== r.結果.keyword)];
+  /*
+   * ★同じ言葉でも、生成ごとに別のものとして残す（2026-08-31 本人の希望）。
+   *
+   *   > 同じ単語で響きを生成した場合、別のものとする
+   *   > 「helmet」「helmet(1)」みたいな感じで。
+   *
+   * ★前は混ぜていた。つまみが無かったころは、それでよかった。
+   * いまはつまみで結果が変わるので、混ぜると
+   * 「王道の helmet」と「外すの helmet」がひとつに潰れて、比べられない。
+   */
+  const 使われている = new Set(前.entries.map((e) => e && e.keyword).filter(Boolean));
+  let 名 = r.結果.keyword;
+  if (使われている.has(名)) {
+    let i = 1;
+    const 作る = (n) => r.結果.keyword + '(' + String(n).padStart(2, '0') + ')';
+    while (使われている.has(作る(i))) i += 1;
+    名 = 作る(i);
+  }
+  前.entries = [{ ...r.結果, keyword: 名 }, ...前.entries];
 
   const 確かめ = 響きを読み込む(JSON.stringify(前));
   if (!確かめ.ok) return { ok: false, error: '生やした木を保存できませんでした（' + 確かめ.error + '）' };

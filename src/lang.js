@@ -149,6 +149,10 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '辿った言葉 {n} 本': "{n} words followed",
+    '🔀 一本を組む': "🔀 Build a set",
+    'この言葉で辿ったものだけから、AI が厳選して並べます（勝手には流れません）':
+      "Builds only from what this word found — the AI picks and orders (nothing starts playing on its own)",
     '・★**数より近さが先です。** 少なくて構いません': "- ★**Closeness comes before quantity.** A short list is fine",
     '　上の一覧にある名前でも、無い名前でも構いません。**近さだけで選んでください**':
       "  On the list above or not, it does not matter. **Choose on closeness alone**",

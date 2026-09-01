@@ -144,7 +144,10 @@
    * 1 つのものなのに 3 つに見えるのが、ごちゃついて見える正体だった。
    * 中に畳んで、触れたときだけ ✎ と × を濃くする。
    */
-  #resbar .resword {
+  /* ★言葉ごとの行（2026-08-31）。札が横に伸びて読めなくなっていた */
+#resbar .resrow { display: flex; align-items: center; gap: 4px;
+  flex-basis: 100%; margin-top: 3px; }
+#resbar .resword {
     display: inline-flex; align-items: center; gap: 2px;
     border: 1px solid var(--line); border-radius: 999px;
     background: #fff; padding: 1px 4px 1px 10px; font-size: 11px; color: var(--accent);
