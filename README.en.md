@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.39.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.39.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.40.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.40.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.39.1.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.40.0.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.39.1.exe` | `84d3ceeb14a4b75b83ec21e630f91dcda51c678b6b1236c322a98fc8c40fcc58` |
-| `Otogura-Portable-0.39.1.exe` | `1d276e1271fca741f6f269e63e2ea22138de5f002c111633471caacdb0e680ed` |
+| `Otogura-Setup-0.40.0.exe` | `18f3b6b762b7ccadd9790edd3a1d677b88afdb01bcb51fabe5c61f5b138a357b` |
+| `Otogura-Portable-0.40.0.exe` | `42b262b69b9c184612e416ff8b24854226c7c15ce83ad7fff21057e03f6aed1a` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
@@ -549,12 +549,17 @@ The tabs above the columns change what you filter by.
 | **🌐 Resonance** | what a traced word turned up |
 | **Genre (grouped)** | scattered genre names gathered into a browsable size |
 
-**Switching tabs keeps the previous tab's filter.**
-Pick a genre, then a year on the date tab, and you get **the intersection**.
-Both tabs take Ctrl / Shift for multiple selection.
+**Only the open tab's selection applies.**
+Switch to the date tab and the genre selection stops filtering (it is not erased).
+Every tab takes Ctrl / Shift for multiple selection.
 
-Because filters persist, **a filter can be in effect where you cannot see it.**
-So hidden tabs show their count, like `● 3`.
+Hidden tabs still show what is left on them, like `● 3`, but **that is not in effect.**
+Press the tab to bring it back.
+
+Up to 0.39.1 the tabs intersected. That was fine with two tabs; with four it became
+the reason you could not tell why so few songs were listed. 0.40.0 drops it.
+
+If you have grouped your genres, that is the tab you start on.
 
 Date columns sort **newest first**. On the author's machine the granularity came out like this:
 
