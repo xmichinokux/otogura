@@ -149,6 +149,13 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '・★**数より近さが先です。** 少なくて構いません': "- ★**Closeness comes before quantity.** A short list is fine",
+    '　上の一覧にある名前でも、無い名前でも構いません。**近さだけで選んでください**':
+      "  On the list above or not, it does not matter. **Choose on closeness alone**",
+    '　★一覧はこの人の蔵書です。**そこに寄せて選ぶと、軸から外れます**': "  ★That list is what they own. **Leaning on it pulls you off the axis**",
+    '・★**近さを優先**してください。数は二の次です': "- ★**Put closeness first.** Quantity is secondary",
+    '　上の一覧にある名前を選んで構いませんが、近くないなら入れないでください':
+      "  You may pick from the list above, but leave out anything that is not close",
     '　※ AI は {挙げた} 組挙げましたが、手元にあったのは {あった} 組でした': "　* The AI named {挙げた} artists; you own {あった} of them",
     '（{名前} などは持っていません）': "({名前} and others are not in your library)",
     '（この気分で手元にあったのが {n} 組なので、{n} 曲にしました）': "(you own {n} artists that fit, so the set is {n} songs)",

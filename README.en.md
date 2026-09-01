@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.36.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.36.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.36.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.36.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.36.0.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.36.1.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.36.0.exe` | `8708686881eb480b0e9ae8e3efdd4a92d9eb2113d5a5bb8c9e10f88d089ad24b` |
-| `Otogura-Portable-0.36.0.exe` | `c95d4b1f2bccfc4d22a5839bd679bff6ebe6f5512659b56fe99b3c7cabb25dfd` |
+| `Otogura-Setup-0.36.1.exe` | `ae00e8592b511184004489fc255740915b8ca1c2dcb8f05d026739c914925a05` |
+| `Otogura-Portable-0.36.1.exe` | `0ba02d7f46429d037eae3bbbf1c1b12d808710028c52079e5e48f3201d04d708` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
@@ -508,7 +508,9 @@ Otogura otherwise **runs entirely on your machine.** This feature is the single 
 | | |
 |---|---|
 | **Sent** | the list of genre names (with counts) ／ the list of years acquired ／ what you typed ／ **the title, artist and album of 200 candidate songs** |
-| **Not sent** | **file paths, and the audio itself** (since 0.8.0 the titles of the 200 candidates are sent)／★**the list of your artists is not sent either** (0.35.0 — the AI names artists from its own knowledge and we match them locally) |
+| **Not sent, either way** | **file paths, and the audio itself** |
+| 　🎧 building a set | the AI names artists from its own knowledge; **your artist list is not sent** (0.35.0) |
+| 　🌱 following a word | ★**up to 800 of your artist names** (with song counts) and your library size **are** sent — otherwise the trace comes back full of names you do not own |
 | **When** | only when you press the button. Nothing goes out in the background |
 | **Default** | **off.** Until a key is entered, the input bar does not even appear |
 | **Model** | `claude-opus-5` |
