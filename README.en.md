@@ -23,8 +23,8 @@ Grab either one from [Releases](https://github.com/xmichinokux/otogura/releases)
 
 | File | When to pick it |
 |---|---|
-| `Otogura-Setup-0.39.0.exe` | **The usual choice.** Installs, and lands in the Start menu |
-| `Otogura-Portable-0.39.0.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
+| `Otogura-Setup-0.39.1.exe` | **The usual choice.** Installs, and lands in the Start menu |
+| `Otogura-Portable-0.39.1.exe` | When you would rather not install. One file, runs as-is (USB is fine) |
 
 <details>
 <summary>If Windows says "Windows protected your PC"</summary>
@@ -46,13 +46,13 @@ A code-signing certificate costs tens of thousands of yen a year.
 Run this in PowerShell and compare against the values below.
 
 ```
-Get-FileHash Otogura-Setup-0.39.0.exe -Algorithm SHA256
+Get-FileHash Otogura-Setup-0.39.1.exe -Algorithm SHA256
 ```
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.39.0.exe` | `e3b4aba9c375662c2cd968dad14a1a0425c0cb6f5a3f86985338ac9348dc4d6a` |
-| `Otogura-Portable-0.39.0.exe` | `700dbe2bfa337ad77db2c451de3d7af7d4a868d16e1ed09986621142a928d7b1` |
+| `Otogura-Setup-0.39.1.exe` | `84d3ceeb14a4b75b83ec21e630f91dcda51c678b6b1236c322a98fc8c40fcc58` |
+| `Otogura-Portable-0.39.1.exe` | `1d276e1271fca741f6f269e63e2ea22138de5f002c111633471caacdb0e680ed` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.

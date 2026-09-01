@@ -210,19 +210,37 @@ function 突き合わせる(木, tracks, いま = Date.now(), 目盛 = 3) {
       const k = ならす(n.name);
       if (!k) continue;
       const 重み = 重みを出す(n.depth, e.savedAt, いま, 目盛);
+      /*
+       * ★どの言葉のものとして数えるかは、**つまみで変えない**（2026-08-31 本人の報告）。
+       *   > スライダーを動かすだけでバンドの数が変わったのですが、どうしてですか？
+       *   > 生成しなくてもスライダーを動かすと内容が変わるのですか？
+       *
+       * 同じ名前が何本かの木に出たとき、持ち主は「重いほう」に決めていた。
+       * その重みがつまみで変わるので、**つまみを動かすたびに持ち主が入れ替わり、
+       * helmet(05) を選んだときの演者が 11 組になったり 6 組になったりしていた。**
+       * 全体（75 組・3,540 曲）は変わっていない。動いていたのは持ち主だけ。
+       *
+       * ★つまみは**並び順**のためのもの。持ち主は目盛 3（平ら）で決める。
+       */
+      const 持ち主の重み = 重みを出す(n.depth, e.savedAt, いま, 3);
       const 前 = 候補.get(k);
       if (!前) {
         候補.set(k, {
           name: n.name, description: n.description, keyword: e.keyword,
-          depth: n.depth, savedAt: e.savedAt, 素の重み: 重み,
+          depth: n.depth, savedAt: e.savedAt, 素の重み: 重み, 持ち主の重み: 持ち主の重み,
           // ★どの言葉から辿り着いたか。同じ言葉は数えない
           言葉たち: [e.keyword],
         });
       } else {
         if (!前.言葉たち.includes(e.keyword)) 前.言葉たち.push(e.keyword);
-        if (重み > 前.素の重み) {
+        if (持ち主の重み > 前.持ち主の重み) {
           前.name = n.name; 前.description = n.description; 前.keyword = e.keyword;
-          前.depth = n.depth; 前.savedAt = e.savedAt; 前.素の重み = 重み;
+          前.depth = n.depth; 前.savedAt = e.savedAt;
+          前.持ち主の重み = 持ち主の重み;
+        }
+        /* 並び順の重みは、つまみの効いたほうで更新する */
+        if (重み > 前.素の重み) {
+          前.素の重み = 重み;
         }
       }
     }
