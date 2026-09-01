@@ -2311,6 +2311,16 @@ function 響きの欄を描く() {
   if (交差を開く && 交差.length) 交差を描く(box, 交差);
   if (!言葉の一覧を開く) return;
 
+  /*
+   * ★桁のそろった板に出す（2026-08-31 本人の希望）。
+   *   > 別ウインドウで綺麗に並ぶ感じが良いです
+   * 窓は増やさない（閉じ忘れ・行き違いが増える）。欲しいのは並びのほうなので、
+   * バーの中ではなく**下に広がる板**にして、桁をそろえる。
+   */
+  const 板 = document.createElement('div');
+  板.className = 'resboard';
+  box.appendChild(板);
+
   /* ── 言葉ごとの行 ── */
   for (const e of 木たち) {
     const 行札 = document.createElement('div');
@@ -2339,7 +2349,7 @@ function 響きの欄を描く() {
       };
       inp.onblur = 決める;
       行札.appendChild(inp);
-      box.appendChild(行札);
+      板.appendChild(行札);
       setTimeout(() => { inp.focus(); inp.select(); }, 0);
       continue;
     }
@@ -2368,7 +2378,12 @@ function 響きの欄を描く() {
      * 何本も辿ると、どの言葉から出た名前か分からなくなっていた。
      */
     const この外れ = 全外れ.filter((x) => x.keyword === e.keyword);
-    if (この外れ.length) {
+    /* ★0 でも桁は空けておく。行ごとにボタンの位置がずれると読みにくい */
+    if (!この外れ.length) {
+      const 空 = document.createElement('span');
+      空.className = 'resgap';
+      行札.appendChild(空);
+    } else {
       const b = document.createElement('button');
       b.className = 'restag';
       const 開いている = 確かめる候補の言葉 === e.keyword;
@@ -2418,8 +2433,8 @@ function 響きの欄を描く() {
     };
     行札.appendChild(消す);
 
-    box.appendChild(行札);
-    if (確かめる候補の言葉 === e.keyword && この外れ.length) 確かめる候補を描く(box, この外れ);
+    板.appendChild(行札);
+    if (確かめる候補の言葉 === e.keyword && この外れ.length) 確かめる候補を描く(板, この外れ);
   }
 }
 

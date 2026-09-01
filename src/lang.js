@@ -149,6 +149,14 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '・★**1 段で構いません。** 無理に 3 段にしないでください': "- ★**One level is fine.** Do not force it to three",
+    '　起点から直接つながるものだけ。遠くまで伸ばすと、軸から外れます':
+      "  Only what connects directly to the word. Reaching further takes you off the axis",
+    '・★数は**多くても {n} 個**。★**足りなければ少なくて構いません**': "- ★**At most {n} names.** ★**Fewer is fine if that is all there is**",
+    '　★数を埋めるために遠いものを足さないでください。**そこが一番外れます**':
+      "  ★Do not pad the count with distant names. **That is where it goes wrong**",
+    '・★**2 段まで。** 3 段目は要りません': "- ★**Two levels at most.** No third level",
+    '・★数は**多くても {n} 個**。足りなければ少なくて構いません': "- ★**At most {n} names.** Fewer is fine if that is all there is",
     '辿った言葉 {n} 本': "{n} words followed",
     '🔀 一本を組む': "🔀 Build a set",
     'この言葉で辿ったものだけから、AI が厳選して並べます（勝手には流れません）':
