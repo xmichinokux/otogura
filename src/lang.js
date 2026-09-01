@@ -149,6 +149,11 @@ const 訳 = {
     '・★次の {n} 個は**もう挙げています。二度と挙げないでください**:': "- ★These {n} have **already been named. Never name them again**:",
 
     /* ★画面の文言（0.33.0） */
+    '・★**できるだけ多くの、別々のバンド**を挙げてください。{n} 個ほしいところです':
+      "- ★Name **as many different bands as you can** — {n} is what we are after",
+    '　★**近さだけで選んでください。**一覧に寄せると、そこから外れます': "  ★**Choose on closeness alone.** Leaning on the list takes you off it",
+    '・★**1 段だけ。** 起点から直接つながるものに留めてください': "- ★**One level only.** Keep to what connects directly to the word",
+    '　遠くまで伸ばすと、軸から外れます': "  Reaching further takes you off the axis",
     '・★**1 段で構いません。** 無理に 3 段にしないでください': "- ★**One level is fine.** Do not force it to three",
     '　起点から直接つながるものだけ。遠くまで伸ばすと、軸から外れます':
       "  Only what connects directly to the word. Reaching further takes you off the axis",
