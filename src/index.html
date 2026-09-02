@@ -148,10 +148,15 @@
  * ★言葉ごとの一覧は、桁のそろった板に出す（2026-08-31 本人の希望）。
  *   > 別ウインドウで綺麗に並ぶ感じが良いです
  * 窓は増やさず、下に広がる板にした。桁がそろえば読みやすい。
+ *
+ * ★高さは 4 行ぶんまで（2026-08-31 本人の指摘）。
+ *   > 目的は画面の圧迫の回避と並びの美しさでした
+ * 40vh だと、開いたときに下の一覧を半分近く押し下げていた。
+ * ふだん出るのは選んだ 1 行なので、効くのは「全部開いた」ときだけ。
  */
 #resbar .resboard { flex-basis: 100%; margin-top: 6px;
   border: 1px solid var(--line); border-radius: 8px;
-  padding: 6px; background: var(--bg); max-height: 40vh; overflow: auto; }
+  padding: 6px; background: var(--bg); max-height: 132px; overflow: auto; }
 #resbar .resrow { display: grid; align-items: center; gap: 6px;
   grid-template-columns: minmax(140px, 1fr) 28px 150px 130px 28px;
   padding: 2px 0; }

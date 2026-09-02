@@ -163,6 +163,9 @@ const 訳 = {
     '・★**2 段まで。** 3 段目は要りません': "- ★**Two levels at most.** No third level",
     '・★数は**多くても {n} 個**。足りなければ少なくて構いません': "- ★**At most {n} names.** Fewer is fine if that is all there is",
     '辿った言葉 {n} 本': "{n} words followed",
+    '全部並べて見比べたいときだけ開きます。': "Open this only when you want them all side by side. ",
+    'ふだんは、下の「辿った言葉」の列で選んだものだけが出ます':
+      "Normally only the word you picked in the Followed words column shows here",
     '🔀 一本を組む': "🔀 Build a set",
     'この言葉で辿ったものだけから、AI が厳選して並べます（勝手には流れません）':
       "Builds only from what this word found — the AI picks and orders (nothing starts playing on its own)",
