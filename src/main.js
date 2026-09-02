@@ -446,6 +446,76 @@ ipcMain.handle('ai:playlist', async (_e, 手がかり) => {
 
 const 響きファイル = () => path.join(app.getPath('userData'), 'resonance.json');
 
+/*
+ * ★消したものは、捨てずに退避する（2026-09-02 本人の希望）。
+ *
+ * ■ 起きたこと
+ * 辿った木 4 本が消えていた。本人にも、押したかどうか記憶が無い。
+ * **記録が何も残らないので、後から判別できなかった。**
+ *
+ * ■ なぜ直すか
+ * 本人が最初に立てた決まりが、ここにだけ効いていなかった。
+ *   > 音楽ファイルを消さないでください。一覧から外すだけにしてください
+ * 曲と違って、辿った木は**元から作り直せない**（AI に何度も問い合わせて作る）。
+ * 押し間違い 1 回で完全に失われるのは、いちばん割に合わない。
+ *
+ * ★消す代わりに、こちらへ移す。1 つ前だけ持つ。
+ * 世代を増やすと「どれが要るのか」が分からなくなるので、増やさない。
+ */
+const 響きの捨てた = () => path.join(app.getPath('userData'), 'resonance-捨てた.json');
+
+/**
+ * いまの控えを、捨てた置き場へ移す。**消さない。**
+ * @returns 移せたら true（もともと無ければ false）
+ */
+async function 響きを退避する() {
+  let 文;
+  try {
+    文 = await fs.readFile(響きファイル(), 'utf8');
+  } catch {
+    return false;                                 // もともと無い
+  }
+  const 包み = { 捨てた日: new Date().toISOString(), 中身: 文 };
+  await fs.mkdir(path.dirname(響きの捨てた()), { recursive: true });
+  await fs.writeFile(響きの捨てた(), JSON.stringify(包み, null, 2), 'utf8');
+  try { await fs.unlink(響きファイル()); } catch { /* 消えていても構わない */ }
+  return true;
+}
+
+/** 捨てた置き場に、戻せるものがあるか。★中身は返さない（要るのは有無と日付だけ） */
+ipcMain.handle('resonance:trashed', async () => {
+  try {
+    const v = JSON.parse(await fs.readFile(響きの捨てた(), 'utf8'));
+    const 確かめ = 響きを読み込む(String(v && v.中身));
+    if (!確かめ.ok) return null;
+    return { 捨てた日: (v && v.捨てた日) || null, 本数: 確かめ.木.木.length };
+  } catch {
+    return null;
+  }
+});
+
+/** 捨てたものを戻す。★いま控えがあるなら、そちらを先に退避してから入れ替える */
+ipcMain.handle('resonance:restore', async () => {
+  let v;
+  try {
+    v = JSON.parse(await fs.readFile(響きの捨てた(), 'utf8'));
+  } catch {
+    return { ok: false, error: '戻せるものがありません' };
+  }
+  const 確かめ = 響きを読み込む(String(v && v.中身));
+  if (!確かめ.ok) return { ok: false, error: 確かめ.error };
+  /*
+   * ★いま控えがあるなら、そちらを捨てた置き場へ入れ替える（入れ違いに使える）。
+   * 無いなら、戻したあとの捨てた置き場は空にする。
+   * 残しておくと「戻す」がずっと出たままになり、戻ったのか分からない。
+   */
+  const 入れ替えた = await 響きを退避する();
+  await fs.mkdir(path.dirname(響きファイル()), { recursive: true });
+  await fs.writeFile(響きファイル(), String(v.中身), 'utf8');
+  if (!入れ替えた) { try { await fs.unlink(響きの捨てた()); } catch { /* 無ければそれでよい */ } }
+  return { ok: true, 木: 確かめ.木 };
+});
+
 ipcMain.handle('resonance:load', async () => {
   const r = await dialog.showOpenDialog({
     title: 'Resonance の書き出し（JSON）を選ぶ',
@@ -754,9 +824,13 @@ async function 響きを書き換える(手当て) {
   生.version = 1;
   const 確かめ = 響きを読み込む(JSON.stringify(生));
   if (!確かめ.ok) {
-    // ★全部消えた場合は、控えごと消す（空の木を置くと、次に読めない）
+    /*
+     * ★全部消えた場合は、控えを退かす（空の木を置くと、次に読めない）。
+     * ★消さずに「捨てた置き場」へ移す（2026-09-02）。最後の 1 本を消したときも、
+     * 戻せないと困る ―― 辿った木は元から作り直せないため。
+     */
     if (/使える木がありません/.test(確かめ.error)) {
-      try { await fs.unlink(響きファイル()); } catch { /* もともと無い */ }
+      await 響きを退避する();
       return { ok: true, 木: null };
     }
     return { ok: false, error: 確かめ.error };
@@ -776,8 +850,13 @@ ipcMain.handle('resonance:remove', async (_e, 言葉) => {
 });
 
 ipcMain.handle('resonance:clear', async () => {
-  // ★消すのはこの控えだけ。音楽ファイルには触らない
-  try { await fs.unlink(響きファイル()); } catch { /* もともと無い */ }
+  /*
+   * ★消すのはこの控えだけ。音楽ファイルには触らない。
+   * ★そして**この控えも消さない。**「捨てた置き場」へ移すだけにする（2026-09-02）。
+   *   > 音楽ファイルを消さないでください。一覧から外すだけにしてください
+   * その決まりが、ここにだけ効いていなかった。
+   */
+  await 響きを退避する();
   return { ok: true };
 });
 

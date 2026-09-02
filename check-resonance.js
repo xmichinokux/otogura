@@ -651,5 +651,64 @@ if (fs.existsSync(実物)) {
   );
 }
 
+/*
+ * [8] 消した響きを、捨てないこと（2026-09-02 本人の希望）。
+ *
+ * ■ 起きたこと
+ * 辿った木 4 本が消えていて、押したかどうか本人にも記憶が無かった。
+ * `fs.unlink` で消していたので、**記録が何も残らず、後から判別できなかった。**
+ *
+ * ■ なぜ直したか
+ * 本人が最初に立てた決まりが、ここにだけ効いていなかった。
+ *   > 音楽ファイルを消さないでください。一覧から外すだけにしてください
+ * 曲と違って、辿った木は**元から作り直せない**（AI に何度も問い合わせて作る）。
+ */
+{
+  console.log('\n[8] 消した響きを、捨てずに残すか');
+  const 本体 = fs.readFileSync(path.join(__dirname, 'src/main.js'), 'utf8');
+  const 素本体 = 本体.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  確認(
+    '★捨てた置き場がある',
+    素本体.includes("path.join(app.getPath('userData'), 'resonance-捨てた.json')"),
+    '消す先が無ければ、戻しようがありません',
+  );
+  確認(
+    '★「全部外す」は unlink せず、退避する',
+    /resonance:clear'[\s\S]{0,400}?響きを退避する\(\)/.test(素本体)
+      && !/resonance:clear'[\s\S]{0,400}?unlink\(響きファイル/.test(素本体),
+    'unlink すると、押し間違い 1 回で永久に失われます',
+  );
+  確認(
+    '★最後の 1 本を消したときも、退避する',
+    /使える木がありません[\s\S]{0,300}?響きを退避する\(\)/.test(素本体),
+    'ここだけ unlink が残ると、1 本ずつ消した人だけ戻せません',
+  );
+  確認(
+    '★戻す窓口がある（有無を調べる／戻す）',
+    素本体.includes("ipcMain.handle('resonance:trashed'")
+      && 素本体.includes("ipcMain.handle('resonance:restore'"),
+    '退避しても、戻す道が無ければ意味がありません',
+  );
+  const 橋 = fs.readFileSync(path.join(__dirname, 'src/preload.js'), 'utf8');
+  確認(
+    '★画面へ渡してある',
+    橋.includes("resonance:trashed") && 橋.includes("resonance:restore"),
+    '橋を通さないと、画面からは呼べません',
+  );
+  const 画面 = fs.readFileSync(path.join(__dirname, 'src/renderer.js'), 'utf8');
+  const 素画面 = 画面.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  確認(
+    '★戻すボタンを、開いたときに出す',
+    素画面.includes('async function 捨てた響きボタンを直す()')
+      && 素画面.includes('await 捨てた響きボタンを直す();'),
+    '出さないと、戻せることに気づけません',
+  );
+  確認(
+    '★戻せるものが無いときは、ボタンを出さない',
+    /捨てた響きボタンを直す\(\)[\s\S]{0,400}?if \(!捨てた\) \{ b\.style\.display = 'none'; return; \}/.test(素画面),
+    '0 件のボタンが並んでいるのは邪魔なだけです',
+  );
+}
+
 console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
 process.exit(失敗 ? 1 : 0);

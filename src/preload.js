@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('mp3', {
   響きを読み込む: () => ipcRenderer.invoke('resonance:load'),
   響きを取る: () => ipcRenderer.invoke('resonance:get'),
   響きを消す: () => ipcRenderer.invoke('resonance:clear'),
+  /*
+   * ★消した響きは、捨てずに退避してある（2026-09-02 本人の希望）。
+   * 辿った木は元から作り直せないので、押し間違いで失われないようにする。
+   */
+  捨てた響きがあるか: () => ipcRenderer.invoke('resonance:trashed'),
+  捨てた響きを戻す: () => ipcRenderer.invoke('resonance:restore'),
   // ★音蔵の中で木を生やす（Resonance が無くても使える）
   木を生やす: (手がかり) => ipcRenderer.invoke('ai:tree', 手がかり),
   木の大きさ: () => ipcRenderer.invoke('ai:treeSizes'),

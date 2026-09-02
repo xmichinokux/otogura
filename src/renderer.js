@@ -2325,15 +2325,17 @@ function 響きの欄を描く() {
   const 外す = document.createElement('button');
   外す.className = 'restag';
   外す.textContent = 言('× 全部外す');
-  外す.title = 言('辿ったものを全部忘れます（音楽ファイルには触りません）');
+  /* ★「忘れる」ではなく「外す」。捨てた置き場に残るので、そのまま戻せる */
+  外す.title = 言('辿ったものを全部外します（音楽ファイルには触りません。あとで戻せます）');
   外す.onclick = async () => {
-    if (!await 確かめる(言('辿ったものを全部忘れますか？\n\n曲は何も変わりません。'))) return;
+    if (!await 確かめる(言('辿ったものを全部外しますか？\n\n曲は何も変わりません。下の「↩ 消した響きを戻す」で戻せます。'))) return;
     $('status').textContent = 言('響きを外しています…');
     await window.mp3.響きを消す();
     響きの木 = null; 響きの当たり = null;
     響きを合わせ直す();
+    await 捨てた響きボタンを直す();               // ★戻せることを、その場で見せる
     描き直す();
-    $('status').textContent = 言('響きを全部外しました');
+    $('status').textContent = 言('響きを全部外しました（下のボタンで戻せます）');
   };
   box.appendChild(外す);
 
@@ -2474,6 +2476,11 @@ function 響きの欄を描く() {
       if (!r || !r.ok) { $('status').textContent = 言('消せませんでした（') + ((r && r.error) || 言('不明')) + '）'; return; }
       響きの木 = r.木;
       響きを合わせ直す();
+      /*
+       * ★最後の 1 本を消したときは、控えごと捨てた置き場へ移る。
+       * その場で「戻せる」と分かるように、ボタンを見直す。
+       */
+      await 捨てた響きボタンを直す();
       描き直す();
       $('status').textContent = 言('「{言葉}」を消しました', { 言葉: e.keyword });
     };
@@ -5234,6 +5241,43 @@ function 外したものボタンを直す(件数) {
   b.textContent = 言('↩ 外した {n} 曲を戻す', { n: 件数.toLocaleString('ja-JP') });
 }
 
+/*
+ * ★消した響きを戻すボタン（2026-09-02 本人の希望）。
+ *
+ * ■ なぜ要るか
+ * 辿った木 4 本が消えていて、押したかどうか本人にも記憶が無く、
+ * **記録が何も残らないので後から判別できなかった。**
+ * 曲と違って、辿った木は元から作り直せない（AI に何度も問い合わせて作る）。
+ *
+ * ★「外した曲を戻す」と同じ場所・同じ形にする。覚えることを増やさない。
+ * ★戻せるものが無いときは、ボタンごと出さない（0 件のボタンは邪魔なだけ）。
+ */
+async function 捨てた響きボタンを直す() {
+  const b = $('resback');
+  if (!b) return;
+  let 捨てた = null;
+  try { 捨てた = await window.mp3.捨てた響きがあるか(); } catch { 捨てた = null; }
+  if (!捨てた) { b.style.display = 'none'; return; }
+  b.style.display = '';
+  b.textContent = 言('↩ 消した響き {n} 本を戻す', { n: 捨てた.本数 });
+  b.title = 捨てた.捨てた日
+    ? 言('{日} に外したものです。そのまま戻せます', { 日: 捨てた.捨てた日.slice(0, 10) })
+    : 言('外した響きを、そのまま戻します');
+}
+
+$('resback').onclick = async () => {
+  const r = await window.mp3.捨てた響きを戻す();
+  if (!r || !r.ok) {
+    $('status').textContent = 言('戻せませんでした（') + ((r && r.error) || 言('不明')) + '）';
+    return;
+  }
+  響きの木 = r.木;
+  響きを合わせ直す();
+  await 捨てた響きボタンを直す();
+  描き直す();
+  $('status').textContent = 言('消した響きを戻しました');
+};
+
 $('unhide').onclick = async () => {
   const s = await window.mp3.設定を取る();
   const 外れている = s.hidden;
@@ -5361,6 +5405,13 @@ $('langbtn').onclick = async () => {
   audio.volume = 音量;
   $('vol').value = String(Math.round(音量 * 100));
   $('volicon').textContent = 音量 === 0 ? '🔇' : 音量 < 0.5 ? '🔉' : '🔊';
+
+  /*
+   * ★消した響きが残っていれば、戻すボタンを出す（2026-09-02）。
+   * 押した覚えが無いまま消えている、ということが実際に起きた。
+   * 開いたときに見えていれば、そこで気づける。
+   */
+  await 捨てた響きボタンを直す();
 
   // ★覚えた「タグ無しを隠す」を戻す
   タグ無しを隠す = await window.mp3.タグ無しを隠すか();

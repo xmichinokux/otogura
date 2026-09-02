@@ -405,6 +405,22 @@ const 訳 = {
       "Paste your API key in the box above (you can make one at console.anthropic.com)",
     "以前のデータを引き継げませんでした。\n\n": "Your earlier data could not be carried over.\n\n",
     "辿ったものを全部忘れますか？\n\n曲は何も変わりません。": "Forget everything you have followed?\n\nNothing about your songs changes.",
+    /*
+     * ★消した響きは、捨てずに退避してある（2026-09-02 本人の希望）。
+     * 「忘れる」ではなく「外す」。戻せることを、文のほうでも言い切る。
+     */
+    "辿ったものを全部外しますか？\n\n曲は何も変わりません。下の「↩ 消した響きを戻す」で戻せます。":
+      "Set aside everything you have followed?\n\nNothing about your songs changes."
+      + "\nThe button below brings it back.",
+    '辿ったものを全部外します（音楽ファイルには触りません。あとで戻せます）':
+      "Sets aside everything you have followed (your music files are untouched, and you can bring it back)",
+    '響きを全部外しました（下のボタンで戻せます）':
+      "Set aside everything you had followed (the button below brings it back)",
+    '↩ 消した響き {n} 本を戻す': "↩ Restore {n} cleared word|↩ Restore {n} cleared words",
+    '{日} に外したものです。そのまま戻せます': "Set aside on {日}. It comes back exactly as it was",
+    '外した響きを、そのまま戻します': "Brings back what you cleared, exactly as it was",
+    '消した響きを戻しました': "Brought back the resonance you had cleared",
+    '戻せませんでした（': "Could not bring it back (",
     'Anthropic の API キーを貼り付けて Enter': "Paste your Anthropic API key and press Enter",
     '手直し.json のある場所を開きます（中を見て、直したり消したりできます）':
       "Opens the folder holding 手直し.json — you can look inside, edit it or delete it",
@@ -607,6 +623,7 @@ const 訳 = {
       "Registers an Anthropic API key. Once it is in, a box for how you feel and a box for following a word appear above",
     '曲名やアーティストの入っていない曲を、一覧にも出さず再生もしない': "Keeps songs with no title or artist out of the list, and does not play them",
     '「一覧から外す」で外した曲を、すべて一覧に戻す': "Puts every song you removed from the list back into it",
+    '「× 全部外す」で外した響きを、そのまま戻す': "Puts back the resonance you cleared with “× Clear all”, exactly as it was",
 
     /* ★表の組み立て（区切りや単位も言葉で変わる） */
     '{名}（{n}曲）': '{名} ({n} song)|{名} ({n} songs)',
