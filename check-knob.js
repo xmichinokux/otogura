@@ -598,10 +598,22 @@ console.log('\n[8-d] ★自分で絞った範囲・響き・左の一覧');
     /if \(自分で絞っているか\(\)\) \{[\s\S]{0,300}?\} else \{[\s\S]{0,200}?気分でおすすめ/.test(素),
     '絞ってあるのに選び直させると、せっかくの指定が消えます',
   );
+  /*
+   * ★ジャンルだけを見る（2026-09-02 本人の指定で入れ替えた）。
+   *
+   *   > ジャンルを指定していなければ全てを参照するけど、ジャンルの指定を
+   *   > していたらそのジャンル内のみ参照する（日付けのリストは参照しない）
+   *
+   * ★前は sel のどれか 1 つでも選んでいれば「自分で絞った」ことにしていた。
+   * 演者やアルバムや日付で絞っただけでも AI にジャンルを選ばせなくなり、
+   * それが生成の誤操作につながっていた。組む範囲がジャンルだけで決まる以上、
+   * ここも揃える。**この見張りは、前の決まりに戻っていないことも見ている。**
+   */
   確認(
-    '★どのカラムでも効く（ジャンルだけでなく）',
-    /Object\.values\(sel\)\.some/.test(素),
-    'ジャンルだけ見ると、演者や日付で絞ったときに効きません',
+    '★見るのはジャンルの選択だけ（演者・アルバム・日付は見ない）',
+    /function 自分で絞っているか\(\) \{[\s\S]{0,160}?生成のジャンル絞り\(\)/.test(素)
+      && !/Object\.values\(sel\)\.some/.test(素),
+    '日付や演者で絞っただけで AI にジャンルを選ばせなくなるのが、誤操作の元でした',
   );
 
   /*
@@ -1217,8 +1229,24 @@ console.log('\n[8-g] ★文脈の強度の足場は、曲数ではなく作品�
   const { 次を選ぶ } = require('./src/shuffle.js');
   void sel; void 曲を並べる; void 絞る; void 開いているリスト; void シャッフル除外;
   void 響きの重み表; void 再生回数; void 小文字; void 次を選ぶ; void tracks;
+  /*
+   * ★組む範囲が画面を見なくなった（2026-09-02 本人の指定）。
+   * ここで見たいのは候補の重みづけなので、範囲は「全部」に固定して回す。
+   * 範囲の決まり方そのものは check-shuffle.js の見張りで見ている。
+   */
+  const 組みの絞り = null;
+  const 見える曲 = () => tracks;
+  const まとめてあるか = () => false;
+  const カラムタブの列 = {
+    tag: [
+      { key: "genre", 取る: (t) => t.genre },
+      { key: "artist", 取る: (t) => t.artist },
+      { key: "album", 取る: (t) => t.album },
+    ],
+  };
+  void 組みの絞り; void 見える曲; void まとめてあるか; void カラムタブの列;
 
-  const 素 = [切る('まぜる'), 切る('組む範囲'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
+  const 素 = [切る('まぜる'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
   // eslint-disable-next-line no-eval
   const 引く = eval(素 + String.fromCharCode(10) + 'AIに渡す候補');
   const 候補 = 引く(160);
@@ -1318,9 +1346,10 @@ console.log('\n[8-f] ★組む元は、開いている再生リストではな�
   }
   const リスト = { id: 1, name: 'ゆうべの一本', tracks: ['L0', 'L1', 'L2'] };
   const 開いているリスト = () => リスト;
-  const sel = { genre: new Set(['Metal Core']), artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
+  /* ★sel は実物と同じく小文字で持つ（列を押したときもそう入る） */
+  const sel = { genre: new Set(['metal core']), artist: null, album: null, 年: null, 月: null, 日: null, 言葉: null, 響演者: null, 響盤: null };
   const 曲を並べる = (a, b) => a.path.localeCompare(b.path);
-  const 絞る = () => tracks.filter((t) => !sel.genre || sel.genre.has(t.genre));
+  const 絞る = () => tracks.filter((t) => !sel.genre || sel.genre.has(小文字(t.genre)));
   const シャッフル除外 = new Set();
   const 自分のか = () => false;   // ★自分の音源（2026-08-30）。ここでは誰も自分のではない
   const つなぎか = () => false;   // ★つなぎの小品（2026-08-30）。ここでは誰もつなぎではない
@@ -1332,8 +1361,24 @@ console.log('\n[8-f] ★組む元は、開いている再生リストではな�
   const { 次を選ぶ } = require('./src/shuffle.js');
   void 開いているリスト; void sel; void 曲を並べる; void 絞る; void シャッフル除外;
   void 響きの重み表; void 再生回数; void 小文字; void 次を選ぶ; void tracks;
+  /*
+   * ★組む範囲が画面を見なくなった（2026-09-02 本人の指定）。
+   * ここで見たいのは候補の重みづけなので、範囲は「全部」に固定して回す。
+   * 範囲の決まり方そのものは check-shuffle.js の見張りで見ている。
+   */
+  const 組みの絞り = null;
+  const 見える曲 = () => tracks;
+  const まとめてあるか = () => false;
+  const カラムタブの列 = {
+    tag: [
+      { key: "genre", 取る: (t) => t.genre },
+      { key: "artist", 取る: (t) => t.artist },
+      { key: "album", 取る: (t) => t.album },
+    ],
+  };
+  void 組みの絞り; void 見える曲; void まとめてあるか; void カラムタブの列;
 
-  const 素 = [切る('まぜる'), 切る('組む範囲'), 切る('AIに渡す候補'), 切る('いまの列')].join(String.fromCharCode(10));
+  const 素 = [切る('まぜる'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('いまの列'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
   // eslint-disable-next-line no-eval
   const 実 = eval(素 + String.fromCharCode(10) + '({範囲: 組む範囲, 候補: AIに渡す候補, 列: いまの列})');
 
@@ -1477,8 +1522,19 @@ console.log('\n[9] ★候補が、同じバンドに偏らないか');
     void 自分のか;
     const 響きの重み表 = () => null;
     const 再生回数 = {};
+    /*
+     * ★組む範囲が画面を見なくなった（2026-09-02 本人の指定）。
+     * ここで見たいのは候補の偏りなので、範囲は「台に置いた全部」でよい。
+     * 範囲の決まり方そのものは check-shuffle.js の見張りで見ている。
+     */
+    const 組みの絞り = null;
+    const 見える曲 = () => 台;
+    const まとめてあるか = () => false;
+    const カラムタブの列 = { tag: [{ key: 'genre', 取る: (t) => t.genre }] };
+    const sel = { genre: null };
     void 次を選ぶ; void 小文字; void いまの列; void シャッフル除外; void 響きの重み表; void 再生回数;
     void 絞る; void 曲を並べる;
+    void 組みの絞り; void 見える曲; void まとめてあるか; void カラムタブの列; void sel;
 
     // eslint-disable-next-line no-eval
     const [AIに渡す候補, まぜる, 台を置く] = eval(
