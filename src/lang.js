@@ -187,8 +187,7 @@ const 訳 = {
     '⧉ コピー': "⧉ Copy",
     '⧉ 写しました': "⧉ Copied",
     '⧉ 写せませんでした': "⧉ Could not copy",
-    'バンド名だけを 1 行ずつ書き写します（説明は入れません）':
-      "Copies just the names, one per line (no descriptions)",
+    '一言 解説つきで、ジャンルごとに書き写します': "Copies them with their one-line notes, grouped by genre",
     '閉じる（Esc でも閉じます）': "Close (Esc also closes it)",
     '辿って挙がったバンドのうち、手元で見つからなかったものです。':
       "Names that came up while following, and were not found in your library. ",
