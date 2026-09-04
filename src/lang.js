@@ -168,6 +168,29 @@ const 訳 = {
      * 打ち込まずに始められるようにするための入口。
      */
     '🌱 {名前} から辿る': "🌱 Follow {名前}",
+    /*
+     * ★手元に無い名前の一覧（2026-09-04 本人の希望）。
+     * 響きを知らなくても読める言葉にする ―― そこが要点なので、訳も同じ方針で。
+     */
+    '📋 手元に無い名前（{n}）': "📋 Not in your library ({n})",
+    '辿って見つかった名前のうち、手元に無かったものです。':
+      "Names that came up while following, which you do not have. ",
+    '響きを外しても残ります。要らないものは 1 つずつ消せます':
+      "They stay even if you clear Resonance. Remove them one at a time if you do not want them",
+    '辿って挙がった名前のうち、手元で見つからなかったものです。':
+      "Names that came up while following, and were not found in your library. ",
+    '演者名だけでなく、盤名・曲名にも当ててみて、それでも無かったものだけ出しています。':
+      "They were checked against artist, album and track names, and only the ones still missing are listed. ",
+    '「持っているのに書かれ方が違う」「AI の思い違い」は残るので、買う前に確かめてください。':
+      "“You have it but it is spelled differently” and “the AI got it wrong” are still possible, so check before you buy.",
+    '「{名}」から': "from “{名}”",
+    'この名前を一覧から消す': "Remove this name from the list",
+    '× 全部消す（あとで戻せます）': "× Clear them all (you can bring them back)",
+    '手元に無い名前を、全部 一覧から外しますか？': "Clear the whole list of names you do not have?",
+    '曲は何も変わりません。すぐ下の「戻す」で戻せます。':
+      "Nothing about your songs changes. The “bring back” line just below restores them.",
+    '手元に無い名前を、全部 外しました（戻せます）': "Cleared the whole list (you can bring it back)",
+    '↩ 外した {n} 個を戻す': "↩ Bring back {n}",
     'この演者から辿れる音楽を探します。手元にあったものは響きタブに、':
       "Looks for music you can reach from this artist. What you already have lands in the Resonance tab, ",
     '無かったものは「確かめる候補」に出ます（一本は組みません）':
@@ -715,6 +738,14 @@ const 訳 = {
     '・**実在するアーティスト／バンド名だけ**を挙げてください。アルバム名や曲名は挙げない':
       "- Name **real artists and bands only**. No album titles, no song titles",
     '　（この名前は、その人の手元のアーティスト名と突き合わせます）': "  (these names get matched against the artists they own)",
+    /*
+     * ★蔵書に寄せさせない 1 行（2026-09-04、実測して入れた）。
+     * 確かめる候補が王道でほぼ倍になった（11,13 → 22,19）。
+     */
+    '・★上に出した一覧は、この人の蔵書です。**そこに寄せて選ぶと、軸から外れます**':
+      "- ★The list above is what they already own. **Picking to match it pulls you off the axis**",
+    '　持っているかどうかは、こちらで突き合わせます。気にしないでください':
+      "  We do the matching on our side — do not let it shape your choices",
     '・★**できるだけ多くの、別々のバンド**を挙げてください。数がほしいところです':
       "- ★Name **as many different bands as you can**. Quantity matters here",
     '　上の一覧にある名前を選んで構いません。**むしろ歓迎します**': "  Names from the list above are fine. **In fact they are welcome**",

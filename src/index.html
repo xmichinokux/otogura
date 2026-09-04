@@ -117,6 +117,13 @@
   .histbox .foot { border-top: 1px solid var(--line); margin-top: 4px; padding: 6px 12px;
     font-size: 12px; color: var(--dim); cursor: pointer; }
   .histbox .foot:hover { background: var(--accent-bg); color: var(--text); }
+  /*
+   * ★手元に無い名前の一覧（2026-09-04 本人の希望）。
+   * 履歴の箱と同じ見た目を使う ―― 新しい見た目を覚えることを増やさない。
+   * 説明つきの行が並ぶので、履歴より広めに取る。
+   */
+  .naibox { max-width: 720px; min-width: 420px; }
+  .naibox .foot { white-space: normal; line-height: 1.5; }
   #aibar .tools { flex-basis: 100%; display: none; gap: 8px; flex-wrap: wrap;
     align-items: center; padding: 6px 2px 0; border-top: 1px dashed var(--line); }
   #aibar .tools.on { display: flex; }
@@ -372,6 +379,14 @@
         ★札に演者名を出す（「🌱 Helmet から辿る」）。押し間違えても何が起きるか分かる。
       -->
       <button class="btn" id="nowtrace" style="display:none"></button>
+      <!--
+        ★手元に無い名前の一覧（2026-09-04 本人の希望）。
+          > 僕が求めるのは一手で持っていないバンドのリストを知る（見る）ことです
+          > 響きでまとまる必要はない（人によってはむしろ迷惑かも）
+        ★響きタブ → バンド選択 → 確かめる候補 の三手が要らなくなる。
+        ★響きを知らなくても使える場所に置く。1 個でもあれば出す。
+      -->
+      <button class="btn" id="nailist" style="display:none"></button>
       <button class="btn" id="prev" title="前の曲" disabled>⏮</button>
       <button class="btn" id="play" disabled>▶</button>
       <button class="btn" id="next" title="次の曲" disabled>⏭</button>

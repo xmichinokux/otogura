@@ -46,6 +46,15 @@ contextBridge.exposeInMainWorld('mp3', {
   響きを取る: () => ipcRenderer.invoke('resonance:get'),
   響きを消す: () => ipcRenderer.invoke('resonance:clear'),
   /*
+   * ★手元に無い名前の一覧（2026-09-04 本人の希望）。
+   * 響きとは別に貯める。響きを全部外しても、この一覧は残る。
+   */
+  無い名前を取る: () => ipcRenderer.invoke('nai:get'),
+  無い名前を足す: (名前たち) => ipcRenderer.invoke('nai:add', 名前たち),
+  無い名前をひとつ消す: (name) => ipcRenderer.invoke('nai:remove', name),
+  無い名前を全部消す: () => ipcRenderer.invoke('nai:clear'),
+  無い名前を戻す: () => ipcRenderer.invoke('nai:restore'),
+  /*
    * ★消した響きは、捨てずに退避してある（2026-09-02 本人の希望）。
    * 辿った木は元から作り直せないので、押し間違いで失われないようにする。
    */

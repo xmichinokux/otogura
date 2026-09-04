@@ -860,6 +860,147 @@ ipcMain.handle('resonance:clear', async () => {
   return { ok: true };
 });
 
+/*
+ * ★手元に無い名前を、辿るたびに貯めておく（2026-09-04 本人の希望）。
+ *
+ *   > 僕が求めるのは一手で持っていないバンドのリストを知る（見る）ことです。
+ *   > 響きでまとまる必要はない（人によってはむしろ迷惑かも）
+ *   > お金を払って操作をする以上、持っていないバンドのリストは残ってほしい
+ *
+ * ■ なぜ別の置き場にするか
+ * いまの「確かめる候補」は、響きの木から**その場で計算している**だけ。
+ * 木を消せば消えるし、辿り直せば入れ替わる。**お金を払って出した名前が、
+ * 操作のはずみで消える。** それが困る、というのが本人の指摘。
+ *
+ * ★響きとは別のファイルにする。響きを全部外しても、この一覧は残る。
+ * ★消すのは本人の意思のときだけ。全部消すときも、捨てた置き場へ退避する
+ *   （0.41.0 で響きに入れたのと同じ考え方）。
+ *
+ * ■ 形
+ *   { 版: 1, 名前たち: [{ name, description, keyword, depth, 見つけた日 }] }
+ *   name … 演者名（同じ名前は 1 つだけ持つ。小文字で見分ける）
+ *   keyword … どの言葉から辿って出てきたか（起点）
+ */
+const 無い名前ファイル = () => path.join(app.getPath('userData'), '手元に無い名前.json');
+const 無い名前の捨てた = () => path.join(app.getPath('userData'), '手元に無い名前-捨てた.json');
+
+const 名前の鍵 = (v) => String(v ?? '').toLocaleLowerCase('ja').trim();
+
+function 無い名前を整える(v) {
+  const 生 = (v && Array.isArray(v.名前たち)) ? v.名前たち : [];
+  const 見た = new Set();
+  const 出 = [];
+  for (const x of 生) {
+    const name = String((x && x.name) || '').trim();
+    const k = 名前の鍵(name);
+    if (!name || 見た.has(k)) continue;
+    見た.add(k);
+    出.push({
+      name,
+      description: String((x && x.description) || '').trim(),
+      keyword: String((x && x.keyword) || '').trim(),
+      depth: Number.isFinite(x && x.depth) ? Math.max(0, Math.min(3, Math.round(x.depth))) : 1,
+      見つけた日: String((x && x.見つけた日) || '').slice(0, 10),
+    });
+  }
+  return { 版: 1, 名前たち: 出 };
+}
+
+async function 無い名前を読む() {
+  try {
+    return 無い名前を整える(JSON.parse(await fs.readFile(無い名前ファイル(), 'utf8')));
+  } catch {
+    return { 版: 1, 名前たち: [] };
+  }
+}
+
+async function 無い名前を書く(v) {
+  await fs.mkdir(path.dirname(無い名前ファイル()), { recursive: true });
+  await fs.writeFile(無い名前ファイル(), JSON.stringify(v, null, 2), 'utf8');
+}
+
+/** 捨てた置き場に、戻せるものがあるか（中身は返さない） */
+async function 無い名前の捨てたを見る() {
+  try {
+    const v = 無い名前を整える(JSON.parse(await fs.readFile(無い名前の捨てた(), 'utf8')));
+    return v.名前たち.length ? { 数: v.名前たち.length } : null;
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('nai:get', async () => ({
+  名前たち: (await 無い名前を読む()).名前たち,
+  捨てた: await 無い名前の捨てたを見る(),
+}));
+
+/** 辿るたびに足す。**同じ名前は増やさない**（先に見つけたほうを残す） */
+ipcMain.handle('nai:add', async (_e, 足すもの) => {
+  const いま = await 無い名前を読む();
+  const 見た = new Set(いま.名前たち.map((x) => 名前の鍵(x.name)));
+  let 足した = 0;
+  for (const x of (Array.isArray(足すもの) ? 足すもの : [])) {
+    const name = String((x && x.name) || '').trim();
+    const k = 名前の鍵(name);
+    if (!name || 見た.has(k)) continue;
+    見た.add(k);
+    足した += 1;
+    いま.名前たち.push({
+      name,
+      description: String((x && x.description) || '').trim(),
+      keyword: String((x && x.keyword) || '').trim(),
+      depth: Number.isFinite(x && x.depth) ? Math.max(0, Math.min(3, Math.round(x.depth))) : 1,
+      見つけた日: new Date().toISOString().slice(0, 10),
+    });
+  }
+  if (足した) await 無い名前を書く(いま);
+  return { 名前たち: いま.名前たち, 足した };
+});
+
+/** 1 つだけ消す。★これは本人が指で選んだものなので、退避しない */
+ipcMain.handle('nai:remove', async (_e, name) => {
+  const いま = await 無い名前を読む();
+  const k = 名前の鍵(name);
+  いま.名前たち = いま.名前たち.filter((x) => 名前の鍵(x.name) !== k);
+  await 無い名前を書く(いま);
+  return { 名前たち: いま.名前たち };
+});
+
+/*
+ * ★全部消すときは、捨てずに退避する（0.41.0 で響きに入れたのと同じ）。
+ * お金を払って出した名前を、押し間違い 1 回で失わせない。
+ */
+ipcMain.handle('nai:clear', async () => {
+  const いま = await 無い名前を読む();
+  if (いま.名前たち.length) {
+    await fs.mkdir(path.dirname(無い名前の捨てた()), { recursive: true });
+    await fs.writeFile(無い名前の捨てた(), JSON.stringify(いま, null, 2), 'utf8');
+  }
+  await 無い名前を書く({ 版: 1, 名前たち: [] });
+  return { 名前たち: [], 捨てた: await 無い名前の捨てたを見る() };
+});
+
+ipcMain.handle('nai:restore', async () => {
+  let 戻す;
+  try {
+    戻す = 無い名前を整える(JSON.parse(await fs.readFile(無い名前の捨てた(), 'utf8')));
+  } catch {
+    return { ok: false, error: '戻せるものがありません' };
+  }
+  /* ★いまあるものと混ぜる。戻したせいで、いまのぶんが消えないように */
+  const いま = await 無い名前を読む();
+  const 見た = new Set(いま.名前たち.map((x) => 名前の鍵(x.name)));
+  for (const x of 戻す.名前たち) {
+    const k = 名前の鍵(x.name);
+    if (見た.has(k)) continue;
+    見た.add(k);
+    いま.名前たち.push(x);
+  }
+  await 無い名前を書く(いま);
+  try { await fs.unlink(無い名前の捨てた()); } catch { /* 無ければそれでよい */ }
+  return { ok: true, 名前たち: いま.名前たち };
+});
+
 ipcMain.handle('migration:get', async () => 引っ越しの結果);
 
 app.on('window-all-closed', () => {

@@ -752,5 +752,77 @@ if (fs.existsSync(実物)) {
   );
 }
 
+/*
+ * [10] 手元に無い名前が、一手で見られて、残ること（2026-09-04 本人の希望）。
+ *
+ *   > 僕が求めるのは一手で持っていないバンドのリストを知る（見る）ことです。
+ *   > 響きでまとまる必要はない（人によってはむしろ迷惑かも）
+ *   > お金を払って操作をする以上、持っていないバンドのリストは残ってほしい
+ *
+ * ★前は 響きタブ → バンド選択 → 確かめる候補 の三手で、しかも
+ * 「響きとは何か」「確かめる候補とは何か」を知っている必要があった。
+ */
+{
+  console.log('\n[10] 手元に無い名前が、一手で見られて、残るか');
+  const 本体 = fs.readFileSync(path.join(__dirname, 'src/main.js'), 'utf8');
+  const 素本体 = 本体.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  const 画面 = fs.readFileSync(path.join(__dirname, 'src/renderer.js'), 'utf8');
+  const 素画面 = 画面.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+  const 頁 = fs.readFileSync(path.join(__dirname, 'src/index.html'), 'utf8');
+  const 橋 = fs.readFileSync(path.join(__dirname, 'src/preload.js'), 'utf8');
+
+  確認(
+    '★響きとは別の置き場に貯める',
+    素本体.includes("path.join(app.getPath('userData'), '手元に無い名前.json')"),
+    '響きの中に置くと、木を消したときに一緒に消えます',
+  );
+  /*
+   * ★響きを消す道の**中身だけ**を見る。
+   * 近くに置いてあるだけで引っかかると、直しようのない見張りになる（1 回そうなった）。
+   */
+  const handleの中 = (名) => {
+    const 頭 = 素本体.indexOf(`ipcMain.handle('${名}'`);
+    if (頭 < 0) return '';
+    const 尾 = 素本体.indexOf('});', 頭);
+    return 尾 < 0 ? 素本体.slice(頭) : 素本体.slice(頭, 尾);
+  };
+  確認(
+    '★響きを消しても、この一覧は消えない',
+    !handleの中('resonance:clear').includes('無い名前')
+      && !handleの中('resonance:remove').includes('無い名前')
+      && !/function 響きを退避する\(\)[\s\S]{0,600}?無い名前/.test(素本体),
+    'お金を払って出した名前です。響きの操作で巻き込まない',
+  );
+  確認(
+    '★辿るたびに貯める',
+    素画面.includes('await 無い名前を貯める();')
+      && 素画面.includes('const 外れ = (響きの当たり && Array.isArray(響きの当たり.外れ))'),
+    '貯めないと、辿り直すたびに前の名前が消えます',
+  );
+  確認(
+    '★一手で見られる（札が再生バーにある）',
+    /<button class="btn" id="nailist"/.test(頁)
+      && 素画面.includes("b.textContent = 言('📋 手元に無い名前（{n}）', { n: 出す.length });"),
+    '三手かかると、響きを知っている人しか辿り着けません',
+  );
+  確認(
+    '★もう手に入れたものは出さない',
+    /function まだ無い名前\(\)[\s\S]{0,320}?ある\.has\(小文字\(x\.name\)\)/.test(素画面),
+    '買ったのに「無い」と出続けると、一覧が信用できなくなります',
+  );
+  確認(
+    '★全部消すときは、捨てずに退避する',
+    /nai:clear'[\s\S]{0,400}?無い名前の捨てた\(\)/.test(素本体)
+      && 素本体.includes("ipcMain.handle('nai:restore'"),
+    '押し間違い 1 回で、払ったぶんが消えないように',
+  );
+  確認(
+    '★1 つずつ消せる',
+    素本体.includes("ipcMain.handle('nai:remove'")
+      && 橋.includes('無い名前をひとつ消す'),
+    '要らない名前を残し続けると、一覧が読めなくなります',
+  );
+}
+
 console.log(失敗 ? `\n★ ${失敗} 件だめでした\n` : '\nすべて通りました\n');
 process.exit(失敗 ? 1 : 0);

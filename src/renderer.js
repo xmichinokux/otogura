@@ -2061,6 +2061,11 @@ const 響きの目盛 = () => {
 function 響きを合わせ直す() {
   響きの当たり = 響きの木 ? 突き合わせる(響きの木, tracks, Date.now(), 響きの目盛()) : null;
   /*
+   * ★札は毎回 見直す（2026-09-04）。
+   * 曲が増えれば「手元に無い」も減るので、貯めたぶんを出し直す。
+   */
+  無い名前の札を直す();
+  /*
    * ★響きが無くなったら、響きのタブから出る。
    * 出ないと、空のタブを開いたまま「1 曲も無い」状態になる。
    */
@@ -2892,6 +2897,11 @@ function 気分の欄を描く() {
     try {
       const 足りた = await 木を生やして足す(v, $("aisaid") || 言った);
       if (!足りた) return;
+      /*
+       * ★手元に無かった名前を貯める（2026-09-04 本人の希望）。
+       * 響きの木を消しても、この一覧は残る。お金を払って出した名前なので。
+       */
+      await 無い名前を貯める();
       カラムタブ = "resonance";
       /*
        * ★**保存された名前**で絞る（2026-08-31 本人の報告で見つけた）。
@@ -4586,6 +4596,25 @@ function 再生できない(理由) {
 /* ★いま鳴っている曲。札を描き直すときに演者名が要る（全曲を探し直さないため） */
 let いま鳴っている曲 = null;
 
+/*
+ * ★手元に無い名前の一覧（2026-09-04 本人の希望）。
+ *
+ *   > 僕が求めるのは一手で持っていないバンドのリストを知る（見る）ことです。
+ *   > 響きでまとまる必要はない（人によってはむしろ迷惑かも）
+ *   > お金を払って操作をする以上、持っていないバンドのリストは残ってほしい
+ *
+ * ■ いままでの道のり（本人の指摘）
+ *   響きタブを選ぶ → バンドを選ぶ → 確かめる候補を押す ―― の**三手**。
+ *   しかも「響きとは何か」「確かめる候補とは何か」を知っている必要があった。
+ *   > 言うなれば裏技のようなものです。
+ *
+ * ★響きとは切り離す。響きを全部外しても、この一覧は残る。
+ * ★辿るたびに貯まる。**消すのは本人が押したときだけ。**
+ */
+let 無い名前 = [];
+let 捨てた無い名前 = null;
+let 無い名前を開く = false;
+
 function この曲から辿るボタンを直す(t = いま鳴っている曲) {
   const b = $('nowtrace');
   if (!b) return;
@@ -4608,6 +4637,121 @@ function この曲から辿るボタンを直す(t = いま鳴っている曲) {
     if (押す) 押す.click();
     else $('status').textContent = 言('⚠ 先に APIキーを入れてください');
   };
+}
+
+/*
+ * ★いま手元に無いものだけを出す。
+ * 貯めたあとに買った／取り込んだものは、もう「無い」ではない。
+ * 保存したものは消さず、**出すときに当てる**（走査のたびに直す仕掛けを増やさない）。
+ */
+function まだ無い名前() {
+  const ある = new Set();
+  for (const t of tracks) { const a = (t.artist || '').trim(); if (a) ある.add(小文字(a)); }
+  return 無い名前.filter((x) => !ある.has(小文字(x.name)));
+}
+
+/** 札を、いまの数に合わせる。1 つも無ければ出さない */
+function 無い名前の札を直す() {
+  const b = $('nailist');
+  if (!b) return;
+  const 出す = まだ無い名前();
+  if (!出す.length) { b.style.display = 'none'; 無い名前を開く = false; return; }
+  b.style.display = '';
+  b.textContent = 言('📋 手元に無い名前（{n}）', { n: 出す.length });
+  b.title = 言('辿って見つかった名前のうち、手元に無かったものです。')
+    + 言('響きを外しても残ります。要らないものは 1 つずつ消せます');
+  b.onclick = () => { 無い名前を開く = !無い名前を開く; 無い名前の欄を描く(); };
+}
+
+/** 押したら下に出る一覧。★響きを知らなくても読めるように、言葉を足す */
+function 無い名前の欄を描く() {
+  const 前 = $('naibox');
+  if (前) 前.remove();
+  無い名前の札を直す();
+  if (!無い名前を開く) return;
+  const 札 = $('nailist');
+  if (!札 || 札.style.display === 'none') return;
+
+  const 面 = document.createElement('div');
+  面.className = 'histbox naibox';
+  面.id = 'naibox';
+
+  const 頭 = document.createElement('div');
+  頭.className = 'foot';
+  頭.textContent = 言('辿って挙がった名前のうち、手元で見つからなかったものです。')
+    + 言('演者名だけでなく、盤名・曲名にも当ててみて、それでも無かったものだけ出しています。')
+    + 言('「持っているのに書かれ方が違う」「AI の思い違い」は残るので、買う前に確かめてください。');
+  面.appendChild(頭);
+
+  for (const x of まだ無い名前()) {
+    const 行 = document.createElement('div');
+    行.className = 'row';
+    const 文 = document.createElement('span');
+    文.className = 'txt';
+    文.textContent = x.description ? `${x.name} ― ${x.description}` : x.name;
+    文.title = [x.keyword ? 言('「{名}」から', { 名: x.keyword }) : '', x.見つけた日]
+      .filter(Boolean).join('　');
+    const 消 = document.createElement('span');
+    消.className = 'del';
+    消.textContent = '×';
+    消.title = 言('この名前を一覧から消す');
+    消.onclick = async (ev) => {
+      ev.stopPropagation();
+      const r = await window.mp3.無い名前をひとつ消す(x.name);
+      無い名前 = (r && r.名前たち) || 無い名前;
+      無い名前の欄を描く();
+    };
+    行.append(文, 消);
+    面.appendChild(行);
+  }
+
+  const 足 = document.createElement('div');
+  足.className = 'foot';
+  足.textContent = 言('× 全部消す（あとで戻せます）');
+  足.onclick = async () => {
+    if (!await 確かめる(言('手元に無い名前を、全部 一覧から外しますか？')
+      + '\n\n' + 言('曲は何も変わりません。すぐ下の「戻す」で戻せます。'))) return;
+    const r = await window.mp3.無い名前を全部消す();
+    無い名前 = (r && r.名前たち) || [];
+    捨てた無い名前 = (r && r.捨てた) || null;
+    無い名前を開く = false;
+    無い名前の欄を描く();
+    $('status').textContent = 言('手元に無い名前を、全部 外しました（戻せます）');
+  };
+  面.appendChild(足);
+
+  if (捨てた無い名前 && 捨てた無い名前.数) {
+    const 戻 = document.createElement('div');
+    戻.className = 'foot';
+    戻.textContent = 言('↩ 外した {n} 個を戻す', { n: 捨てた無い名前.数 });
+    戻.onclick = async () => {
+      const r = await window.mp3.無い名前を戻す();
+      if (!r || !r.ok) { $('status').textContent = 言('戻せませんでした（') + ((r && r.error) || 言('不明')) + '）'; return; }
+      無い名前 = r.名前たち || [];
+      捨てた無い名前 = null;
+      無い名前の欄を描く();
+    };
+    面.appendChild(戻);
+  }
+
+  札.parentElement.appendChild(面);
+  const r = 札.getBoundingClientRect();
+  const 親 = 札.parentElement.getBoundingClientRect();
+  面.style.left = `${Math.max(0, r.left - 親.left)}px`;
+  面.style.top = `${r.bottom - 親.top + 4}px`;
+}
+
+/** 辿ったあとに呼ぶ。手元に無かった名前を貯める */
+async function 無い名前を貯める() {
+  const 外れ = (響きの当たり && Array.isArray(響きの当たり.外れ)) ? 響きの当たり.外れ : [];
+  if (!外れ.length) return;
+  try {
+    const r = await window.mp3.無い名前を足す(外れ.map((x) => ({
+      name: x.name, description: x.description, keyword: x.keyword, depth: x.depth,
+    })));
+    無い名前 = (r && r.名前たち) || 無い名前;
+  } catch { /* 貯められなくても、辿った結果そのものは残る */ }
+  無い名前の欄を描く();
 }
 
 function 再生する(t, { 列を保つ = false } = {}) {
@@ -5561,6 +5705,16 @@ $('langbtn').onclick = async () => {
    * 開いたときに見えていれば、そこで気づける。
    */
   await 捨てた響きボタンを直す();
+
+  /*
+   * ★貯めてある「手元に無い名前」を戻す（2026-09-04）。
+   * 響きを外していても、開いた時点で札が出る ―― それがこの一覧の要点。
+   */
+  try {
+    const 無 = await window.mp3.無い名前を取る();
+    無い名前 = (無 && 無.名前たち) || [];
+    捨てた無い名前 = (無 && 無.捨てた) || null;
+  } catch { 無い名前 = []; }
 
   // ★覚えた「タグ無しを隠す」を戻す
   タグ無しを隠す = await window.mp3.タグ無しを隠すか();
