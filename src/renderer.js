@@ -223,7 +223,14 @@ const カラムタブの列 = {
     { key: 'album', 見出し: 'アルバム', 取る: (t) => t.album },
   ],
   resonance: [
-    { key: '言葉', 見出し: '辿った言葉', 取る: (t) => 響きの印(t, 'keyword') },
+    /*
+     * ★この列だけ、**1 曲が複数の値を持つ**（2026-09-05 本人の報告）。
+     *   > dinosaur jr から王道のプレイリストと外しのプレイリストを作りたかった
+     *   > 結果は外しが wrecking crew だけになってしまった
+     * 同じ名前を 2 本の木が挙げたなら、**どちらで絞っても出る**のが正しい。
+     * 1 本しか持てない作りだと、必ずどちらかが痩せる。
+     */
+    { key: '言葉', 見出し: '辿った言葉', 取る: (t) => 響きの印(t, '言葉たち') },
     { key: '響演者', 見出し: '演者', 取る: (t) => 響きの印(t, 'artist') },
     { key: '響盤', 見出し: 'アルバム', 取る: (t) => t.album },
   ],
@@ -1021,12 +1028,22 @@ function 見える曲() {
  * ★列でまとめたのと同じ規則で見る（小文字にして比べる）。
  * 厳密比較にすると「まとめて表示したのに、選ぶと片方しか出ない」ことになる。
  */
+/*
+ * ★1 曲が複数の値を持つ列がある（2026-09-05）。
+ * 「辿った言葉」がそれ ―― 同じ名前を 2 本の木が挙げたら、どちらでも出る。
+ * ここを 1 つに決めると、必ずどちらかの一覧が痩せる。
+ */
+function 値たち(v) {
+  if (v === null || v === undefined || v === '') return [];
+  return Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined && x !== '') : [v];
+}
+
 function タブに合う(t, タブ名, n, 列 = カラムタブの列[タブ名]) {
   for (let i = 0; i < n && i < 列.length; i += 1) {
     const 選 = sel[列[i].key];
     if (!選) continue;                             // すべて
-    const v = 列[i].取る(t);
-    if (v === null || !選.has(小文字(v))) return false;
+    const vs = 値たち(列[i].取る(t));
+    if (!vs.some((v) => 選.has(小文字(v)))) return false;
   }
   return true;
 }
@@ -1486,8 +1503,9 @@ function 組みに合う(t, 絞り) {
     if (!集 || !集.size) continue;
     const 取る = 取り方を引く(k);
     if (!取る) continue;
-    const v = 取る(t);
-    if (v === null || v === undefined || !集.has(小文字(v))) return false;
+    /* ★1 曲が複数の値を持つ列がある（辿った言葉）。どれかが合えばよい */
+    const vs = 値たち(取る(t));
+    if (!vs.some((v) => 集.has(小文字(v)))) return false;
   }
   return true;
 }
@@ -1540,11 +1558,12 @@ function 組む範囲を書く() {
   const 選んでいる鍵 = Object.keys(効く絞り).filter((k) => 効く絞り[k] && 取り方[k]);
   for (const t of (選んでいる鍵.length ? 範囲 : [])) {
     for (const k of 選んでいる鍵) {
-      const v = 取り方[k](t);
-      if (v === null || v === undefined || v === '') continue;
-      const 小 = 小文字(v);
-      if (!字面[k]) 字面[k] = new Map();
-      if (!字面[k].has(小)) 字面[k].set(小, String(v));
+      /* ★1 曲が複数の値を持つ列がある（辿った言葉）。全部 拾う */
+      for (const v of 値たち(取り方[k](t))) {
+        const 小 = 小文字(v);
+        if (!字面[k]) 字面[k] = new Map();
+        if (!字面[k].has(小)) 字面[k].set(小, String(v));
+      }
     }
   }
   const 見せる = (k, v) => (字面[k] && 字面[k].get(v)) || v;
@@ -3253,7 +3272,8 @@ function 列を描く(ulId, level, 定義) {
    * 日付タブは、日付の分からない曲で null を返す。
    * 落とさないと まとめる の中で小文字にしようとして落ちる。
    */
-  const 素材 = 絞る(level).map(値を取る).filter((v) => v !== null && v !== undefined && v !== '');
+  /* ★1 曲が複数の値を持つ列があるので、ほどいてから数える（2026-09-05） */
+  const 素材 = 絞る(level).flatMap((t) => 値たち(値を取る(t)));
   const 全部 = まとめる(素材);
   // ★日付の列は新しい順。古い順に並べても、探したいのはたいてい最近のもの
   if (定義.新しい順) 全部.reverse();

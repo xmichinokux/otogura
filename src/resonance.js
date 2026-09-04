@@ -294,7 +294,25 @@ function 突き合わせる(木, tracks, いま = Date.now(), 目盛 = 3) {
     let e = 当たり表.get(k);
     if (!e) { e = { ...c, artist: t.artist, 曲数: 0 }; 当たり表.set(k, e); }
     e.曲数 += 1;
-    曲.set(t.path, { artist: t.artist, description: c.description, keyword: c.keyword, 重み: c.重み });
+    /*
+     * ★言葉たち も渡す（2026-09-05 本人の報告）。
+     *
+     *   > dinosaur jr から響きで選んだバンドで
+     *   > 王道のプレイリストと外しのプレイリストを作りたかった
+     *   > 結果は外しが wrecking crew だけになってしまった
+     *
+     * ★1 つの名前を 1 本の木しか持てない作りだと、**どちらかが必ず痩せる。**
+     *   新しいほうが奪う … 1 本目が痩せる（最初の報告）
+     *   先着が総取り     … 2 本目が痩せる（この報告）
+     * 王道の池と外しの池を並べたいのだから、**両方に居てよい。**
+     *
+     * ★keyword（持ち主）は今までどおり 1 つ。理由と並び順に使う。
+     * 絞り込みだけを 言葉たち で見る。
+     */
+    曲.set(t.path, {
+      artist: t.artist, description: c.description, keyword: c.keyword,
+      言葉たち: c.言葉たち, 重み: c.重み,
+    });
   }
 
   // ★重い順。同じなら交差の多い順、それも同じなら曲数の多い順

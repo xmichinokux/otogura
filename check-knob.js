@@ -1246,7 +1246,7 @@ console.log('\n[8-g] ★文脈の強度の足場は、曲数ではなく作品�
   };
   void 組みの絞り; void 見える曲; void まとめてあるか; void カラムタブの列;
 
-  const 素 = [切る('まぜる'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
+  const 素 = [切る('まぜる'), 切る('値たち'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
   // eslint-disable-next-line no-eval
   const 引く = eval(素 + String.fromCharCode(10) + 'AIに渡す候補');
   const 候補 = 引く(160);
@@ -1378,7 +1378,7 @@ console.log('\n[8-f] ★組む元は、開いている再生リストではな�
   };
   void 組みの絞り; void 見える曲; void まとめてあるか; void カラムタブの列;
 
-  const 素 = [切る('まぜる'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('いまの列'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
+  const 素 = [切る('まぜる'), 切る('値たち'), 切る('取り方を引く'), 切る('組みに合う'), 切る('生成のジャンル絞り'), 切る('組む範囲'), 切る('いまの列'), 切る('AIに渡す候補')].join(String.fromCharCode(10));
   // eslint-disable-next-line no-eval
   const 実 = eval(素 + String.fromCharCode(10) + '({範囲: 組む範囲, 候補: AIに渡す候補, 列: いまの列})');
 
