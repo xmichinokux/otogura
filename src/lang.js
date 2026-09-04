@@ -175,8 +175,15 @@ const 訳 = {
     '📋 手元に無い名前（{n}）': "📋 Not in your library ({n})",
     '辿って見つかった名前のうち、手元に無かったものです。':
       "Names that came up while following, which you do not have. ",
-    '響きを外しても残ります。要らないものは 1 つずつ消せます':
-      "They stay even if you clear Resonance. Remove them one at a time if you do not want them",
+    '響きを外しても残ります': "They stay even if you clear Resonance",
+    '手元に無い名前（{n}）': "Not in your library ({n})",
+    'その他': "Other",
+    '⧉ コピー': "⧉ Copy",
+    '⧉ 写しました': "⧉ Copied",
+    '⧉ 写せませんでした': "⧉ Could not copy",
+    '名前だけを 1 行ずつ書き写します（説明は入れません）':
+      "Copies just the names, one per line (no descriptions)",
+    '閉じる（Esc でも閉じます）': "Close (Esc also closes it)",
     '辿って挙がった名前のうち、手元で見つからなかったものです。':
       "Names that came up while following, and were not found in your library. ",
     '演者名だけでなく、盤名・曲名にも当ててみて、それでも無かったものだけ出しています。':

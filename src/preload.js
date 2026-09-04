@@ -51,7 +51,7 @@ contextBridge.exposeInMainWorld('mp3', {
    */
   無い名前を取る: () => ipcRenderer.invoke('nai:get'),
   無い名前を足す: (名前たち) => ipcRenderer.invoke('nai:add', 名前たち),
-  無い名前をひとつ消す: (name) => ipcRenderer.invoke('nai:remove', name),
+  書き写す: (文) => ipcRenderer.invoke('clip:write', 文),
   無い名前を全部消す: () => ipcRenderer.invoke('nai:clear'),
   無い名前を戻す: () => ipcRenderer.invoke('nai:restore'),
   /*

@@ -14,7 +14,7 @@
  * 指示書に無い判断が要るときは、実装で埋めずに相談する。
  */
 
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, clipboard } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 /*
@@ -957,14 +957,12 @@ ipcMain.handle('nai:add', async (_e, 足すもの) => {
   return { 名前たち: いま.名前たち, 足した };
 });
 
-/** 1 つだけ消す。★これは本人が指で選んだものなので、退避しない */
-ipcMain.handle('nai:remove', async (_e, name) => {
-  const いま = await 無い名前を読む();
-  const k = 名前の鍵(name);
-  いま.名前たち = いま.名前たち.filter((x) => 名前の鍵(x.name) !== k);
-  await 無い名前を書く(いま);
-  return { 名前たち: いま.名前たち };
-});
+/*
+ * ★1 つずつ消す道は置かない（2026-09-04 本人の判断）。
+ *   > リスト内のバンドを削除する機能は必要ないかも、です
+ * 手に入れれば出さなくなるので、手で消す用が無い。
+ * 押すものが 1 行ごとに並ぶのは、そもそも押し間違いの元でもあった。
+ */
 
 /*
  * ★全部消すときは、捨てずに退避する（0.41.0 で響きに入れたのと同じ）。
@@ -999,6 +997,21 @@ ipcMain.handle('nai:restore', async () => {
   await 無い名前を書く(いま);
   try { await fs.unlink(無い名前の捨てた()); } catch { /* 無ければそれでよい */ }
   return { ok: true, 名前たち: いま.名前たち };
+});
+
+/*
+ * ★書き写せるようにする（2026-09-04 本人の希望）。
+ *   > 単純に使ってみて思った感想は「コピペするためのコピーボタンが欲しい」です
+ * 手元に無い名前は、探しに行くための名前。**外へ持ち出せないと使えない。**
+ * ★画面側の navigator.clipboard は file:// では当てにならないので、本体で書く。
+ */
+ipcMain.handle('clip:write', async (_e, 文) => {
+  try {
+    clipboard.writeText(String(文 ?? ''));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : '不明' };
+  }
 });
 
 ipcMain.handle('migration:get', async () => 引っ越しの結果);

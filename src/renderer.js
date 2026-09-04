@@ -4614,6 +4614,33 @@ let いま鳴っている曲 = null;
 let 無い名前 = [];
 let 捨てた無い名前 = null;
 let 無い名前を開く = false;
+/* ★どのジャンルの組を開いているか。null なら「いちばん多い組を開く」 */
+let 無い名前の開いた組 = null;
+
+/*
+ * ★起点のジャンルを引く（2026-09-04 本人の希望）。
+ *
+ * 持っていない名前そのものからはジャンルが引けない ―― タグが無いので。
+ * **だが起点は、この人が持っているバンド**（🌱 なら鳴っていた曲の演者、
+ * 打ち込んだ場合もたいてい手元にある）。そちらから引けば、AI に聞き直さずに済む。
+ *
+ * ★まとめてあればまとめた名前、無ければ元のジャンル名。
+ * 同じ演者に複数のジャンルが付いていることがあるので、いちばん多いものを採る。
+ */
+function 起点のジャンル(起点) {
+  const k = 小文字(String(起点 || '').trim());
+  if (!k) return '';
+  const 数 = new Map();
+  for (const t of tracks) {
+    if (小文字((t.artist || '').trim()) !== k) continue;
+    const 生 = (t.genre || '').trim();
+    if (!生) continue;
+    const g = まとめてあるか() ? (まとめた名(まとめ索引, t.genre) || 生) : 生;
+    数.set(g, (数.get(g) || 0) + 1);
+  }
+  if (!数.size) return '';
+  return [...数.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
 
 function この曲から辿るボタンを直す(t = いま鳴っている曲) {
   const b = $('nowtrace');
@@ -4659,7 +4686,7 @@ function 無い名前の札を直す() {
   b.style.display = '';
   b.textContent = 言('📋 手元に無い名前（{n}）', { n: 出す.length });
   b.title = 言('辿って見つかった名前のうち、手元に無かったものです。')
-    + 言('響きを外しても残ります。要らないものは 1 つずつ消せます');
+    + 言('響きを外しても残ります');
   b.onclick = () => { 無い名前を開く = !無い名前を開く; 無い名前の欄を描く(); };
 }
 
@@ -4676,6 +4703,50 @@ function 無い名前の欄を描く() {
   面.className = 'histbox naibox';
   面.id = 'naibox';
 
+  const 出す = まだ無い名前();
+
+  /*
+   * ★閉じられるようにする（2026-09-04 本人の報告）。
+   *   > 別ウインドウで表示されてめちゃくちゃ良かったのですが、
+   *   > ウインドウを閉じることができませんでした。
+   *
+   * ★原因は置き場所。#bar に position: relative が無いので、
+   * 箱が画面の左上を基準に浮き、**押すはずの札を覆っていた。**
+   * 見た目は気に入ってもらえたので、浮かせたまま**閉じる道を作る。**
+   * 「✕」「Esc」「外側を押す」の 3 通り ―― どれか 1 つは思いつく。
+   */
+  const 帯 = document.createElement('div');
+  帯.className = 'naihead';
+  const 題 = document.createElement('span');
+  題.className = 'naititle';
+  題.textContent = 言('手元に無い名前（{n}）', { n: 出す.length });
+
+  /*
+   * ★書き写せるようにする（2026-09-04 本人の希望）。
+   *   > 単純に使ってみて思った感想は「コピペするためのコピーボタンが欲しい」です
+   * 探しに行くための名前なので、**外へ持ち出せないと使えない。**
+   * ★名前だけを 1 行ずつ。説明を混ぜると、そのまま検索窓に貼れない。
+   */
+  const 写 = document.createElement('button');
+  写.className = 'restag';
+  写.textContent = 言('⧉ コピー');
+  写.title = 言('名前だけを 1 行ずつ書き写します（説明は入れません）');
+  写.onclick = async () => {
+    const 文 = 出す.map((x) => x.name).join('\n');
+    const r = await window.mp3.書き写す(文);
+    写.textContent = (r && r.ok) ? 言('⧉ 写しました') : 言('⧉ 写せませんでした');
+    setTimeout(() => { 写.textContent = 言('⧉ コピー'); }, 1600);
+  };
+
+  const 閉 = document.createElement('button');
+  閉.className = 'restag';
+  閉.textContent = '✕';
+  閉.title = 言('閉じる（Esc でも閉じます）');
+  閉.onclick = () => { 無い名前を開く = false; 無い名前の欄を描く(); };
+
+  帯.append(題, 写, 閉);
+  面.appendChild(帯);
+
   const 頭 = document.createElement('div');
   頭.className = 'foot';
   頭.textContent = 言('辿って挙がった名前のうち、手元で見つからなかったものです。')
@@ -4683,26 +4754,65 @@ function 無い名前の欄を描く() {
     + 言('「持っているのに書かれ方が違う」「AI の思い違い」は残るので、買う前に確かめてください。');
   面.appendChild(頭);
 
-  for (const x of まだ無い名前()) {
-    const 行 = document.createElement('div');
-    行.className = 'row';
-    const 文 = document.createElement('span');
-    文.className = 'txt';
-    文.textContent = x.description ? `${x.name} ― ${x.description}` : x.name;
-    文.title = [x.keyword ? 言('「{名}」から', { 名: x.keyword }) : '', x.見つけた日]
-      .filter(Boolean).join('　');
-    const 消 = document.createElement('span');
-    消.className = 'del';
-    消.textContent = '×';
-    消.title = 言('この名前を一覧から消す');
-    消.onclick = async (ev) => {
-      ev.stopPropagation();
-      const r = await window.mp3.無い名前をひとつ消す(x.name);
-      無い名前 = (r && r.名前たち) || 無い名前;
+  /*
+   * ★1 つずつ消す道は外した（2026-09-04 本人の判断）。
+   *   > リスト内のバンドを削除する機能は必要ないかも、です
+   * 手に入れれば勝手に消えるので、手で消す用が無い。
+   * 押すものが 1 行ごとに並ぶのは、そもそも押し間違いの元でもあった。
+   */
+  /*
+   * ★ジャンルごとにまとめて出す（2026-09-04 本人の希望）。
+   *
+   *   > リストが溜まるで思ったのは、ジャンル別でまとまらないかな
+   *   > 使う側としてはリストが溜まれば溜まるほど嬉しいけど、煩雑になるのは嫌
+   *
+   * ★溜めるほうに上限は要らない。1,000 件でも 120 KB ほどで、
+   * 32 MB の覚え書きの横では誤差。**煩雑さは「出し方」で解く。**
+   *
+   * ★ジャンルは、持っていない名前そのものからは引けない（タグが無いので）。
+   * だが**起点はこの人が持っているバンド**なので、そちらから引ける。
+   * まとめてあればまとめた名前、無ければ元のジャンル名。
+   * どちらも引けなければ、起点の名前そのものを見出しにする。
+   */
+  const 組ごと = new Map();
+  for (const x of 出す) {
+    const 見出し = 起点のジャンル(x.keyword) || x.keyword || 言('その他');
+    if (!組ごと.has(見出し)) 組ごと.set(見出し, []);
+    組ごと.get(見出し).push(x);
+  }
+  const 並び = [...組ごと.entries()].sort((a, b) => b[1].length - a[1].length);
+
+  /*
+   * ★組が多いときは、たたんでおく。開いているのは 1 つだけ。
+   * 全部 開いていると、結局いまと同じで読み切れない。
+   */
+  if (無い名前の開いた組 === null && 並び.length) [[無い名前の開いた組]] = 並び;
+
+  for (const [見出し, 中身] of 並び) {
+    const 開いている = 並び.length === 1 || 無い名前の開いた組 === 見出し;
+    const 頭行 = document.createElement('div');
+    頭行.className = 'row naigroup';
+    const 名文 = document.createElement('span');
+    名文.className = 'txt';
+    名文.textContent = (開いている ? '▼ ' : '▶ ') + 見出し + `（${中身.length}）`;
+    頭行.appendChild(名文);
+    頭行.onclick = () => {
+      無い名前の開いた組 = 開いている ? '' : 見出し;
       無い名前の欄を描く();
     };
-    行.append(文, 消);
-    面.appendChild(行);
+    面.appendChild(頭行);
+    if (!開いている) continue;
+    for (const x of 中身) {
+      const 行 = document.createElement('div');
+      行.className = 'row';
+      const 文 = document.createElement('span');
+      文.className = 'txt';
+      文.textContent = x.description ? `${x.name} ― ${x.description}` : x.name;
+      文.title = [x.keyword ? 言('「{名}」から', { 名: x.keyword }) : '', x.見つけた日]
+        .filter(Boolean).join('　');
+      行.appendChild(文);
+      面.appendChild(行);
+    }
   }
 
   const 足 = document.createElement('div');
@@ -4734,12 +4844,41 @@ function 無い名前の欄を描く() {
     面.appendChild(戻);
   }
 
-  札.parentElement.appendChild(面);
+  /*
+   * ★画面に対して置く（position: fixed）。
+   * 前は position: absolute で、#bar に position: relative が無かったため
+   * **画面の左上を基準に浮いて、札そのものを覆っていた。**
+   * fixed なら、置き場所の都合に左右されない。
+   * ★画面からはみ出さないように、右端と下端で折り返す。
+   */
+  document.body.appendChild(面);
   const r = 札.getBoundingClientRect();
-  const 親 = 札.parentElement.getBoundingClientRect();
-  面.style.left = `${Math.max(0, r.left - 親.left)}px`;
-  面.style.top = `${r.bottom - 親.top + 4}px`;
+  const 幅 = 面.offsetWidth || 480;
+  const 高 = 面.offsetHeight || 300;
+  const 左 = Math.max(8, Math.min(r.left, window.innerWidth - 幅 - 8));
+  const 上 = (r.bottom + 4 + 高 <= window.innerHeight)
+    ? r.bottom + 4
+    : Math.max(8, r.top - 4 - 高);
+  面.style.left = `${左}px`;
+  面.style.top = `${上}px`;
 }
+
+/*
+ * ★Esc と「外側を押す」でも閉じる（2026-09-04 本人の報告）。
+ * 閉じ方を 1 つしか用意しないと、それを見落とした人は閉じられない。
+ */
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && 無い名前を開く) { 無い名前を開く = false; 無い名前の欄を描く(); }
+});
+document.addEventListener('mousedown', (ev) => {
+  if (!無い名前を開く) return;
+  const 箱 = $('naibox');
+  const 札 = $('nailist');
+  if (箱 && !箱.contains(ev.target) && 札 !== ev.target) {
+    無い名前を開く = false;
+    無い名前の欄を描く();
+  }
+});
 
 /** 辿ったあとに呼ぶ。手元に無かった名前を貯める */
 async function 無い名前を貯める() {

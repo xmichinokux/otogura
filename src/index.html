@@ -122,8 +122,22 @@
    * 履歴の箱と同じ見た目を使う ―― 新しい見た目を覚えることを増やさない。
    * 説明つきの行が並ぶので、履歴より広めに取る。
    */
-  .naibox { max-width: 720px; min-width: 420px; }
+  /*
+   * ★画面に対して置く（2026-09-04 本人の報告で直した）。
+   * absolute のままだと、#bar に position: relative が無いので
+   * 画面の左上を基準に浮き、**押すはずの札を覆って閉じられなくなる。**
+   */
+  .naibox { position: fixed; max-width: 720px; min-width: 420px; max-height: 60vh; }
   .naibox .foot { white-space: normal; line-height: 1.5; }
+  /* ★閉じる・書き写す。上の帯に置いて、いつでも目に入るようにする */
+  .naihead { position: sticky; top: 0; z-index: 1; background: #fff;
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 10px 6px 12px; border-bottom: 1px solid var(--line); }
+  .naihead .naititle { flex: 1; font-weight: 600; font-size: 12px; }
+  /* ★ジャンルの組の見出し。押すと開け閉めできると分かる見た目にする */
+  .naibox .naigroup { background: var(--sub); font-weight: 600; color: var(--text);
+    border-top: 1px solid var(--line); }
+  .naibox .naigroup:hover { background: var(--accent-bg); }
   #aibar .tools { flex-basis: 100%; display: none; gap: 8px; flex-wrap: wrap;
     align-items: center; padding: 6px 2px 0; border-top: 1px dashed var(--line); }
   #aibar .tools.on { display: flex; }
