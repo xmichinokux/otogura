@@ -163,6 +163,15 @@ const 訳 = {
     '・★**2 段まで。** 3 段目は要りません': "- ★**Two levels at most.** No third level",
     '・★数は**多くても {n} 個**。足りなければ少なくて構いません': "- ★**At most {n} names.** Fewer is fine if that is all there is",
     '辿った言葉 {n} 本': "{n} words followed",
+    /*
+     * ★いま鳴っている曲から辿る（2026-09-04 本人の希望）。
+     * 打ち込まずに始められるようにするための入口。
+     */
+    '🌱 {名前} から辿る': "🌱 Follow {名前}",
+    'この演者から辿れる音楽を探します。手元にあったものは響きタブに、':
+      "Looks for music you can reach from this artist. What you already have lands in the Resonance tab, ",
+    '無かったものは「確かめる候補」に出ます（一本は組みません）':
+      "and what you do not have shows up under “worth checking” (it does not build a set)",
     '全部並べて見比べたいときだけ開きます。': "Open this only when you want them all side by side. ",
     'ふだんは、下の「辿った言葉」の列で選んだものだけが出ます':
       "Normally only the word you picked in the Followed words column shows here",
