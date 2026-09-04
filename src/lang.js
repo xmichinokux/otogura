@@ -172,31 +172,37 @@ const 訳 = {
      * ★手元に無い名前の一覧（2026-09-04 本人の希望）。
      * 響きを知らなくても読める言葉にする ―― そこが要点なので、訳も同じ方針で。
      */
-    '📋 手元に無い名前（{n}）': "📋 Not in your library ({n})",
-    '辿って見つかった名前のうち、手元に無かったものです。':
+    '📋 手元に無いバンド（{n}）': "📋 Not in your library ({n})",
+    '辿って見つかったバンドのうち、手元に無かったものです。':
       "Names that came up while following, which you do not have. ",
     '響きを外しても残ります': "They stay even if you clear Resonance",
-    '手元に無い名前（{n}）': "Not in your library ({n})",
+    '手元に無いバンド（{n}）': "Not in your library ({n})",
+    /*
+     * ★🌱 のときは画面も再生も動かさないので、何か言わないと
+     * 「押したのに何も起きない」に見える（2026-09-04 本人の報告で分けた）。
+     */
+    '「{言葉}」から辿りました。手元に無いバンドは、上の 📋 に入っています':
+      "Followed from “{言葉}”. The bands you do not have are in the 📋 above",
     'その他': "Other",
     '⧉ コピー': "⧉ Copy",
     '⧉ 写しました': "⧉ Copied",
     '⧉ 写せませんでした': "⧉ Could not copy",
-    '名前だけを 1 行ずつ書き写します（説明は入れません）':
+    'バンド名だけを 1 行ずつ書き写します（説明は入れません）':
       "Copies just the names, one per line (no descriptions)",
     '閉じる（Esc でも閉じます）': "Close (Esc also closes it)",
-    '辿って挙がった名前のうち、手元で見つからなかったものです。':
+    '辿って挙がったバンドのうち、手元で見つからなかったものです。':
       "Names that came up while following, and were not found in your library. ",
     '演者名だけでなく、盤名・曲名にも当ててみて、それでも無かったものだけ出しています。':
       "They were checked against artist, album and track names, and only the ones still missing are listed. ",
     '「持っているのに書かれ方が違う」「AI の思い違い」は残るので、買う前に確かめてください。':
       "“You have it but it is spelled differently” and “the AI got it wrong” are still possible, so check before you buy.",
     '「{名}」から': "from “{名}”",
-    'この名前を一覧から消す': "Remove this name from the list",
+    'このバンドを一覧から消す': "Remove this name from the list",
     '× 全部消す（あとで戻せます）': "× Clear them all (you can bring them back)",
-    '手元に無い名前を、全部 一覧から外しますか？': "Clear the whole list of names you do not have?",
+    '手元に無いバンドを、全部 一覧から外しますか？': "Clear the whole list of names you do not have?",
     '曲は何も変わりません。すぐ下の「戻す」で戻せます。':
       "Nothing about your songs changes. The “bring back” line just below restores them.",
-    '手元に無い名前を、全部 外しました（戻せます）': "Cleared the whole list (you can bring it back)",
+    '手元に無いバンドを、全部 外しました（戻せます）': "Cleared the whole list (you can bring it back)",
     '↩ 外した {n} 個を戻す': "↩ Bring back {n}",
     'この演者から辿れる音楽を探します。手元にあったものは響きタブに、':
       "Looks for music you can reach from this artist. What you already have lands in the Resonance tab, ",
