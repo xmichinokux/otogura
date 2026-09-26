@@ -56,8 +56,8 @@ Get-FileHash Otogura-Setup-0.45.0.exe -Algorithm SHA256
 
 | File | SHA256 |
 |---|---|
-| `Otogura-Setup-0.45.0.exe` | `da409b11d7cac8d6b83399b6fe1b61d77af1579f1339c3e3dd696ec24d737c96` |
-| `Otogura-Portable-0.45.0.exe` | `52903aef65ca1e65e314fef0ee8f4bd81b445693b7d2677ccebb5a23c3fbb867` |
+| `Otogura-Setup-0.45.0.exe` | `97bf27597dd71ebce529f10fd97998c4e938cf92ad4fb184bba35fee8165ad37` |
+| `Otogura-Portable-0.45.0.exe` | `775ac10ff34a91daad1081a3ee8370b3b9bd34e0ea4b5fba50d296e642ef6482` |
 
 This confirms **that the file was not altered in transit**.
 Whether the person who made it can be trusted is a separate question — for that, read the source.
