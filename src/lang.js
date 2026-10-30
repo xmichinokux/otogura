@@ -324,6 +324,7 @@ const 訳 = {
     '最後まで再生しました': "Played to the end",
     '読み込みが中断された': "the load was interrupted",
     'ファイルを読めなかった': "the file could not be read",
+    '大きすぎて読み込めない（{MB} MB）': "too large to load ({MB} MB)",
     'ファイルが壊れている': "the file is damaged",
     'この形式は再生できない': "this format cannot be played",
     '🔁 1曲': "🔁 One song",
