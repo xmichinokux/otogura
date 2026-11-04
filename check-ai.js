@@ -566,6 +566,32 @@ const 確認 = (名, 条件, 補足 = '') => {
     確認(`${名} … 理由を返す`, !!(r && r.ok === false && r.error), JSON.stringify(r));
   }
 
+  console.log('\n[9-b] ★知らないバンドは、木を作らず足してもらう（2026-11-05）');
+  {
+    /* 実物の窓口は呼ばない（費用が要る）。返事だけ偽物にして、そのあとの道を確かめる */
+    const 鍵 = require.resolve('@anthropic-ai/sdk');
+    require(鍵);
+    const 元 = require.cache[鍵].exports;
+    const 偽 = (出) => { require.cache[鍵].exports = class { constructor() { this.messages = { stream: () => ({ finalMessage: async () => ({ stop_reason: 'end_turn', parsed_output: 出 }) }) }; } }; };
+    try {
+      偽({ known: false, nodes: [] });
+      const 無 = await 木を生やす({ キー: 'sk-dummy', 言葉: 'Wounded Touch' });
+      確認('知らないと言ったら、失敗として返す', 無.ok === false && 無.知らない === true, JSON.stringify(無));
+      偽({ known: false, nodes: [{ name: 'Sex Prisoner', description: 'x', depth: 1 }] });
+      const 混 = await 木を生やす({ キー: 'sk-dummy', 言葉: 'Wounded Touch' });
+      確認('知らないのに名前を挙げても、木にしない', 混.ok === false && 混.知らない === true, JSON.stringify(混));
+      偽({ known: true, nodes: [{ name: 'Knocked Loose', description: 'x', depth: 1 }] });
+      const 有 = await 木を生やす({ キー: 'sk-dummy', 言葉: 'Wounded Touch (Michigan metalcore)' });
+      確認('知っていれば、今までどおり木を返す', 有.ok === true && 有.結果.nodes.length === 1, JSON.stringify(有));
+    } finally { require.cache[鍵].exports = 元; }
+    const 文 = 木の頼み文([]);
+    確認('頼み文が、推測しないように言っている', /名前の響きから推測しない/.test(文) && /known を false/.test(文));
+    確認('足した言葉があれば辿ってよいと言っている', /足してあれば/.test(文));
+    確認('バンド名でない言葉を断らせていない', /バンド名ではない言葉/.test(文));
+    const 画面 = require('node:fs').readFileSync(require('node:path').join(__dirname, 'src/renderer.js'), 'utf8');
+    確認('画面が「知らない」を受けて、足す案内を出す', /r\.知らない/.test(画面) && /ジャンルや地域を足すと辿れます/.test(画面));
+  }
+
   console.log('\n[10] 渡す人数');
   /*
    * ★全員（5,860 人）渡さない。実測（Opus 5・150円/ドル）:

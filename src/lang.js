@@ -509,6 +509,9 @@ const 訳 = {
     '⚠ 手直しを覚えられませんでした': "⚠ Could not save your edits",
     '⚠ 一本を組めませんでした: ': "⚠ Could not build a set: ",
     '⚠ 辿れませんでした: ': "⚠ Could not follow that: ",
+    '知らない言葉でした': "Did not know that one",
+    '⚠ AI は「{言葉}」をよく知りませんでした。ジャンルや地域を足すと辿れます（例: Wounded Touch (Michigan metalcore)）':
+      "⚠ The AI does not know “{言葉}” well. Add a genre or region and it can follow it (e.g. Wounded Touch (Michigan metalcore))",
     '⚠ 絞り込めませんでした: ': "⚠ Could not narrow it down: ",
     '⚠ 持ち出せませんでした: ': "⚠ Could not copy them out: ",
     '⚠ 先に APIキーを入れてください': "⚠ Enter your API key first",
@@ -739,6 +742,15 @@ const 訳 = {
     '・「題」は、この一本につける短い名前（日本語 15 字程度）': "- The title is a short name for this set, in English (a few words)",
     'あなたは音楽に詳しい人です。ある言葉を起点に、**そこから辿れる音楽**を木の形で並べます。':
       "You know music deeply. Starting from one word, lay out **the music you can trace from it** as a tree.",
+    '■ 起点の言葉を知っているか（先に確かめる）': "■ Do you know the starting word? (check this first)",
+    '・起点がバンド／アーティストの名前なら、そのジャンルと活動地域を確かに言えるときだけ known を true にする':
+      "- If it is a band or artist name, set known to true only when you can state their genre and home region with confidence",
+    '・言えないときは、名前の響きから推測しない。known を false、nodes を空にして返す':
+      "- If you cannot, do not guess from how the name sounds. Set known to false and return nodes empty",
+    '・括弧などでジャンルや地域が足してあれば、それを手がかりに辿ってよい。known は true にする':
+      "- If a genre or region is added, for example in brackets, you may follow from that. Set known to true",
+    '・バンド名ではない言葉（気分・ジャンル・場所など）は known を true にする':
+      "- For words that are not band names (a mood, a genre, a place), set known to true",
     '■ この人の蔵書の大きさ': "■ How large this collection is",
     '■ この人がよく持っているアーティスト（曲数の多い順・一部）': "■ Artists they own a lot of (most songs first, a sample)",
     '（分かりません）': "(unknown)",

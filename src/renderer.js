@@ -2204,6 +2204,15 @@ async function 木を生やして足す(言葉, 言った) {
      */
     const 訳 = (r && r.error) || 言("不明");
     if (止めたか(r, 言った)) return false;
+    /*
+     * ★失敗ではなく、足してもらえば辿れる（2026-11-05）。
+     * 欄の文字は残るので、そのまま続けて打てる。
+     */
+    if (r && r.知らない) {
+      言った.textContent = 言("知らない言葉でした");
+      $("status").textContent = 言('⚠ AI は「{言葉}」をよく知りませんでした。ジャンルや地域を足すと辿れます（例: Wounded Touch (Michigan metalcore)）', { 言葉 });
+      return false;
+    }
     言った.textContent = 言("だめでした");
     $("status").textContent = 言("⚠ 辿れませんでした: ") + 訳;
     return false;
