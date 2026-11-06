@@ -154,7 +154,58 @@ function 鳴らせるか(codec) {
 /**
  * @param 止めるか 「もう止めてよいか」を返す関数。true なら、そこで切り上げる
  */
-async function collectTracks(dir, out, depth = 0, 知らせる = null, 止めるか = null) {
+/**
+ * ★フォルダの覚え書きの版。**拾う拡張子や「._」の扱いを変えたら 1 つ増やすこと。**
+ *
+ * 下の「開かない」は、前に見たときの並びをそのまま使い回す。
+ * 拾う決まりを変えても、覚えている並びは古い決まりのまま残るので、
+ * 版を増やして一度 開き直させる。
+ *
+ *   1 … 最初（2026-11-07）
+ */
+const フォルダの覚えの版 = 1;
+
+/**
+ * フォルダを再帰的にたどって曲を集める。
+ *
+ * @param 棚  フォルダごとの覚え書き { 前, 新, 開かず, 開いた }。null なら毎回 開く
+ *
+ * ─────────────────────────────────────────────────────────
+ * ■ ★変わっていないフォルダは開かない（2026-11-07 本人の報告）
+ *
+ *   > 指定のフォルダーに新しいデータを入れて再スキャンするたびに
+ *   > 長い読み込みになるのですが、この長さを何とかできないですか？
+ *
+ * ★測ったら、**曲数ではなくフォルダ数**が効いていた。
+ * 本人のライブラリは **94,597 曲 / 17,264 フォルダ**。置き場は **USB の HDD**
+ * （WD Elements。回る円盤）。冷えた状態で測ると、
+ *
+ *   フォルダを 1 つ開く（readdir）   23.6 ms   ← ヘッドの移動 1 回ぶん
+ *   曲を 1 つ stat する              0.75 ms
+ *
+ * なので毎回、**開くだけで 17,264 × 23.6 ms ≒ 6.8 分**かかっていた。
+ * 新しいデータを入れたとき、実際に変わっているのはそのうち数個なのに、
+ * 全部 開き直していた。
+ *
+ * ★「親フォルダの更新日時が同じなら、中の並びは変わっていない」を
+ * 実物の `E:`（NTFS）で確かめてから入れた:
+ *
+ *   ファイルを足した      → 親の更新日時が変わる
+ *   名前を変えた          → 変わる
+ *   消した                → 変わる
+ *   下にフォルダを作った  → 変わる
+ *   ★中身だけ書き換えた  → **変わらない**
+ *
+ * ★だから曲ごとの stat は残す。
+ * 中身（タグ）を外の道具で書き換えたときは親の日時が動かないので、
+ * ここを削ると**外で直したタグを見逃す**。削ったのは「開く」だけ。
+ *
+ * ★日時は**開く前に**見る。
+ * 開いたあとに見ると、その隙に足されたものまで「もう見た」ことになる。
+ * 先に見れば覚える日時のほうが古くなるので、次の走査で開き直せる。
+ * ─────────────────────────────────────────────────────────
+ */
+async function collectTracks(dir, out, depth = 0, 知らせる = null, 止めるか = null, 棚 = null) {
   if (depth > 8) return out;                 // 深すぎるところで止まらないように
   /*
    * ★数えている最中でも止まれるようにする（2026-08-29 本人の希望）。
@@ -165,19 +216,30 @@ async function collectTracks(dir, out, depth = 0, 知らせる = null, 止める
    * 読み始めてからしか止まらない作りだと、そのあいだ止められない。
    */
   if (止めるか && 止めるか()) return out;
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return out;                              // 読めないフォルダは黙って飛ばす
-  }
-  // ★フォルダ 1 つ読むごとに息継ぎ。数えるだけで 297 秒かかるので、ここも詰まる
-  await 息継ぎ();
-  for (const e of entries) {
-    const p = path.join(dir, e.name);
-    if (止めるか && 止めるか()) return out;
-    if (e.isDirectory()) await collectTracks(p, out, depth + 1, 知らせる, 止めるか);
-    else if (e.isFile() && 拾う拡張子.includes(path.extname(e.name).toLowerCase())) {
+
+  let 日 = null;
+  try { 日 = (await fs.stat(dir)).mtimeMs; } catch { return out; }  // 読めないフォルダは飛ばす
+
+  const 前 = 棚 ? 棚.前[dir] : null;
+  let 曲名;
+  let 下;
+  if (前 && 前.日 === 日 && Array.isArray(前.曲) && Array.isArray(前.下)) {
+    曲名 = 前.曲;                            // ★開かない。ここが 23.6 ms の節約ぶん
+    下 = 前.下;
+    棚.開かず += 1;
+  } else {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return out;                            // 読めないフォルダは黙って飛ばす
+    }
+    曲名 = [];
+    下 = [];
+    for (const e of entries) {
+      if (e.isDirectory()) { 下.push(e.name); continue; }
+      if (!e.isFile()) continue;
+      if (!拾う拡張子.includes(path.extname(e.name).toLowerCase())) continue;
       /*
        * ★「._」で始まるものは曲ではない（2026-08-25 実測で判明）。
        *
@@ -192,9 +254,22 @@ async function collectTracks(dir, out, depth = 0, 知らせる = null, 止める
        * 数えて初めて分かった。見た目には「曲がたくさんある」ようにしか見えない。
        */
       if (e.name.startsWith('._')) continue;
-      out.push(p);
-      if (知らせる && out.length % 500 === 0) 知らせる(out.length);
+      曲名.push(e.name);
     }
+    if (棚) 棚.開いた += 1;
+  }
+  if (棚) 棚.新[dir] = { 日, 曲: 曲名, 下 };
+
+  // ★フォルダ 1 つごとに息継ぎ。数えるだけで 297 秒かかるので、ここも詰まる
+  await 息継ぎ();
+
+  for (const n of 曲名) {
+    out.push(path.join(dir, n));
+    if (知らせる && out.length % 500 === 0) 知らせる(out.length);
+  }
+  for (const n of 下) {
+    if (止めるか && 止めるか()) return out;
+    await collectTracks(path.join(dir, n), out, depth + 1, 知らせる, 止めるか, 棚);
   }
   return out;
 }
@@ -431,14 +506,26 @@ async function 目印(file) {
  * 覚え書きも返すので、次に開いたときは続きから進む。
  * 途中でやめたら全部やり直し、では止めるボタンを押せない。
  */
-async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = null, 途中経過 = null, 覚え途中 = null, 止めるか = null) {
+/**
+ * @param フォルダの覚え 前回の { 版, 棚 }。版が合えば、変わっていないフォルダを開かない
+ */
+async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = null, 途中経過 = null, 覚え途中 = null, 止めるか = null, フォルダの覚え = null) {
   const 止まった = () => !!(止めるか && 止めるか());
   const 知らせる = (n) => 進み && 進み({ 段階: '数えています', 済み: n, 全体: null });
+
+  /*
+   * ★版が合わないときは、覚えている並びを使わない（全部 開き直す）。
+   * 拾う決まりが変わっているのに古い並びを使うと、
+   * 新しく拾うはずの形式が**いつまでも出てこない**。
+   */
+  const 使える棚 = (フォルダの覚え && フォルダの覚え.版 === フォルダの覚えの版
+    && フォルダの覚え.棚 && typeof フォルダの覚え.棚 === 'object') ? フォルダの覚え.棚 : {};
+  const 棚 = { 前: 使える棚, 新: {}, 開かず: 0, 開いた: 0 };
 
   const files = [];
   for (const dir of folders) {
     if (止まった()) break;
-    await collectTracks(dir, files, 0, 知らせる, 止まった);
+    await collectTracks(dir, files, 0, 知らせる, 止まった, 棚);
   }
   if (進み) 進み({ 段階: '数えました', 済み: files.length, 全体: files.length });
 
@@ -590,6 +677,13 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
       hidden: skip.size,
       // ★元の覚え書きを土台にして、読んだぶんだけ上書きする。**消さない**
       覚え書き: { ...覚え書き, ...新しい覚え書き, ...外したぶんの覚え書き },
+      /*
+       * ★止めたときは、フォルダの覚え書きも**足すだけ**にする。
+       * まだ見ていないフォルダの記録を消すと、次の走査でそこを開き直すことになる。
+       */
+      フォルダの覚え: { 版: フォルダの覚えの版, 棚: { ...棚.前, ...棚.新 } },
+      開かずに済んだフォルダ: 棚.開かず,
+      開いたフォルダ: 棚.開いた,
       使い回し,
       補った: 補い.length,
     };
@@ -603,9 +697,20 @@ async function scanLibrary(folders, hidden = [], 覚え書き = {}, 進み = nul
     hidden: skip.size,
     // ★外した曲の記録も持ち越す。一覧に出さないだけで、忘れはしない
     覚え書き: { ...新しい覚え書き, ...外したぶんの覚え書き },
+    /*
+     * ★最後まで走れたときは、見たフォルダだけにする。
+     * 消えたフォルダの記録がここで落ちる（持ち越すと溜まり続ける）。
+     * 開かずに済ませたフォルダも 棚.新 に入れてあるので、取りこぼさない。
+     */
+    フォルダの覚え: { 版: フォルダの覚えの版, 棚: 棚.新 },
+    開かずに済んだフォルダ: 棚.開かず,
+    開いたフォルダ: 棚.開いた,
     使い回し,
     補った: 0,
   };
 }
 
-module.exports = { collectTracks, 拾う拡張子, 鳴らせるか, readTags, scanLibrary, アートワークを読む, 目印, 目印から更新日時 };
+module.exports = {
+  collectTracks, 拾う拡張子, 鳴らせるか, readTags, scanLibrary,
+  アートワークを読む, 目印, 目印から更新日時, フォルダの覚えの版,
+};

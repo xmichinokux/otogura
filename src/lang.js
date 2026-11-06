@@ -412,6 +412,9 @@ const 訳 = {
     'ディスクの空きを確かめてください。': "Check that you have free disk space.",
     '一覧から外した {n} 件': "{n} removed from the list",
     '変わっていない {n} 件は読み直していません': "{n} unchanged were not read again",
+    '変わっていない {n} フォルダは開いていません': "{n} unchanged folders were not opened",
+    '★フォルダの記録を保存できませんでした（次はまた全部 開きます）':
+      "The folder record could not be saved (every folder will be opened again next time)",
     '　■ 途中で止めました（次は続きから進みます{補い}）': "　■ Stopped partway (it picks up from here next time{補い})",
     ' ／ まだ見ていない {n} 曲は前の記録から出しています': " ／ the {n} not yet seen are shown from the earlier scan",
     '響き {n} 本を読みました ― {組} 組・{曲} 曲が手元にありました': "Read {n} resonance trees — {組} matches, {曲} songs you own",
