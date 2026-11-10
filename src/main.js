@@ -23,7 +23,7 @@ const fs = require('node:fs/promises');
  * **タグを直しても覚え書きが更新されず、立ち上げ直すと元に戻っていた。**
  * 下の catch が console.warn で握りつぶしていたので、画面には何も出なかった。
  */
-const { scanLibrary, アートワークを読む, readTags, 目印 } = require('./library');
+const { scanLibrary, アートワークを読む, readTags, 目印, フォルダの覚えの版 } = require('./library');
 const { 掃除する, m3uにする, m3uを読む, 名前を安全に, 持ち出すm3u } = require('./playlists');
 const { タグを書く } = require('./tags');
 const genre = require('./genre');
@@ -1395,6 +1395,26 @@ ipcMain.handle('scan', async (e) => {
     try { await 覚え書きを書く(統合); } finally { 保存中 = false; }
   };
 
+  /*
+   * ★フォルダの記録も、途中で書く（2026-11-11）。
+   * 前は走査が最後まで終わったときにしか書いていなかったので、
+   * **途中で閉じると、数え直しのぶんがまるごと消えていた。**
+   * 画面が「途中で閉じても続きから進みます」と案内しているのに、
+   * フォルダの記録だけがその約束を守れていなかった。
+   */
+  const 前の棚 = await フォルダの覚えを読む();
+  const 棚が使える = !!(前の棚 && 前の棚.版 === フォルダの覚えの版
+    && 前の棚.棚 && typeof 前の棚.棚 === 'object');
+  const 棚統合 = 棚が使える ? { ...前の棚.棚 } : {};
+  let 棚の保存中 = false;
+  let 棚の最後の保存 = Date.now();
+  const 棚の途中保存 = async () => {
+    if (棚の保存中) return;
+    棚の保存中 = true;
+    棚の最後の保存 = Date.now();
+    try { await フォルダの覚えを書く({ 版: フォルダの覚えの版, 棚: 棚統合 }); } finally { 棚の保存中 = false; }
+  };
+
   const r = await scanLibrary(
     s.folders,
     s.hidden,
@@ -1406,7 +1426,11 @@ ipcMain.handle('scan', async (e) => {
       if (Date.now() - 最後の保存 >= 30000) 途中保存();
     },
     () => 止めてほしい,                          // ★押されたら、そこで切り上げる
-    await フォルダの覚えを読む(),                // ★変わっていないフォルダは開かせない
+    前の棚,                                      // ★変わっていないフォルダは開かせない
+    (増分, 今すぐ) => {
+      Object.assign(棚統合, 増分);
+      if (今すぐ || Date.now() - 棚の最後の保存 >= 30000) 棚の途中保存();
+    },
   );
 
   const 保存 = await 覚え書きを書く(r.覚え書き);
