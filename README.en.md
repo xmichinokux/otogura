@@ -8,7 +8,7 @@ A music player for Windows, built on Electron.
 Narrow your library down with three columns — Genre → Artist → Album — and play from the list below.
 
 **A storehouse for sound.** As the name says, **it was built for large libraries.**
-It is measured and corrected against the author's own **171,085 files / 387 GB**.
+It is measured and corrected against the author's own **86,057 songs / 387 GB**.
 
 **This app is a worked example of letting an AI build something.** How it was made is at the bottom.
 
@@ -678,7 +678,12 @@ Pick an `.m4a` and it says so before writing, and skips it (**reading and playba
 
 ## About large libraries
 
-Measured and corrected against the author's library — **171,085 files / 387 GB**.
+Measured and corrected against the author's library — **86,057 songs / 387 GB**.
+
+**This said "171,085" for a long time (corrected on 2026-11-11).**
+That number still had the **85,039 entries** counted under "Half of them were not songs" in it,
+which made the library look nearly twice its real size.
+
 
 | | Before | After |
 |---|---|---|
@@ -688,10 +693,13 @@ Measured and corrected against the author's library — **171,085 files / 387 GB
 
 ### Tag-reading speed (read these numbers carefully)
 
-| | Per song | For 171,085 songs |
+| | Per song | For 86,057 songs |
 |---|---|---|
-| a file touched for the first time | **~36 ms** | **~100 minutes** |
-| a file read before | ~1 ms | ~3 minutes |
+| a file touched for the first time | **~36 ms** | **~52 minutes** |
+| a file read before | ~1 ms | ~1.5 minutes |
+
+The right-hand column is **arithmetic, redone**. What was measured is the left column
+(per song); the right used to read "171,085 songs = ~100 minutes".
 
 **Do not mix these two up.** The author did, once.
 Measuring the same sample twice in a row, it read as "changing a setting made it 24× faster".
