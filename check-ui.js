@@ -179,6 +179,35 @@ if (process.versions.electron) {
               } catch (e) { return { 失敗: String((e && e.message) || e) }; }
             })();
 
+            /*
+             * ★曲順の列（2026-11-17 本人の希望）。
+             *   > 下の曲のリストの並びが本当に曲順通りかわからなくなったので、
+             *   > リストのところに曲順がほしいなと思いました
+             *
+             * ★番号が出ているかどうかは、開いて読むしかない。
+             * 列を足したつもりで中身が空、は見た目では気づきにくい。
+             * **番号の無い曲が「—」になること**も一緒に見る ――
+             * そこが空白だと「並びが狂っている」と「番号が無い」を見分けられない。
+             */
+            const 曲順検査 = (() => {
+              try {
+                const 元t = tracks; const 元l = lists; const 元id = 開いているID;
+                const 作る = (i, n) => ({
+                  path: 'C:/検査/trk' + i + '.mp3', title: '曲 ' + i,
+                  artist: 'ア', album: 'ル', genre: 'G', track: n,
+                  duration: 200, タグあり: true,
+                });
+                tracks = [作る(1, 1), 作る(2, 2), 作る(3, null)];
+                開いているID = null; lists = []; 一覧を描く();
+                const 値 = [...document.querySelectorAll('#tbody tr td.trk')]
+                  .map((e) => (e.textContent || '').trim());
+                const 見出し = [...document.querySelectorAll('#table thead th')]
+                  .map((e) => (e.textContent || '').replace(/[▲▼]/g, '').trim());
+                tracks = 元t; lists = 元l; 開いているID = 元id; 一覧を描く();
+                return { 値, 見出し };
+              } catch (e) { return { 失敗: String((e && e.message) || e) }; }
+            })();
+
             const み = (id) => {
               const e = document.getElementById(id);
               if (!e) return { ある: false };
@@ -196,6 +225,7 @@ if (process.versions.electron) {
               音を読む検査,
               再生ボタン検査,
               操作欄検査,
+              曲順検査,
             };
           })()`);
           r.時間の記録 = 記録;
@@ -313,6 +343,28 @@ const 時間切れ = setTimeout(() => { 子.kill(); }, 60000);
       );
       確認(`${札}: 表が横にはみ出さない`, !v.横棒が出る, '欄を広げすぎると横棒が出ます');
     }
+  }
+
+  const 曲順 = r.曲順検査;
+  if (!曲順 || 曲順.失敗) {
+    確認('曲順の列を測れる', false, 曲順 ? 曲順.失敗 : '結果が返っていません');
+  } else {
+    確認(
+      '★曲順の列が見出しに出ている',
+      曲順.見出し.includes('曲順'),
+      '見出し: ' + 曲順.見出し.filter(Boolean).join(' / '),
+    );
+    確認(
+      '★タグの曲番号がそのまま出る',
+      曲順.値[0] === '1' && 曲順.値[1] === '2',
+      '出た値: ' + JSON.stringify(曲順.値) + ' ― 並びが曲順どおりか、これで確かめます',
+    );
+    確認(
+      '★番号が無い曲は「—」になる',
+      曲順.値[2] === '—',
+      '出た値: ' + JSON.stringify(曲順.値)
+        + ' ― 空白だと「並びが狂っている」と「番号が無い」を見分けられません',
+    );
   }
 
   /*

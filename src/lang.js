@@ -321,6 +321,7 @@ const 訳 = {
       "Deletes the Anthropic API key kept on this PC (nothing about your songs changes)",
     '流せる曲がありません（この範囲は鳴らせない曲だけです）': "There is nothing to play (this range holds only songs that cannot be played)",
     '流せる曲がありません': "There is nothing to play",
+    '曲順': "Track",
     '最後まで再生しました': "Played to the end",
     '読み込みが中断された': "the load was interrupted",
     'ファイルを読めなかった': "the file could not be read",
